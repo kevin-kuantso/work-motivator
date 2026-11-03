@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { startServer, launch, openAt } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
+const T1830 = '2026-11-03T18:30:00+08:00';
 
 function pipStub(opts) {
   const reg = { calls: [], wins: [] };
@@ -18,7 +19,7 @@ function pipStub(opts) {
       if (opts.reject) throw new DOMException('denied', 'NotAllowedError');
       const f = document.createElement('iframe');
       f.className = 'pip-stub';
-      f.style.cssText = 'position:fixed;left:0;bottom:0;width:340px;height:280px;border:0;z-index:9';
+      f.style.cssText = `position:fixed;left:0;bottom:0;width:${o.width}px;height:${o.height}px;border:0;z-index:9`; // 尺寸 = 请求的视口
       document.documentElement.append(f);
       const w = f.contentWindow;
       const entry = { active: new Set(), closed: false };
@@ -199,6 +200,51 @@ test('PiP timer keeps updating while the opener is hidden; no ghost timers after
     const before = await txt(main);
     await page.clock.runFor(1000);
     assert.notEqual(await txt(main), before);
+  }, { init: stub() }));
+
+// 高度随内容（spec §4.2）：开窗前量好，小窗内不出现卷轴
+async function floatFits(page) {
+  await floatBtn(page).click();
+  await pip(page).locator('#status-card').waitFor();
+  const [req] = await page.evaluate(() => window.__pip.calls);
+  assert.equal(req.width, 340, 'width fixed');
+  assert.ok(req.height >= 280, `height >= 280 (got ${req.height})`);
+  // about:blank 文档是 quirks 模式：卷动元素是 body，不是 html，故用 scrollingElement
+  const m = await pip(page).locator('html').evaluate((el) => {
+    const se = el.ownerDocument.scrollingElement;
+    return { sh: se.scrollHeight, ch: se.clientHeight, card: el.ownerDocument.getElementById('status-card').getBoundingClientRect().height };
+  });
+  assert.ok(m.sh <= m.ch, `PiP content fits without scrolling (scrollHeight ${m.sh} > clientHeight ${m.ch})`);
+  assert.ok(m.card <= req.height, `card ${m.card} fits requested height ${req.height}`);
+  return { req, m };
+}
+async function setCheerAndPayday(page) {
+  await page.getByLabel('鼓励语').fill('今天也要好好加油，下班吃顿好的');
+  await page.getByRole('button', { name: /高级设置/ }).click();
+  await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
+}
+
+test('PiP height: default requests 280 and fits', () =>
+  withPage(T1412, async (page) => {
+    const { req } = await floatFits(page);
+    assert.equal(req.height, 280);
+  }, { init: stub() }));
+
+test('PiP height grows with cheer + payday (working) and fits', () =>
+  withPage(T1412, async (page) => {
+    await setCheerAndPayday(page);
+    const { req } = await floatFits(page);
+    assert.ok(req.height > 280, `taller than default (got ${req.height})`);
+    assert.equal(await pip(page).locator('.card-cheer').isVisible(), true);
+    assert.equal(await pip(page).locator('.card-payday').isVisible(), true);
+  }, { init: stub() }));
+
+test('PiP height with cheer + payday after work fits', () =>
+  withPage(T1830, async (page) => {
+    await setCheerAndPayday(page);
+    await floatFits(page);
+    assert.equal(await txt(pip(page).locator('.card-badge')), '已下班');
+    assert.equal(await pip(page).locator('.card-payday').isVisible(), true);
   }, { init: stub() }));
 
 test('unsupported browser: float button disabled with explanatory text', () =>
