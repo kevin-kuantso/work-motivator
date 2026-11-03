@@ -51,13 +51,15 @@ export function mountApp(doc, storage, clock) {
   // ---- 提示层 ----
   const storageBanner = h(doc, 'p', { class: 'banner banner-error storage-banner', role: 'alert', hidden: true, text: t.banner.storageFail });
   // 已保存的设置损坏或部分字段无效：明确告知，不当作首次打开静默处理（spec §2 反目标）
-  const loadIssue = loaded.corrupt
+  const issueOf = (r) => (r.corrupt
     ? t.banner.loadCorrupt
-    : loaded.dropped.length
-      ? t.banner.loadPartial([...new Set(loaded.dropped.map((d) => fieldLabel(d.field, t)))])
-      : null;
+    : r.dropped.length
+      ? t.banner.loadPartial([...new Set(r.dropped.map((d) => fieldLabel(d.field, t)))])
+      : null);
+  const loadIssue = issueOf(loaded);
+  const loadText = h(doc, 'span', { text: loadIssue ?? '' });
   const loadBanner = h(doc, 'div', { class: 'banner banner-error load-banner', role: 'alert', hidden: !loadIssue },
-    h(doc, 'span', { text: loadIssue ?? '' }),
+    loadText,
     h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': t.banner.dismiss, title: t.banner.dismiss, text: t.banner.closeGlyph, onclick: () => show(loadBanner, false) }));
   const hintBanner = h(doc, 'div', { class: 'banner banner-info hint-banner', hidden: !(firstRun && !ui.hintDismissed) },
     h(doc, 'span', { text: t.banner.firstRun }),
@@ -257,6 +259,24 @@ export function mountApp(doc, storage, clock) {
     start();
     tick();
   }
+  // 其他分页改了设置（或清空了储存）：重新读取并套用，不回写，避免两个分页互相覆盖（spec §2 反目标）
+  function applyRemote() {
+    const r = loadState(storage);
+    state = r.state;
+    storageOk = r.storageOk;
+    show(storageBanner, !storageOk);
+    const issue = issueOf(r);
+    if (issue) setText(loadText, issue);
+    show(loadBanner, Boolean(issue) && (issue !== loadIssue || !loadBanner.hidden));
+    settings.sync(state.cfg);
+    calendar.render();
+    tick();
+  }
+  win.addEventListener('storage', (e) => {
+    if (e.storageArea && e.storageArea !== storage) return;
+    if (e.key === STORAGE_KEY || e.key === null) applyRemote();
+  });
+
   mq?.addEventListener?.('change', start);
   doc.addEventListener('visibilitychange', tick);
   win.addEventListener('focus', tick);

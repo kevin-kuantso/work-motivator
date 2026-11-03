@@ -26,6 +26,17 @@ after(async () => {
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
 const visible = (page, sel) => page.locator(sel).first().isVisible();
 const card = '#status-card';
+// 在 node 端轮询（页面的 rAF / setTimeout 都被 page.clock 接管且暂停，不能用 waitForFunction）
+async function until(page, sel, expected, ms = 3000) {
+  const end = Date.now() + ms;
+  let last;
+  while (Date.now() < end) {
+    last = await page.locator(sel).first().textContent();
+    if (last === expected) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  assert.fail(`${sel}: expected ${expected}, last ${last}`);
+}
 const bodyText = (page) => page.evaluate(() => document.body.innerText);
 
 function assertNoTraditional(s, where) {
@@ -320,6 +331,47 @@ test('partly invalid saved settings: notice lists field labels, other fields sti
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥428.57', 'valid salary 9000 still loaded');
     assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false);
   }, seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } }))));
+
+test('two tabs: a change in one tab reaches the other without reload and is never reverted', async () => {
+  // 只记录设置键的写入次数（测试用 init script，不是成品钩子）
+  const count = () => {
+    window.__settingsWrites = 0;
+    const orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'work-motivator-v1') window.__settingsWrites++;
+      return orig.call(this, k, v);
+    };
+  };
+  const { context, page: p1, errors } = await openAt(browser, server.url, T1412, { init: count });
+  try {
+    const p2 = await context.newPage();
+    p2.setDefaultTimeout(5000);
+    p2.on('pageerror', (e) => errors.push(e));
+    await p2.goto(server.url);
+    await p2.getByLabel('月薪').fill('9000');
+    assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57');
+    // 第 1 页不重新整理：storage 事件到达后立即反映
+    await until(p1, `${card} .metric-daily .metric-value`, '¥428.57');
+    assert.equal(await p1.getByLabel('月薪').inputValue(), '9000', 'settings panel synced');
+    assert.equal(await p1.evaluate(() => window.__settingsWrites), 0, 'applying a remote change does not write storage');
+    // 第 1 页再改鼓励语：不得把第 2 页的月薪改回 6800
+    await p1.getByLabel('鼓励语').fill('加油');
+    const saved = JSON.parse(await p1.evaluate(() => localStorage.getItem('work-motivator-v1')));
+    assert.equal(saved.salary, 9000);
+    assert.equal(saved.cheer, '加油');
+    await until(p2, `${card} .card-cheer`, '加油');
+    assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57', 'tab 2 salary not reverted');
+    // 月历标记同样同步
+    await p2.locator('.cal-grid button[aria-label^="11月3日 "]').click();
+    await until(p1, `${card} .card-badge .badge-text`, '带薪假');
+    // 其他分页清空储存（key === null）：回到默认值
+    await p2.evaluate(() => localStorage.clear());
+    await until(p1, `${card} .metric-daily .metric-value`, '¥323.81');
+    assert.deepEqual(errors.map(String), []);
+  } finally {
+    await context.close();
+  }
+});
 
 test('first successful save shows one-time backup nudge and requests persistence (failure tolerated)', () =>
   withPage(T1412, async (page) => {
