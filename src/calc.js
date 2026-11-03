@@ -1,4 +1,7 @@
 import { dayInfo, workdaysInMonth, nextWorkdayInDays } from './calendar.js';
+import { STRINGS } from './strings.zh-CN.js';
+
+const R = STRINGS.reasons;
 
 // 'HH:MM' -> 当日秒数；格式不合法返回 NaN
 function parseHM(s) {
@@ -15,20 +18,20 @@ const overlap = (a1, a2, b1, b2) => Math.max(0, Math.min(a2, b2) - Math.max(a1, 
 
 export function validateSchedule(cfg) {
   const fail = (field, reason) => ({ ok: false, field, reason });
-  if (!validSalary(cfg.salary)) return fail('salary', '月薪必须是大于 0 的数字');
+  if (!validSalary(cfg.salary)) return fail('salary', R.salary);
   const s = parseHM(cfg.start);
   const e = parseHM(cfg.end);
-  if (Number.isNaN(s)) return fail('start', '上班时间格式应为 HH:MM');
-  if (Number.isNaN(e)) return fail('end', '下班时间格式应为 HH:MM');
-  if (e <= s) return fail('end', '下班时间必须晚于上班时间');
+  if (Number.isNaN(s)) return fail('start', R.timeFormat(R.labels.start));
+  if (Number.isNaN(e)) return fail('end', R.timeFormat(R.labels.end));
+  if (e <= s) return fail('end', R.endAfterStart);
   if (cfg.lunchOn) {
     const ls = parseHM(cfg.lunchStart);
     const le = parseHM(cfg.lunchEnd);
-    if (Number.isNaN(ls)) return fail('lunchStart', '午休开始时间格式应为 HH:MM');
-    if (Number.isNaN(le)) return fail('lunchEnd', '午休结束时间格式应为 HH:MM');
-    if (ls < s || ls > e) return fail('lunchStart', '午休开始须在上下班时间之间');
-    if (le < s || le > e) return fail('lunchEnd', '午休结束须在上下班时间之间');
-    if (ls >= le) return fail('lunchStart', '午休开始必须早于午休结束');
+    if (Number.isNaN(ls)) return fail('lunchStart', R.timeFormat(R.labels.lunchStart));
+    if (Number.isNaN(le)) return fail('lunchEnd', R.timeFormat(R.labels.lunchEnd));
+    if (ls < s || ls > e) return fail('lunchStart', R.lunchInShift(R.labels.lunchStart));
+    if (le < s || le > e) return fail('lunchEnd', R.lunchInShift(R.labels.lunchEnd));
+    if (ls >= le) return fail('lunchStart', R.lunchOrder);
   }
   return { ok: true };
 }

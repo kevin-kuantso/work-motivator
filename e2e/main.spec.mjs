@@ -6,8 +6,10 @@ import { startServer, launch, openAt, root } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 // 常见繁体字（简体中不存在的字形）+ 台湾用语；成品中一个都不得出现。
-const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預灣準備載檔記號啟離階動處無帶'];
-const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', '请改成你的月薪'];
+const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶'];
+const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', '请改成你的月薪', '字串', '物件', 'JSON 文字'];
+// dist 中即使有 \\uXXXX 转义也要还原后再扫描
+const decode = (s) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, x) => String.fromCharCode(parseInt(x, 16)));
 const VOID_NUMBERS = ['312.64', '44.66', '187.5862', '500.23', '6,565.52', '5,627.59', '21.75', '0.0124'];
 
 let server;
@@ -229,8 +231,9 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     assert.equal(await text(page, '.import-report h2'), '已导入 2 项，4 项未导入');
     const rows = await page.locator('.import-report tbody tr').allTextContents();
     const joined = rows.join('\n');
-    assert.match(joined, /月薪.*月薪必须是大于 0 的有限数字.*保留当前值 6800/);
-    assert.match(joined, /上班时间.*上班时间必须是 24 小时制.*保留当前值 08:30/);
+    assert.match(joined, /月薪.*月薪必须是大于 0 的数字.*保留当前值 6800/);
+    assert.match(joined, /上班时间.*上班时间格式不正确.*保留当前值 08:30/);
+    assert.doesNotMatch(joined, /paidLeave|unpaidLeave|true 或 false|null/, 'no raw keys / enum values');
     assert.match(joined, /月历标记 2026-02-30.*不是真实存在的日期/);
     assert.match(joined, /foo.*无法识别的字段，已忽略/);
     assert.equal(rows.length, 4);
@@ -242,6 +245,19 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     await page.locator('input[type=file]').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
     await report.waitFor({ state: 'visible' });
     assert.match(await text(page, '.import-report'), /导入失败：无法识别这个文件。当前设置没有被修改。/);
+    assert.match(await text(page, '.import-report'), /原因：不是有效的 JSON 文本/);
+    assertNoTraditional(await bodyText(page), 'import failure panel (non-JSON)');
+    await page.locator('input[type=file]').setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('[1]') });
+    await page.getByText('原因：文件内容的结构不正确').waitFor();
+    await page.locator('input[type=file]').setInputFiles({ name: 'z.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ cheer: 5, lunchOn: 'yes', payday: 0, marks: { '2026-11-09': 'holiday' } })) });
+    await page.getByText('已导入 0 项，4 项未导入').waitFor();
+    const partial = await text(page, '.import-report');
+    assert.match(partial, /鼓励语格式不正确/);
+    assert.match(partial, /午休开关只能是开或关/);
+    assert.match(partial, /发薪日必须是 1 到 31 之间的整数/);
+    assert.match(partial, /标记类型无法识别/);
+    assert.doesNotMatch(partial, /holiday|true|false|null|marks/);
+    assertNoTraditional(await bodyText(page), 'partial import report');
     assert.equal(await text(page, `${card} .card-cheer`), '加油', 'failed import changes nothing');
 
     await page.locator('input[type=file]').setInputFiles({ name: 'ok.json', mimeType: 'application/json', buffer: Buffer.from('{"version":1,"salary":7000}') });
@@ -285,6 +301,25 @@ test('storage unreadable at load: warning bar from the start, defaults still tic
     assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
   }, { init: () => { Storage.prototype.getItem = () => { throw new DOMException('denied', 'SecurityError'); }; } }));
 
+const seed = (raw) => ({ init: `if (!sessionStorage.getItem('seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(raw)}); sessionStorage.setItem('seeded', '1'); }` });
+
+test('corrupt saved settings: visible dismissible notice, not a silent first run', () =>
+  withPage(T1412, async (page) => {
+    assert.equal(await text(page, '.load-banner span'), '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。');
+    assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false, 'not treated as first run');
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
+    assertNoTraditional(await bodyText(page), 'corrupt-load notice');
+    await page.locator('.load-banner').getByRole('button', { name: '关闭提示' }).click();
+    assert.equal(await visible(page, '.load-banner'), false);
+  }, seed('{oops')));
+
+test('partly invalid saved settings: notice lists field labels, other fields still loaded', () =>
+  withPage(T1412, async (page) => {
+    assert.equal(await text(page, '.load-banner span'), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：发薪日、月历标记 2026-02-30');
+    assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥428.57', 'valid salary 9000 still loaded');
+    assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false);
+  }, seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } }))));
+
 test('first successful save shows one-time backup nudge and requests persistence (failure tolerated)', () =>
   withPage(T1412, async (page) => {
     assert.equal(await visible(page, '.backup-banner'), false);
@@ -316,5 +351,6 @@ test('no Traditional characters in visible text or in the shipped file', () =>
     await page.getByRole('button', { name: /高级设置/ }).click();
     assertNoTraditional(await bodyText(page), 'advanced settings open');
     const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');
-    assertNoTraditional(html, 'dist/work-motivator.html');
+    assert.ok(html.includes('这是默认值，可在设置里修改'), 'dist keeps raw UTF-8 Chinese (charset utf8)');
+    assertNoTraditional(decode(html), 'dist/work-motivator.html (decoded)');
   }));

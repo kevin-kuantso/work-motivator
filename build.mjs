@@ -13,11 +13,13 @@ const js = await build({
   format: 'iife',
   write: false,
   legalComments: 'none',
+  charset: 'utf8', // 保留原始中文，不转成 \uXXXX（否则 dist 扫描形同虚设）
 });
 const css = await transform(read('src/style.css'), {
   loader: 'css',
   minify: false,
   legalComments: 'none',
+  charset: 'utf8',
 });
 
 // Comments are stripped (esbuild drops JS/CSS comments; HTML comments removed here)

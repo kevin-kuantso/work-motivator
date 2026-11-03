@@ -141,12 +141,26 @@ test('import report counts applied items and lists dropped + unknown with curren
   assert.equal(importReport({ marks: [] }, bad, t).rows[0].label, '月历标记');
 });
 
-test('no user-visible CJK text outside strings.zh-CN.js (comments excluded)', () => {
-  const src = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'ui');
-  for (const f of readdirSync(src)) {
-    const code = readFileSync(join(src, f), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/.*$/gm, '$1');
-    assert.doesNotMatch(code, /[一-鿿]/, `CJK literal in src/ui/${f}`);
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
+const stripComments = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+function walk(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
+}
+
+test('no CJK literals anywhere in src/ outside strings.zh-CN.js (comments excluded)', () => {
+  const files = walk(SRC).filter((f) => /\.(js|css)$/.test(f) && !f.endsWith('strings.zh-CN.js'));
+  assert.ok(files.length >= 15, 'scanned all source files');
+  for (const f of files) {
+    assert.doesNotMatch(stripComments(readFileSync(f, 'utf8')), /[一-鿿]/, `CJK literal in ${f}`);
   }
+});
+
+test('strings.zh-CN.js: no Taiwan-only terms or Traditional characters', () => {
+  const code = stripComments(readFileSync(join(SRC, 'strings.zh-CN.js'), 'utf8'));
+  for (const w of ['字串', '物件', '文字', '預', '预设', '进阶', '有薪假', '使用者', '档案']) {
+    assert.ok(!code.includes(w), `forbidden term ${w}`);
+  }
+  const trad = [...'設開時賺鐘勵週與請計錢進導電連線標題預覽'].filter((c) => code.includes(c));
+  assert.deepEqual(trad, []);
 });
