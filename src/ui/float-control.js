@@ -15,7 +15,13 @@ export function createFloatControl(doc, t, { cardRoot, onOpen, onClose, onFail }
     disabled: !supported, 'aria-describedby': supported ? undefined : 'float-note', onclick: toggle,
   });
   // 整张占位卡是一个按钮；不显示金额，避免两处同时跳动与重复朗读（design §4.4）
-  const placeholder = h(doc, 'button', { type: 'button', class: 'pip-placeholder', hidden: true, text: f.placeholder, onclick: close });
+  // 可访问名称 = 「已悬浮 · 点此收回」；说明（小窗依附本页，spec §3）作为描述
+  const placeholder = h(doc, 'button', {
+    type: 'button', class: 'pip-placeholder', hidden: true, onclick: close,
+    'aria-labelledby': 'pip-placeholder-title', 'aria-describedby': 'pip-placeholder-note',
+  },
+  h(doc, 'span', { class: 'pip-placeholder-title', id: 'pip-placeholder-title', text: f.placeholder }),
+  h(doc, 'span', { class: 'pip-placeholder-note', id: 'pip-placeholder-note', text: f.placeholderNote }));
 
   function toggle() {
     if (pipWin) close();
