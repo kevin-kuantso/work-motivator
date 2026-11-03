@@ -6,6 +6,7 @@ import { h, show, setText } from './dom.js';
 import { renderCard } from './card.js';
 import { createSettingsPanel } from './settings-panel.js';
 import { createCalendar } from './calendar-view.js';
+import { createFloatControl } from './float-control.js';
 import { importReport, fieldLabel } from './import-model.js';
 import { ymd } from './format.js';
 
@@ -69,18 +70,24 @@ export function mountApp(doc, storage, clock) {
   const reportPanel = h(doc, 'section', { class: 'panel import-report', hidden: true, 'aria-live': 'off' });
 
   // ---- 顶栏 ----
+  const cardRoot = h(doc, 'div', { id: 'status-card', 'data-size': 'lg' });
+  const float = createFloatControl(doc, t, {
+    cardRoot,
+    onOpen: (pipWin) => moveTimer(pipWin),
+    onClose: () => moveTimer(win),
+    onFail: () => toast(t.float.failed),
+  });
   const fileInput = h(doc, 'input', { type: 'file', accept: '.json,application/json', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true', onchange: onFile });
   const header = h(doc, 'header', { class: 'app-header' },
     h(doc, 'h1', { text: t.appTitle }),
     h(doc, 'div', { class: 'header-actions' },
-      // 悬浮按钮的行为由 Task 6（pip.js）接线
-      h(doc, 'button', { type: 'button', class: 'btn btn-primary', id: 'btn-float', text: t.header.float }),
+      float.button,
+      float.note,
       h(doc, 'button', { type: 'button', class: 'btn btn-secondary', id: 'btn-export', text: t.header.export, onclick: doExport }),
       h(doc, 'button', { type: 'button', class: 'btn btn-secondary', id: 'btn-import', text: t.header.import, onclick: () => fileInput.click() }),
       fileInput));
 
   // ---- 主区 ----
-  const cardRoot = h(doc, 'div', { id: 'status-card', 'data-size': 'lg' });
   const settings = createSettingsPanel(doc, t, { getCfg: () => state.cfg, onChange: (cfg) => commit({ ...state, cfg }, true) });
   const calendar = createCalendar(doc, t, {
     getState: () => state,
@@ -100,7 +107,7 @@ export function mountApp(doc, storage, clock) {
   app.replaceChildren(
     header,
     h(doc, 'div', { class: 'notices' }, storageBanner, loadBanner, hintBanner, backupBanner, reportPanel),
-    h(doc, 'main', { class: 'main-grid' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot), settings.el),
+    h(doc, 'main', { class: 'main-grid' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot, float.placeholder), settings.el),
     calendar.el,
     toastEl,
     live);
@@ -235,11 +242,20 @@ export function mountApp(doc, storage, clock) {
     }
   }
 
+  // 计时器跑在状态卡所在的视窗：悬浮时改由 PiP 视窗的 setInterval 驱动（spec §3），收回后回到主视窗。
   const mq = win.matchMedia ? win.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  let timerHost = win;
   let timer = null;
   function start() {
-    win.clearInterval(timer);
-    timer = win.setInterval(tick, mq && mq.matches ? TICK_MS_REDUCED : TICK_MS);
+    timerHost.clearInterval(timer);
+    timer = timerHost.setInterval(tick, mq && mq.matches ? TICK_MS_REDUCED : TICK_MS);
+  }
+  function moveTimer(host) {
+    timerHost.clearInterval(timer);
+    timer = null;
+    timerHost = host;
+    start();
+    tick();
   }
   mq?.addEventListener?.('change', start);
   doc.addEventListener('visibilitychange', tick);
@@ -250,4 +266,10 @@ export function mountApp(doc, storage, clock) {
   calendar.render();
   tick();
   start();
+
+  // 齿轮只在小窗显示：收回小窗（同按 X）并滚动到设置区，不依赖聚焦开启者视窗的 API（spec §4.2）
+  cardRoot.querySelector('.card-gear').addEventListener('click', () => {
+    float.close();
+    settings.el.scrollIntoView({ block: 'start' });
+  });
 }

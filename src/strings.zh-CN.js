@@ -8,6 +8,14 @@ export const STRINGS = {
     import: '导入备份',
   },
 
+  // 悬浮小窗（Document PiP）
+  float: {
+    recall: '收回小窗',
+    placeholder: '已悬浮 · 点此收回',
+    unsupported: '请使用 Edge 或 Chrome（116 以上）',
+    failed: '小窗没能打开，请再试一次',
+  },
+
   // 法定节假日名称（holidays-cn.js 引用）
   holidays: {
     newYear: '元旦', spring: '春节', qingming: '清明', labour: '劳动节',
