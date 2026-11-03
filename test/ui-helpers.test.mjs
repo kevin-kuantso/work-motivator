@@ -48,6 +48,13 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
   assert.equal(m.progressPct, 60);
   assert.equal(m.payday, null, 'payday hidden when empty');
   assert.equal(m.cheer, null);
+  assert.equal(cardModel({ ...snapshot(at(11, 3, 14, 12), cfg, {}), now: at(11, 3, 14, 12) }, cfg, t).yearNote, null);
+});
+
+test('card shows a year note when the holiday table is missing (R15)', () => {
+  const now = at(1, 4, 10, 0, 0, 2027);
+  const m = cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
+  assert.equal(m.yearNote, '2027 年假期未内置');
 });
 
 test('card model per status', () => {

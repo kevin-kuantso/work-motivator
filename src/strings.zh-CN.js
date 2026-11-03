@@ -89,6 +89,7 @@ export const STRINGS = {
     dailyFull: '今日满勤可得',
     payIn: (n) => `距离发薪日 ${n} 天`,
     payToday: '今天发薪',
+    yearMissing: (year) => `${year} 年假期未内置`,
     gear: '收回小窗并定位到设置',
     srSummary: (badge, yuan) => `${badge}，今天已赚 ${yuan} 元`,
   },
