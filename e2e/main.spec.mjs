@@ -55,6 +55,7 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     assert.equal(await text(page, `${card} .card-label`), '今天已经赚了');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
     assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0128 /秒');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥518.10');
     assert.equal(await text(page, `${card} .metric-hourly .metric-value`), '¥46.26');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥323.81');
