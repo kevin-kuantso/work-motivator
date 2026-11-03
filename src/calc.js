@@ -41,6 +41,7 @@ const dayDiff = (a, b) =>
 
 function paydayIn(now, payday) {
   if (payday === null || payday === undefined) return null;
+  if (!Number.isInteger(payday) || payday < 1 || payday > 31) return null;
   const y = now.getFullYear();
   const mo = now.getMonth();
   const target = (yy, mm) => new Date(yy, mm, Math.min(payday, new Date(yy, mm + 1, 0).getDate()));
