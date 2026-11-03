@@ -110,7 +110,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
   }
 
   function check(cfg) {
-    if ([...cfg.cheer].length > CHEER_MAX) return s.cheerTooLong;
+    if ([...cfg.cheer].length > CHEER_MAX) return t.reasons.cheerTooLong;
     const v = validateSchedule(cfg);
     return v.ok ? null : v.reason;
   }

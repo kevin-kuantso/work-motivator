@@ -1,4 +1,4 @@
-// 全部界面文字（中国大陆简体）。其他档案不得写死界面文字。
+// 全部界面文案（中国大陆简体）。其他源文件不得写死界面文案。
 export const STRINGS = {
   appTitle: '上班鼓励器',
 
@@ -6,6 +6,35 @@ export const STRINGS = {
     float: '悬浮成小窗',
     export: '导出备份',
     import: '导入备份',
+  },
+
+  // 法定节假日名称（holidays-cn.js 引用）
+  holidays: {
+    newYear: '元旦', spring: '春节', qingming: '清明', labour: '劳动节',
+    dragonBoat: '端午', midAutumn: '中秋', national: '国庆',
+  },
+
+  // 校验原因（calc.js / settings.js 引用；用户看得懂的描述，不出现字段键名或枚举值）
+  reasons: {
+    salary: '月薪必须是大于 0 的数字',
+    timeFormat: (label) => `${label}格式不正确，应为 24 小时制的「时:分」，例如 08:30`,
+    endAfterStart: '下班时间必须晚于上班时间',
+    lunchInShift: (label) => `${label}必须在上下班时间之间`,
+    lunchOrder: '午休开始时间必须早于午休结束时间',
+    switchValue: (label) => `${label}只能是开或关`,
+    payday: '发薪日必须是 1 到 31 之间的整数，或者不设置',
+    cheerType: '鼓励语格式不正确',
+    cheerTooLong: '鼓励语不能超过 40 个字',
+    marksType: '月历标记的格式不正确',
+    markDate: '日期格式不正确',
+    markNotReal: '不是真实存在的日期',
+    markValue: '标记类型无法识别',
+    notJson: '不是有效的 JSON 文本',
+    notObject: '文件内容的结构不正确',
+    labels: {
+      start: '上班时间', end: '下班时间', lunchStart: '午休开始时间', lunchEnd: '午休结束时间',
+      lunchOn: '午休开关', weekends: '周末开关',
+    },
   },
 
   banner: {
@@ -16,6 +45,8 @@ export const STRINGS = {
     ok: '知道了',
     storageFail: '无法保存设置，关闭页面后会丢失。请先导出备份',
     yearMissing: (year) => `${year} 年假期未内置，请自行标记`,
+    loadCorrupt: '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。',
+    loadPartial: (labels) => `已保存的设置中有部分项目无法使用，以下项目已改用默认值：${labels.join('、')}`,
   },
 
   status: {
@@ -74,7 +105,6 @@ export const STRINGS = {
     cheer: '鼓励语',
     cheerPlaceholder: '写一句给自己的话',
     cheerCount: (n, max) => `${n}/${max}`,
-    cheerTooLong: '鼓励语不能超过 40 个字',
     weekends: '周末是否计入',
     weekendsHint: '开 = 周六、周日也是常规工作日；个别日子调休上班请在月历上标记',
     payday: '发薪日',

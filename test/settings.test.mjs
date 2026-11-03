@@ -20,27 +20,40 @@ test('save -> load round trip', () => {
   const state = { cfg: { ...DEFAULTS, salary: 9000, cheer: '加油', payday: 10 }, marks: { '2026-05-04': 'rest' } };
   assert.deepEqual(saveState(st, state), { ok: true });
   assert.ok(st._m.has('work-motivator-v1'));
-  assert.deepEqual(loadState(st), { state, storageOk: true });
+  assert.deepEqual(loadState(st), { state, storageOk: true, dropped: [], corrupt: false });
 });
 
 test('load: empty / garbage storage -> defaults, storageOk true', () => {
-  assert.deepEqual(loadState(fakeStorage()), { state: cur(), storageOk: true });
-  assert.deepEqual(loadState(fakeStorage({ 'work-motivator-v1': 'not json' })), { state: cur(), storageOk: true });
+  assert.deepEqual(loadState(fakeStorage()), { state: cur(), storageOk: true, dropped: [], corrupt: false });
+  assert.deepEqual(loadState(fakeStorage({ 'work-motivator-v1': 'not json' })), { state: cur(), storageOk: true, dropped: [], corrupt: true });
+  assert.equal(loadState(fakeStorage({ 'work-motivator-v1': '[1,2]' })).corrupt, true, 'not an object');
+  assert.equal(loadState(fakeStorage({ 'work-motivator-v1': 'null' })).corrupt, true);
 });
 
 test('load: invalid fields in storage dropped via same rules', () => {
   const raw = JSON.stringify({ version: 1, salary: 'abc', start: '25:99', cheer: 'hi', marks: { '2026-02-30': 'work', '2026-05-04': 'rest' } });
-  const { state, storageOk } = loadState(fakeStorage({ 'work-motivator-v1': raw }));
+  const { state, storageOk, dropped, corrupt } = loadState(fakeStorage({ 'work-motivator-v1': raw }));
   assert.equal(storageOk, true);
+  assert.equal(corrupt, false);
+  assert.deepEqual(dropped.map((d) => d.field).sort(), ['marks.2026-02-30', 'salary', 'start']);
+  assert.ok(dropped.every((d) => typeof d.reason === 'string' && d.reason.length > 0));
   assert.equal(state.cfg.salary, 6800);
   assert.equal(state.cfg.start, '08:30');
   assert.equal(state.cfg.cheer, 'hi');
   assert.deepEqual(state.marks, { '2026-05-04': 'rest' });
 });
 
+test('load: one bad field is reported in dropped, every other field still loads', () => {
+  const raw = JSON.stringify({ version: 1, salary: 9000, start: '09:00', end: '18:00', payday: 99, cheer: '冲' });
+  const r = loadState(fakeStorage({ 'work-motivator-v1': raw }));
+  assert.deepEqual(r.dropped.map((d) => d.field), ['payday']);
+  assert.equal(r.corrupt, false);
+  assert.deepEqual(r.state.cfg, { ...DEFAULTS, salary: 9000, start: '09:00', end: '18:00', cheer: '冲' });
+});
+
 test('getItem throws -> storageOk false + DEFAULTS', () => {
   const st = { getItem() { throw new Error('denied'); }, setItem() {} };
-  assert.deepEqual(loadState(st), { state: cur(), storageOk: false });
+  assert.deepEqual(loadState(st), { state: cur(), storageOk: false, dropped: [], corrupt: false });
 });
 
 test('setItem throws -> {ok:false}', () => {

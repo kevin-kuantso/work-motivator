@@ -6,7 +6,7 @@ import { h, show, setText } from './dom.js';
 import { renderCard } from './card.js';
 import { createSettingsPanel } from './settings-panel.js';
 import { createCalendar } from './calendar-view.js';
-import { importReport } from './import-model.js';
+import { importReport, fieldLabel } from './import-model.js';
 import { ymd } from './format.js';
 
 const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、备份提示已显示），与设置分开存放
@@ -49,6 +49,15 @@ export function mountApp(doc, storage, clock) {
 
   // ---- 提示层 ----
   const storageBanner = h(doc, 'p', { class: 'banner banner-error storage-banner', role: 'alert', hidden: true, text: t.banner.storageFail });
+  // 已保存的设置损坏或部分字段无效：明确告知，不当作首次打开静默处理（spec §2 反目标）
+  const loadIssue = loaded.corrupt
+    ? t.banner.loadCorrupt
+    : loaded.dropped.length
+      ? t.banner.loadPartial([...new Set(loaded.dropped.map((d) => fieldLabel(d.field, t)))])
+      : null;
+  const loadBanner = h(doc, 'div', { class: 'banner banner-error load-banner', role: 'alert', hidden: !loadIssue },
+    h(doc, 'span', { text: loadIssue ?? '' }),
+    h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': t.banner.dismiss, title: t.banner.dismiss, text: t.banner.closeGlyph, onclick: () => show(loadBanner, false) }));
   const hintBanner = h(doc, 'div', { class: 'banner banner-info hint-banner', hidden: !(firstRun && !ui.hintDismissed) },
     h(doc, 'span', { text: t.banner.firstRun }),
     h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': t.banner.dismiss, title: t.banner.dismiss, text: t.banner.closeGlyph, onclick: dismissHint }));
@@ -90,7 +99,7 @@ export function mountApp(doc, storage, clock) {
   const app = doc.getElementById('app') ?? doc.body;
   app.replaceChildren(
     header,
-    h(doc, 'div', { class: 'notices' }, storageBanner, hintBanner, backupBanner, reportPanel),
+    h(doc, 'div', { class: 'notices' }, storageBanner, loadBanner, hintBanner, backupBanner, reportPanel),
     h(doc, 'main', { class: 'main-grid' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot), settings.el),
     calendar.el,
     toastEl,

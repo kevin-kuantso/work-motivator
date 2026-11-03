@@ -1,4 +1,7 @@
 import { validateSchedule } from './calc.js';
+import { STRINGS } from './strings.zh-CN.js';
+
+const R = STRINGS.reasons;
 
 export const STORAGE_KEY = 'work-motivator-v1';
 
@@ -13,30 +16,30 @@ const isTime = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 // 每个 cfg 字段：返回 null 表示合格，否则返回原因。严格校验，绝不转型。
-const timeRule = (label) => (v) => (isTime(v) ? null : `${label}必须是 24 小时制 HH:MM（00:00–23:59）`);
-const boolRule = (label) => (v) => (typeof v === 'boolean' ? null : `${label}必须是 true 或 false`);
+const timeRule = (label) => (v) => (isTime(v) ? null : R.timeFormat(label));
+const boolRule = (label) => (v) => (typeof v === 'boolean' ? null : R.switchValue(label));
 const CFG_RULES = {
-  salary: (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? null : '月薪必须是大于 0 的有限数字'),
-  start: timeRule('上班时间'),
-  end: timeRule('下班时间'),
-  lunchStart: timeRule('午休开始时间'),
-  lunchEnd: timeRule('午休结束时间'),
-  lunchOn: boolRule('午休开关'),
-  weekends: boolRule('周末开关'),
-  payday: (v) => (v === null || (Number.isInteger(v) && v >= 1 && v <= 31) ? null : '发薪日必须是 1–31 的整数或 null'),
+  salary: (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? null : R.salary),
+  start: timeRule(R.labels.start),
+  end: timeRule(R.labels.end),
+  lunchStart: timeRule(R.labels.lunchStart),
+  lunchEnd: timeRule(R.labels.lunchEnd),
+  lunchOn: boolRule(R.labels.lunchOn),
+  weekends: boolRule(R.labels.weekends),
+  payday: (v) => (v === null || (Number.isInteger(v) && v >= 1 && v <= 31) ? null : R.payday),
   cheer: (v) => {
-    if (typeof v !== 'string') return '鼓励语必须是字串';
-    return [...v].length > 40 ? '鼓励语不能超过 40 个字' : null;
+    if (typeof v !== 'string') return R.cheerType;
+    return [...v].length > 40 ? R.cheerTooLong : null;
   },
 };
 
 function markKeyReason(key) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-  if (!m) return '日期格式应为 YYYY-MM-DD';
+  if (!m) return R.markDate;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const dt = new Date(Date.UTC(y, mo - 1, d));
   const real = dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
-  return real ? null : '不是真实存在的日期';
+  return real ? null : R.markNotReal;
 }
 
 // 共用的验证核心：load 与 import 皆走此处。
@@ -53,11 +56,11 @@ function applyParsed(obj, current) {
     if (key === 'version') continue;
     if (key === 'marks') {
       if (!isPlainObject(v)) {
-        dropped.push({ field: 'marks', reason: 'marks 必须是物件' });
+        dropped.push({ field: 'marks', reason: R.marksType });
         continue;
       }
       for (const mk of Object.keys(v)) {
-        const reason = markKeyReason(mk) ?? (MARKS.includes(v[mk]) ? null : `标记必须是 ${MARKS.join('/')} 之一`);
+        const reason = markKeyReason(mk) ?? (MARKS.includes(v[mk]) ? null : R.markValue);
         if (reason) dropped.push({ field: `marks.${mk}`, reason });
         else marks[mk] = v[mk];
       }
@@ -98,9 +101,9 @@ function parseObject(text) {
   try {
     obj = JSON.parse(text);
   } catch {
-    return { error: '不是有效的 JSON 文字' };
+    return { error: R.notJson };
   }
-  if (!isPlainObject(obj)) return { error: '内容必须是 JSON 物件' };
+  if (!isPlainObject(obj)) return { error: R.notObject };
   return { obj };
 }
 
@@ -121,12 +124,13 @@ export function loadState(storage) {
   try {
     raw = storage.getItem(STORAGE_KEY);
   } catch {
-    return { state: defaultState(), storageOk: false };
+    return { state: defaultState(), storageOk: false, dropped: [], corrupt: false };
   }
-  if (typeof raw !== 'string') return { state: defaultState(), storageOk: true };
+  if (typeof raw !== 'string') return { state: defaultState(), storageOk: true, dropped: [], corrupt: false };
   const p = parseObject(raw);
-  if (p.error) return { state: defaultState(), storageOk: true };
-  return { state: applyParsed(p.obj, defaultState()).state, storageOk: true };
+  if (p.error) return { state: defaultState(), storageOk: true, dropped: [], corrupt: true };
+  const r = applyParsed(p.obj, defaultState());
+  return { state: r.state, storageOk: true, dropped: r.dropped, corrupt: false };
 }
 
 export function saveState(storage, state) {
