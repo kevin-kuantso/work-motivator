@@ -53,3 +53,13 @@ test('nextWorkdayInDays', () => {
   assert.equal(nextWorkdayInDays(d(2026, 10, 3), cfg, {}), 5);
   assert.equal(nextWorkdayInDays(d(2026, 11, 7), cfg, {}), 2);
 });
+
+test('weekends:true makes Saturday and Sunday ordinary workdays', () => {
+  const w = { weekends: true };
+  assert.equal(dayInfo(d(2026, 11, 8), w, {}).base, 'work'); // Sunday
+  assert.equal(dayInfo(d(2026, 11, 8), cfg, {}).base, 'rest');
+  assert.equal(workdaysInMonth(2026, 10, w, {}), 30);
+  const h = dayInfo(d(2026, 10, 3), w, {}); // Saturday inside 国庆
+  assert.equal(h.base, 'rest');
+  assert.equal(h.reason, 'holiday');
+});

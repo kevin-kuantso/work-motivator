@@ -19,7 +19,7 @@ export function dayInfo(date, cfg, marks) {
   if (table && table.makeup[key]) return out('work', 'makeup');
   if (table && table.off[key]) return out('rest', 'holiday');
   const dow = date.getDay();
-  if (dow === 0 || (dow === 6 && !cfg.weekends)) return out('rest', 'weekend');
+  if (!cfg.weekends && (dow === 0 || dow === 6)) return out('rest', 'weekend');
   return out('work', 'weekday');
 }
 
