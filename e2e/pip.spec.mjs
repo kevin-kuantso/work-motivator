@@ -105,6 +105,8 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
 
     // 主分页：占位卡出现，按钮文案变「收回小窗」
     assert.equal(await placeholder(page).isVisible(), true);
+    assert.equal(await txt(page.locator('.pip-placeholder-note')), '请保持本页开启：关闭本页，小窗也会一起关闭');
+    assert.equal(await placeholder(page).getAttribute('aria-describedby'), 'pip-placeholder-note');
     assert.equal(await txt(floatBtn(page)), '收回小窗');
     assert.ok(!(await page.locator('#card-slot').innerText()).includes('194'), 'placeholder shows no amount');
 
@@ -265,7 +267,7 @@ test('unsupported browser: float button disabled with explanatory text', () =>
   withPage(T1412, async (page) => {
     assert.equal(await page.evaluate(() => 'documentPictureInPicture' in window), false);
     assert.equal(await floatBtn(page).isDisabled(), true);
-    const note = page.getByText('请使用 Edge 或 Chrome（116 以上）');
+    const note = page.getByText('当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）');
     assert.equal(await note.isVisible(), true);
     const id = await note.getAttribute('id');
     assert.equal(await floatBtn(page).getAttribute('aria-describedby'), id);
@@ -273,7 +275,7 @@ test('unsupported browser: float button disabled with explanatory text', () =>
 
 test('supported browser: no explanatory note', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await page.getByText('请使用 Edge 或 Chrome（116 以上）').isVisible(), false);
+    assert.equal(await page.getByText('当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）').isVisible(), false);
     assert.equal(await floatBtn(page).getAttribute('aria-describedby'), null);
   }, { init: stub() }));
 

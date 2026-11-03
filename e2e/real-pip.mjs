@@ -151,7 +151,7 @@ const PIP_INFO = `(() => {
     openerIv100: window.__ivCount(window, 100),
     mainHasCard: !!document.getElementById('status-card'),
     placeholderHidden: document.querySelector('.pip-placeholder').hidden,
-    placeholderText: document.querySelector('.pip-placeholder').textContent,
+    placeholderText: document.querySelector('.pip-placeholder-title').textContent,
     btn: document.getElementById('btn-float').textContent,
   };
 })()`;

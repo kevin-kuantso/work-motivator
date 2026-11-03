@@ -12,7 +12,8 @@ export const STRINGS = {
   float: {
     recall: '收回小窗',
     placeholder: '已悬浮 · 点此收回',
-    unsupported: '请使用 Edge 或 Chrome（116 以上）',
+    unsupported: '当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）',
+    placeholderNote: '请保持本页开启：关闭本页，小窗也会一起关闭',
     failed: '小窗没能打开，请再试一次',
   },
 
@@ -105,6 +106,7 @@ export const STRINGS = {
     on: '开',
     off: '关',
     salary: '月薪',
+    salaryError: '请输入大于 0 的数字，只用半角数字、不加逗号，例如 6800',
     start: '上班时间',
     end: '下班时间',
     lunchOn: '午休',

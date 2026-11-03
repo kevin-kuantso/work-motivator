@@ -132,8 +132,14 @@ test('salary edits reflect immediately; invalid input shows error and keeps last
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 200.0000');
     assert.equal(await visible(page, '.autosave'), true, 'autosave indicator shown');
+    // 不做任何转换：逗号、全角数字、句号一律拒绝（Kevin 的 no-coercion 规则）
+    for (const bad of ['6,800', '６８００', '6800。', '']) {
+      await salary.fill(bad);
+      assert.equal(await text(page, '#err-salary'), '请输入大于 0 的数字，只用半角数字、不加逗号，例如 6800', `rejects ${JSON.stringify(bad)}`);
+      assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33', `${JSON.stringify(bad)} not salvaged`);
+    }
     await salary.fill('0');
-    assert.equal(await text(page, '#err-salary'), '月薪必须是大于 0 的数字');
+    assert.equal(await text(page, '#err-salary'), '请输入大于 0 的数字，只用半角数字、不加逗号，例如 6800');
     assert.equal(await salary.getAttribute('aria-invalid'), 'true');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33', 'last valid kept');
     await page.getByLabel('下班时间').fill('08:00');
