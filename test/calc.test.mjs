@@ -138,6 +138,13 @@ test('paydayInDays', () => {
   assert.equal(p(3, 29, 28), 30); // 3/29 -> 4/28
 });
 
+test('paydayInDays invalid payday -> null, valid still works', () => {
+  const p = (payday) => snapshot(at(11, 3, 10), { ...cfg, payday }, {}).paydayInDays;
+  for (const bad of [NaN, 0, 32, 'abc', -1, Infinity, 1.5]) assert.equal(p(bad), null, String(bad));
+  assert.equal(p(5), 2);
+  assert.equal(p(31), 27);
+});
+
 test('validateSchedule', () => {
   assert.deepEqual(validateSchedule(cfg), { ok: true });
   const bad = (patch) => validateSchedule({ ...cfg, ...patch });
