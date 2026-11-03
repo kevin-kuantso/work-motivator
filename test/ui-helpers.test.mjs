@@ -41,6 +41,7 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
   assert.equal(m.hourly, '¥46.26');
   assert.equal(m.month, '¥518.10');
   assert.equal(m.rate, '¥0.0128 /秒');
+  assert.equal(t.card.rate, '当前赚钱速度');
   assert.deepEqual(heroParts(m.amount), { head: '194.28', tail: '57' });
   assert.equal(m.secondary, '距下班 2小时48分0秒');
   assert.equal(m.progressText, '已工作 4.20 / 7.00 小时');

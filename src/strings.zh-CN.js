@@ -74,7 +74,7 @@ export const STRINGS = {
     unpaidNote: '今天不计薪',
     worked: (a, b) => `已工作 ${a} / ${b} 小时`,
     progressLabel: '工时进度',
-    rate: '现在每秒赚',
+    rate: '当前赚钱速度',
     rateUnit: ' /秒',
     month: '本月累计',
     hourly: '时薪',
