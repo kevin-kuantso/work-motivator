@@ -252,3 +252,15 @@ button, input, select { font: inherit; color: inherit; }
 .toast-action { border: 0; background: none; color: #BBF7D0; font-weight: 600; cursor: pointer; text-decoration: underline; min-height: 24px; }
 .status-card[data-tone="rest"] .card-label { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); color: var(--color-text-900); }
 h2[tabindex="-1"]:focus { outline: none; }
+
+/* Float (Document PiP) */
+.float-note { font-size: var(--fs-caption); color: var(--color-text-600); }
+.pip-placeholder {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 160px;
+  padding: var(--space-5); border: 2px dashed var(--color-border-control); border-radius: var(--radius-lg);
+  background: var(--color-surface); color: var(--color-text-600); font-weight: 600; cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.pip-placeholder:hover { background: var(--color-brand-50); }
+.pip-placeholder:active { background: var(--color-brand-100); }
+.pip-body { background: var(--color-surface); }
