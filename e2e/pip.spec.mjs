@@ -247,6 +247,20 @@ test('PiP height with cheer + payday after work fits', () =>
     assert.equal(await pip(page).locator('.card-payday').isVisible(), true);
   }, { init: stub() }));
 
+test('2027: year note shows in the PiP card and the window is not clipped', () =>
+  withPage('2027-01-04T10:00:00+08:00', async (page) => {
+    await setCheerAndPayday(page);
+    await floatFits(page);
+    assert.equal(await pip(page).locator('.card-year').isVisible(), true);
+    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年假期未内置');
+  }, { init: stub() }));
+
+test('2026: no year note in the PiP card', () =>
+  withPage(T1412, async (page) => {
+    await floatFits(page);
+    assert.equal(await pip(page).locator('.card-year').isVisible(), false);
+  }, { init: stub() }));
+
 test('unsupported browser: float button disabled with explanatory text', () =>
   withPage(T1412, async (page) => {
     assert.equal(await page.evaluate(() => 'documentPictureInPicture' in window), false);

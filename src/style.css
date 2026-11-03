@@ -253,6 +253,13 @@ button, input, select { font: inherit; color: inherit; }
 .status-card[data-tone="rest"] .card-label { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); color: var(--color-text-900); }
 h2[tabindex="-1"]:focus { outline: none; }
 
+/* 无内置假期表的年份提示（文字本身就是信息，不只靠颜色） */
+.card-year {
+  justify-self: start; padding: 2px var(--space-2); border-radius: var(--radius-full);
+  font: 500 var(--fs-caption)/1.4 var(--font-sans);
+  background: var(--state-lunch-bg); color: var(--state-lunch-fg);
+}
+
 /* Float (Document PiP) */
 .float-note { font-size: var(--fs-caption); color: var(--color-text-600); }
 .pip-placeholder {

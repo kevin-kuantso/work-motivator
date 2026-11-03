@@ -52,6 +52,8 @@ export function cardModel(snap, cfg, t) {
     hourly: `${t.currency}${money(snap.hourlyWage)}`,
     daily: `${t.currency}${money(snap.dailyWage)}`,
     payday,
+    // 无内置假期表的年份：日薪按周一至周五估算，卡片上要看得出来（R15）
+    yearNote: snap.tableMissing && snap.now instanceof Date ? c.yearMissing(snap.now.getFullYear()) : null,
     cheer,
     srSummary: c.srSummary(t.status[s], Math.floor(Number.isFinite(snap.earned) ? snap.earned : 0)),
   };

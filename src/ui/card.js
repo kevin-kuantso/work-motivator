@@ -45,6 +45,7 @@ function build(root, t) {
       metric('metric-hourly', c.hourly, ' lg-only'),
       metric('metric-daily', c.dailyFull, ' lg-only')),
     (r.payday = h(doc, 'div', { class: 'card-payday', hidden: true })),
+    (r.year = h(doc, 'div', { class: 'card-year', hidden: true })),
   );
   root.classList.add('status-card');
   r.iconTone = null;
@@ -95,5 +96,7 @@ export function renderCard(root, snap, cfg, t) {
 
   show(r.payday, m.payday !== null);
   setText(r.payday, m.payday ?? '');
+  show(r.year, m.yearNote !== null);
+  setText(r.year, m.yearNote ?? '');
   return m;
 }

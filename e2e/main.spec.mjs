@@ -75,6 +75,7 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     assert.equal(await page.locator(`${card} [role=progressbar]`).getAttribute('aria-valuenow'), '60');
     assert.equal(await visible(page, `${card} .card-payday`), false, 'payday row hidden when payday empty');
     assert.equal(await visible(page, `${card} .card-cheer`), false, 'cheer row hidden when empty');
+    assert.equal(await visible(page, `${card} .card-year`), false, 'no year note in 2026');
     const all = await bodyText(page);
     assert.ok(!all.includes('快速开始'), 'no quick-start card');
     for (const n of VOID_NUMBERS) assert.ok(!all.includes(n), `void ÷21.75 number ${n} must not appear`);
@@ -205,6 +206,13 @@ test('calendar shows holiday names, legend, and a banner for years without a bui
     await page.getByRole('button', { name: '回到今天' }).click();
     assert.equal(await text(page, '.cal-title'), '2026 年 10 月');
     assert.equal(await visible(page, '.year-banner'), false);
+  }));
+
+test('2027 (no built-in holiday table): the status card says so', () =>
+  withPage('2027-01-04T10:00:00+08:00', async (page) => {
+    assert.equal(await visible(page, `${card} .card-year`), true);
+    assert.equal(await text(page, `${card} .card-year`), '2027 年假期未内置');
+    assertNoTraditional(await bodyText(page), '2027 card');
   }));
 
 test('lunch, before-work and after-work states', async () => {
