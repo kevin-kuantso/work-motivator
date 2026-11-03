@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test",
     "build": "node build.mjs",
-    "e2e": "node build.mjs && node --test --test-concurrency=1 \"e2e/*.spec.mjs\""
+    "e2e": "node build.mjs && node --test --test-concurrency=1 \"e2e/*.spec.mjs\"",
+    "e2e:real": "npm run build && node e2e/real-pip.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
