@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "e2e": "node build.mjs && node --test --test-concurrency=1 \"e2e/*.spec.mjs\""
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.64.1"
   }
 }
