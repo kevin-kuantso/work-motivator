@@ -9,7 +9,8 @@ function parseSalary(s) {
   return /^\d+(\.\d+)?$/.test(v) ? Number(v) : NaN;
 }
 
-export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImport, report = null }) {
+// holiday：{ body, advBody, advSummary }（假期数据组的内容与高级设置里的自定义网址，见 holiday-panel.js）
+export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImport, report = null, holiday = null }) {
   const s = t.settings;
   const win = doc.defaultView;
   const inputs = {};
@@ -59,8 +60,8 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
   const lunchTimes = h(doc, 'div', { class: 'field-row' },
     textField('lunchStart', s.lunchStart, { type: 'time' }),
     textField('lunchEnd', s.lunchEnd, { type: 'time' }));
-  // 高级设置：本期只有占位（Task 11 放入「自定义网址」等）
-  const advBody = h(doc, 'div', { class: 'adv-body', id: 'adv-body', hidden: true });
+  // 高级设置（折叠）：自定义网址；标题旁显示「自定义网址：未设置 / 主机名」
+  const advBody = h(doc, 'div', { class: 'adv-body', id: 'adv-body', hidden: true }, holiday ? holiday.advBody : null);
   const advToggle = h(doc, 'button', {
     type: 'button', class: 'adv-toggle', 'aria-expanded': 'false', 'aria-controls': 'adv-body',
     onclick: () => {
@@ -68,7 +69,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
       advBody.hidden = !open;
       advToggle.setAttribute('aria-expanded', String(open));
     },
-  }, h(doc, 'span', { class: 'adv-title', text: s.sections.advanced }), h(doc, 'span', { class: 'adv-summary', text: s.advancedSummary }));
+  }, h(doc, 'span', { class: 'adv-title', text: s.sections.advanced }), holiday ? holiday.advSummary : null);
 
   const el = h(doc, 'div', { class: 'settings', id: 'settings' },
     autosave,
@@ -89,13 +90,13 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
           switchField('weekends', s.weekends, s.weekendsHint),
           h(doc, 'div', { class: 'field' },
             h(doc, 'label', { for: 'f-payday', text: s.payday }), paydaySelect, fieldError('payday'))),
-        // 假期数据：本期只有标题占位（Task 11 填入状态行、检查更新、导入假期表）
-        block('section-holiday', s.sections.holiday, h(doc, 'div', { class: 'holiday-slot' })),
+        block('section-holiday', s.sections.holiday, holiday ? holiday.body : null),
         block('section-backup', s.sections.backup,
+          // 旁注与按钮同一行（放不下时自动换行），省一行高度给假期数据的结果区
           h(doc, 'div', { class: 'backup-actions' },
             h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', text: s.backup.export, onclick: onExport }),
-            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: s.backup.import, onclick: onImport })),
-          h(doc, 'p', { class: 'field-hint', text: s.backup.note }),
+            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: s.backup.import, onclick: onImport }),
+            h(doc, 'p', { class: 'field-hint backup-note', text: s.backup.note })),
           report),
         h(doc, 'div', { class: 'section section-adv' }, advToggle, advBody))));
 

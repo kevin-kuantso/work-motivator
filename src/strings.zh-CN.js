@@ -75,6 +75,37 @@ export const STRINGS = {
     allFailed: (last) => `所有数据源都获取失败：${last}`,
   },
 
+  // 「检查更新」/「导入假期表文件」/ 自定义网址（基本设置 › 假期数据、高级设置）
+  holidayUpdate: {
+    builtin: (y) => `${y} 内置`,
+    online: (y) => `${y} 联网更新（来源：国办通知）`,
+    importedYear: (y) => `${y} 已导入文件（来源：国办通知）`,
+    missing: (y) => `${y} 未内置（可联网更新）`,
+    lastCheck: (md) => `上次检查 ${md}`,
+    sep: ' · ',
+    check: '检查更新',
+    checking: '检查中…',
+    importFile: '导入假期表文件',
+    added: (years) => `已更新：新增 ${years.join('、')} 年假期表`,
+    refreshed: (years) => `已更新：${years.join('、')} 年假期表有新版本，已采用`,
+    same: '已是最新 · 刚刚检查过',
+    unpublished: (y) => `数据来源暂未发布 ${y} 年放假安排，发布后会自动更新。现在可以先在月历上自己标记。`,
+    network: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」',
+    invalid: '来源数据不完整，已拒绝，未采用',
+    detail: (reason) => `原因：${reason}`,
+    diff: (n) => `联网数据与内置表有 ${n} 处不同，未采用`,
+    fetched: (years) => `已获取 ${years.join('、')} 年假期表`,
+    importDone: (y, off, makeup) => `已导入 ${y} 年假期表（放假 ${off} 天，调休上班 ${makeup} 天）`,
+    importNoYear: '文件里没有可用的年份和放假数据，未导入',
+    importBuiltin: (y) => `${y} 年假期已内置，未采用导入的数据`,
+    customUrl: '自定义网址',
+    customUrlPlaceholder: 'https://example.com/{year}.json',
+    customUrlHint: '用 {year} 代表年份',
+    customUrlSummary: (host) => `自定义网址：${host ?? '未设置'}`,
+    customUrlError: '网址必须以 https:// 开头，并包含 {year}',
+    customUrlSpace: '网址里不能有空格',
+  },
+
   banner: {
     firstRun: '这是默认值，可在设置里修改',
     goFix: '去修改',
@@ -153,8 +184,6 @@ export const STRINGS = {
     payday: '发薪日',
     paydayNone: '未设置',
     paydayOption: (d) => `每月 ${d} 号`,
-    // 高级设置（折叠）标题旁的摘要；本期只有占位，Task 11 接上「自定义网址」
-    advancedSummary: '自定义网址：未设置',
     backup: {
       export: '导出备份',
       import: '导入备份',

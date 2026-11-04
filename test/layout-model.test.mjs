@@ -85,3 +85,8 @@ test('cell tag colours (假 / 班 / 带薪 / 无薪) have ≥ 4.5:1 contrast on 
   }
   assert.ok(ruleUses('.kind-unpaid', 'background', '--state-unpaid-stripe'), 'stripe colour comes from the token');
 });
+
+test('info channel: holiday diff notice sits between firstRun and backupNudge, queued', () => {
+  assert.equal(pickInfo(new Set(['backupNudge', 'holidayDiff'])), 'holidayDiff');
+  assert.equal(pickInfo(new Set(['holidayDiff', 'firstRun'])), 'firstRun');
+});

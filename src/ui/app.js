@@ -12,6 +12,9 @@ import { createTabs } from './tabs.js';
 import { createBanners } from './banners.js';
 import { importReport, fieldLabel } from './import-model.js';
 import { ymd } from './format.js';
+import { HOLIDAYS_STORAGE_KEY } from '../holiday-store.js';
+import { startHolidayUpdate } from './holiday-update.js';
+import { createHolidayPanel } from './holiday-panel.js';
 
 const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、备份提示已显示），与设置分开存放
 const TICK_MS = 100;
@@ -52,6 +55,7 @@ export function mountApp(doc, storage, clock) {
   const ui = readUi(storage);
   // 当前使用的假期表（R16）：所有计算与月历都用它；替换请走 setTables()。
   let tables = HOLIDAYS_CN;
+  let mounted = false;
 
   // ---- 提示层（spec §13.2：错误通道 + 信息通道）----
   const banners = createBanners(doc, t);
@@ -92,7 +96,14 @@ export function mountApp(doc, storage, clock) {
     h(doc, 'div', { class: 'header-actions' }, float.note, float.button));
 
   // ---- 主区：左 状态卡｜右 分页「月历」「基本设置」----
+  let holiday = null; // 下方建立；面板的回调在用户操作时才会用到
+  const holidayPanel = createHolidayPanel(doc, t, {
+    onCheck: () => holiday.checkNow(),
+    onImportText: (text) => holiday.importFile(text),
+    onCustomUrl: (value) => holiday.setCustomUrl(value),
+  });
   const settings = createSettingsPanel(doc, t, {
+    holiday: holidayPanel,
     getCfg: () => state.cfg,
     onChange: (cfg) => commit({ ...state, cfg }, true),
     onExport: () => doExport(),
@@ -148,14 +159,46 @@ export function mountApp(doc, storage, clock) {
 
   // ---- 行为 ----
   let toastTimer = null;
+  let pendingQuiet = null; // 不打扰的提示（例如自动获取了假期表）：撤销提示还在时排在它后面，不盖掉撤销
+  function hideToast() {
+    show(toastEl, false);
+    if (pendingQuiet !== null) {
+      const msg = pendingQuiet;
+      pendingQuiet = null;
+      toast(msg);
+    }
+  }
   function toast(msg, undo) {
     setText(toastText, msg);
     show(toastUndo, Boolean(undo));
-    toastUndo.onclick = undo ? () => { show(toastEl, false); undo(); } : null;
+    toastUndo.onclick = undo ? () => { win.clearTimeout(toastTimer); hideToast(); undo(); } : null;
     show(toastEl, true);
     win.clearTimeout(toastTimer);
-    toastTimer = win.setTimeout(() => show(toastEl, false), 5000);
+    toastTimer = win.setTimeout(hideToast, 5000);
   }
+  function quietToast(msg) {
+    if (!toastEl.hidden && !toastUndo.hidden) pendingQuiet = msg;
+    else toast(msg);
+  }
+
+  // 假期表换了（联网 / 导入 / 其他分页）：状态卡、月历、小窗都按新表重算（缺表标签随之消失）
+  function setTables(next) {
+    tables = next;
+    if (!mounted) return;
+    calendar.render();
+    tick();
+  }
+  holiday = startHolidayUpdate({
+    storage,
+    clock,
+    fetchImpl: (...a) => win.fetch(...a),
+    getTables: () => tables,
+    onTables: setTables,
+    // info = 页面级、可关闭的提示（联网数据与内置表不同）；success = 不打扰的 toast（不带「查看」）
+    notify: (msg, kind) => (kind === 'info' ? banners.queueInfo('holidayDiff', msg) : quietToast(msg)),
+    onStatus: holidayPanel.update,
+  });
+  holiday.reload(); // 开页：读取已保存的联网 / 导入假期表
 
   function dismissHint() {
     hintShown = false;
@@ -272,8 +315,12 @@ export function mountApp(doc, storage, clock) {
     const m = renderCard(cardRoot, snap, state.cfg, t);
     const day = ymd(now);
     if (day !== lastDay) {
-      if (lastDay !== null) calendar.render();
-      lastDay = day;
+      const crossed = lastDay !== null;
+      lastDay = day; // 先记下：reload → setTables → tick 会再进来
+      if (crossed) {
+        calendar.render();
+        holiday.reload(); // 跨日：状态行里的年份可能变了
+      }
     }
     if (m.status !== lastStatus || now - lastAnnounce >= ANNOUNCE_MS) {
       setText(live, m.srSummary);
@@ -313,17 +360,22 @@ export function mountApp(doc, storage, clock) {
   win.addEventListener('storage', (e) => {
     if (e.storageArea && e.storageArea !== storage) return;
     if (e.key === STORAGE_KEY || e.key === null) applyRemote();
+    // 其他分页更新了假期数据：重新读取并刷新，不回写
+    if (e.key === HOLIDAYS_STORAGE_KEY || e.key === null) holiday.reload();
   });
 
   mq?.addEventListener?.('change', start);
   doc.addEventListener('visibilitychange', tick);
   win.addEventListener('focus', tick);
 
+  mounted = true;
   settings.sync(state.cfg);
   setStorageFail(!storageOk);
   calendar.render();
   tick();
   start();
+  // 只有当年 / （11 月起的）下一年缺可信假期表、且今天还没检查过时才会联网（spec §12.3）
+  holiday.autoCheckIfNeeded();
 
   // 齿轮只在小窗显示：收回小窗（同按 X）并切到「基本设置」分页，不依赖聚焦开启者视窗的 API（spec §13.1）
   cardRoot.querySelector('.card-gear').addEventListener('click', () => {
@@ -333,10 +385,6 @@ export function mountApp(doc, storage, clock) {
 
   return {
     // 换用另一份假期表（例如合并了联网数据）：状态卡与月历立即按新表重算。
-    setTables(next) {
-      tables = next;
-      calendar.render();
-      tick();
-    },
+    setTables,
   };
 }

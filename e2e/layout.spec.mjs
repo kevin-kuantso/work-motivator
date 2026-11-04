@@ -3,7 +3,7 @@
 // 量测结果以 `MEASURE {...}` 打印，供报告引用（数字都是本次实际量到的）。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer, launch, openAt } from './harness.mjs';
+import { startServer, launch, openAt, expectedAutoUrls } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00'; // 2026-11：周一为首共 6 周
 const VIEWPORTS = [[1280, 585], [1366, 650], [1536, 730], [1920, 950]];
@@ -22,10 +22,14 @@ after(async () => {
 });
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
   try {
+    // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
+    assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
     assert.deepEqual(errors.map(String), [], 'no uncaught page errors');
+    assert.deepEqual(consoleErrors, [], 'no console errors (blocked external requests are counted separately)');
+    assert.deepEqual(external, autoUrls, 'no external request besides the load-time auto-check');
   } finally {
     await context.close();
   }
@@ -510,3 +514,4 @@ test('changing numbers use tabular digits in the font Chrome actually uses (same
     }
     console.log(`MEASURE ${JSON.stringify({ case: 'platformFonts', fonts })}`);
   }));
+
