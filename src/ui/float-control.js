@@ -64,6 +64,14 @@ export function createFloatControl(doc, t, { cardRoot, onOpen, onClose, onFail }
     placeholder.style.minHeight = `${liveCardHeight()}px`;
   }
   win.addEventListener('resize', syncPlaceholder);
+  // 悬浮中卡片内容变高 / 变矮（鼓励语、发薪日、状态切换……）：小窗里的卡片尺寸一变就重新量（round 2）
+  let cardObserver = null;
+  function watchCard(pip) {
+    const RO = pip?.ResizeObserver ?? win.ResizeObserver;
+    if (typeof RO !== 'function') return;
+    cardObserver = new RO(() => syncPlaceholder());
+    cardObserver.observe(cardRoot);
+  }
 
   async function open() {
     if (opening) return;
@@ -82,12 +90,15 @@ export function createFloatControl(doc, t, { cardRoot, onOpen, onClose, onFail }
     placeholder.style.minHeight = `${height}px`;
     show(placeholder, true);
     setFloating(true);
+    watchCard(w);
     onOpen(w);
   }
 
   // pagehide 时调用（按 X、占位卡、按钮、齿轮都走这里）
   function restored() {
     const refocus = doc.activeElement === placeholder;
+    cardObserver?.disconnect();
+    cardObserver = null;
     pipWin = null;
     show(placeholder, false);
     setFloating(false);

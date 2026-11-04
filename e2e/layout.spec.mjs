@@ -1563,3 +1563,25 @@ test('C round 2: today circle with 2 digits has ≥ 2px side room, stays round a
     });
   }
 });
+
+// ---- Task 14 fix round 2 · Block A ----
+// 悬浮中卡片内容变高（例如加了鼓励语、发薪日）：占位卡跟着变高，收回时不跳
+test('A round 2: while floating, the placeholder follows the live card when its content grows (cheer + payday), no jump on recall', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await page.locator('#btn-float').click();
+    await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
+    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; });
+    const ph = () => page.locator('.pip-placeholder').evaluate((e) => Math.round(e.getBoundingClientRect().height * 10) / 10);
+    const before = await ph();
+    await tab(page, '基本设置').click();
+    await page.getByLabel('鼓励语').fill('今天也要好好加油，下班吃顿好的');
+    await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
+    for (let i = 0; i < 4; i++) { await page.clock.runFor(100); await new Promise((r) => setTimeout(r, 50)); }
+    const after = await ph();
+    await page.locator('#btn-float').click(); // 收回
+    const card = await page.locator('#status-card').evaluate((e) => Math.round(e.getBoundingClientRect().height * 10) / 10);
+    console.log(`MEASURE ${JSON.stringify({ case: 'A r2 placeholder follows content', before, after, cardAfterRecall: card })}`);
+    assert.ok(after > before, `placeholder grew (${before} → ${after})`);
+    assert.ok(Math.abs(after - card) <= 1, `placeholder ${after} = card after recall ${card}`);
+  }, { init: FLOAT_STUB }));
