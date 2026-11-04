@@ -175,6 +175,10 @@ button, input, select { font: inherit; color: inherit; }
 .status-card[data-size="sm"] .card-amount { font-size: var(--fs-hero-sm); }
 .amount-tail { color: var(--color-text-500); }
 .status-card.is-settled .amount-tail { color: inherit; }
+/* 收工当下的金额高亮（Task 17）：一次、约 1.2 s、淡绿褪去；只改背景色，不影响版面。减少动态：不播（也不会加类） */
+.card-amount.is-celebrating { border-radius: var(--radius-md); animation: wm-cheer 1.2s var(--ease) 1; }
+@keyframes wm-cheer { 0% { background-color: var(--state-working-bg); } 100% { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .card-amount.is-celebrating { animation: none; } }
 .card-cheer { color: var(--color-text-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-progress { display: grid; gap: var(--space-1); }
 .bar { height: 8px; border-radius: var(--radius-full); background: var(--state-rest-bg); overflow: hidden; border: 1px solid var(--color-border-control); }
