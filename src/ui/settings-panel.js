@@ -9,7 +9,7 @@ function parseSalary(s) {
   return /^\d+(\.\d+)?$/.test(v) ? Number(v) : NaN;
 }
 
-export function createSettingsPanel(doc, t, { getCfg, onChange }) {
+export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImport, report = null }) {
   const s = t.settings;
   const win = doc.defaultView;
   const inputs = {};
@@ -21,11 +21,14 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
   }
 
   function textField(field, label, attrs = {}, extra = null) {
-    inputs[field] = h(doc, 'input', { id: `f-${field}`, name: field, 'aria-describedby': `err-${field}`, ...attrs });
+    const { prefix, ...rest } = attrs;
+    inputs[field] = h(doc, 'input', { id: `f-${field}`, name: field, 'aria-describedby': `err-${field}`, ...rest });
+    // extra（字数计数）放在输入框右侧；有 extra 的字段，组标题已写明用途，标签只给屏幕阅读器（省一行高度）
     return h(doc, 'div', { class: 'field' },
-      h(doc, 'label', { for: `f-${field}`, text: label }),
-      attrs['data-prefix'] ? h(doc, 'div', { class: 'input-prefix' }, h(doc, 'span', { 'aria-hidden': 'true', text: t.currency }), inputs[field]) : inputs[field],
-      extra,
+      h(doc, 'label', { for: `f-${field}`, class: extra ? 'visually-hidden' : undefined, text: label }),
+      // 「¥」是输入框外的装饰，不进 value（不猜测修补用户的输入）
+      prefix ? h(doc, 'div', { class: 'input-prefix' }, h(doc, 'span', { class: 'input-prefix-sign', 'aria-hidden': 'true', text: prefix }), inputs[field])
+        : extra ? h(doc, 'div', { class: 'input-with-extra' }, inputs[field], extra) : inputs[field],
       fieldError(field));
   }
 
@@ -40,6 +43,12 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
       fieldError(field));
   }
 
+  const group = (title, ...children) =>
+    h(doc, 'fieldset', { class: 'section' }, h(doc, 'legend', { text: title }), ...children);
+  const block = (cls, title, ...children) =>
+    h(doc, 'section', { class: `section ${cls}`, 'aria-labelledby': `${cls}-title` },
+      h(doc, 'h3', { class: 'section-title', id: `${cls}-title`, text: title }), ...children);
+
   const cheerCount = h(doc, 'span', { class: 'cheer-count', 'aria-live': 'off' });
   const paydaySelect = h(doc, 'select', { id: 'f-payday', name: 'payday', 'aria-describedby': 'err-payday' },
     h(doc, 'option', { value: '', text: s.paydayNone }),
@@ -50,11 +59,8 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
   const lunchTimes = h(doc, 'div', { class: 'field-row' },
     textField('lunchStart', s.lunchStart, { type: 'time' }),
     textField('lunchEnd', s.lunchEnd, { type: 'time' }));
-  const advSummary = h(doc, 'span', { class: 'adv-summary' });
-  const advBody = h(doc, 'div', { class: 'adv-body', id: 'adv-body', hidden: true },
-    switchField('weekends', s.weekends, s.weekendsHint),
-    h(doc, 'div', { class: 'field' },
-      h(doc, 'label', { for: 'f-payday', text: s.payday }), paydaySelect, fieldError('payday')));
+  // 高级设置：本期只有占位（Task 11 放入「自定义网址」等）
+  const advBody = h(doc, 'div', { class: 'adv-body', id: 'adv-body', hidden: true });
   const advToggle = h(doc, 'button', {
     type: 'button', class: 'adv-toggle', 'aria-expanded': 'false', 'aria-controls': 'adv-body',
     onclick: () => {
@@ -62,24 +68,36 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
       advBody.hidden = !open;
       advToggle.setAttribute('aria-expanded', String(open));
     },
-  }, h(doc, 'span', { class: 'adv-title', text: s.sections.advanced }), advSummary);
+  }, h(doc, 'span', { class: 'adv-title', text: s.sections.advanced }), h(doc, 'span', { class: 'adv-summary', text: s.advancedSummary }));
 
-  const el = h(doc, 'section', { class: 'panel settings', id: 'settings', 'aria-labelledby': 'settings-title' },
-    h(doc, 'div', { class: 'panel-head' }, h(doc, 'h2', { id: 'settings-title', text: s.title }), autosave),
-    h(doc, 'fieldset', { class: 'section' },
-      h(doc, 'legend', { text: s.sections.pay }),
-      textField('salary', s.salary, { type: 'text', inputmode: 'decimal', autocomplete: 'off', 'data-prefix': '1' }),
-      h(doc, 'div', { class: 'field-row' },
-        textField('start', s.start, { type: 'time' }),
-        textField('end', s.end, { type: 'time' }))),
-    h(doc, 'fieldset', { class: 'section' },
-      h(doc, 'legend', { text: s.sections.lunch }),
-      switchField('lunchOn', s.lunchOn, s.lunchOffHint),
-      lunchTimes),
-    h(doc, 'fieldset', { class: 'section' },
-      h(doc, 'legend', { text: s.sections.cheer }),
-      textField('cheer', s.cheer, { type: 'text', placeholder: s.cheerPlaceholder, autocomplete: 'off' }, cheerCount)),
-    h(doc, 'div', { class: 'section section-adv' }, advToggle, advBody));
+  const el = h(doc, 'div', { class: 'settings', id: 'settings' },
+    autosave,
+    h(doc, 'div', { class: 'settings-cols' },
+      h(doc, 'div', { class: 'settings-col' },
+        group(s.sections.pay,
+          textField('salary', s.salary, { type: 'text', inputmode: 'decimal', autocomplete: 'off', prefix: t.currency }),
+          h(doc, 'div', { class: 'field-row' },
+            textField('start', s.start, { type: 'time' }),
+            textField('end', s.end, { type: 'time' }))),
+        group(s.sections.lunch,
+          switchField('lunchOn', s.lunchOn, s.lunchOffHint),
+          lunchTimes),
+        group(s.sections.cheer,
+          textField('cheer', s.cheer, { type: 'text', placeholder: s.cheerPlaceholder, autocomplete: 'off' }, cheerCount))),
+      h(doc, 'div', { class: 'settings-col' },
+        group(s.sections.weekPay,
+          switchField('weekends', s.weekends, s.weekendsHint),
+          h(doc, 'div', { class: 'field' },
+            h(doc, 'label', { for: 'f-payday', text: s.payday }), paydaySelect, fieldError('payday'))),
+        // 假期数据：本期只有标题占位（Task 11 填入状态行、检查更新、导入假期表）
+        block('section-holiday', s.sections.holiday, h(doc, 'div', { class: 'holiday-slot' })),
+        block('section-backup', s.sections.backup,
+          h(doc, 'div', { class: 'backup-actions' },
+            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', text: s.backup.export, onclick: onExport }),
+            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: s.backup.import, onclick: onImport })),
+          h(doc, 'p', { class: 'field-hint', text: s.backup.note }),
+          report),
+        h(doc, 'div', { class: 'section section-adv' }, advToggle, advBody))));
 
   const readers = {
     salary: (i) => parseSalary(i.value),
@@ -99,7 +117,6 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
     lunchTimes.hidden = !cfg.lunchOn;
     for (const f of ['lunchOn', 'weekends']) setText(inputs[f].stateText, inputs[f].checked ? s.on : s.off);
     setText(cheerCount, s.cheerCount([...inputs.cheer.value].length, CHEER_MAX));
-    setText(advSummary, s.advancedSummary(cfg.weekends, cfg.payday === null ? s.paydayNone : s.paydayOption(cfg.payday)));
   }
 
   let savedTimer = null;
@@ -155,7 +172,6 @@ export function createSettingsPanel(doc, t, { getCfg, onChange }) {
   function focusField(field) {
     const input = inputs[field];
     if (!input) return;
-    if (advBody.contains(input) && advBody.hidden) advToggle.click();
     input.focus();
   }
 

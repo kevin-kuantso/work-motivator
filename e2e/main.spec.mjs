@@ -7,7 +7,7 @@ import { startServer, launch, openAt, root } from './harness.mjs';
 const T1412 = '2026-11-03T14:12:00+08:00';
 // 常见繁体字（简体中不存在的字形）+ 台湾用语；成品中一个都不得出现。
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶'];
-const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', '请改成你的月薪', '字串', '物件', 'JSON 文字', '选单'];
+const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', '请改成你的月薪', '字串', '物件', 'JSON 文字', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用'];
 // dist 中即使有 \\uXXXX 转义也要还原后再扫描
 const decode = (s) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, x) => String.fromCharCode(parseInt(x, 16)));
 const VOID_NUMBERS = ['312.64', '44.66', '187.5862', '500.23', '6,565.52', '5,627.59', '21.75', '0.0124'];
@@ -56,6 +56,10 @@ async function withPage(iso, fn, opts) {
   }
 }
 
+// 设置在「基本设置」分页里：先切过去（spec §13.1）
+const openSettings = (page) => page.getByRole('tab', { name: '基本设置' }).click();
+const errorBar = '.notices .banner-error';
+const infoBar = '.notices .banner-info';
 const todayCell = (page, label) => page.locator(`.cal-grid button[aria-label^="${label} "]`);
 
 test('fresh storage shows numbers derived from defaults, no setup card, no payday row', () =>
@@ -83,6 +87,7 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     // 首次提示：可关闭、关闭后记住
     const hint = page.getByText('这是默认值，可在设置里修改');
     assert.equal(await hint.isVisible(), true);
+    assert.equal(await page.locator(infoBar).getByRole('button', { name: '去修改' }).isVisible(), true);
     await page.getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await hint.isVisible(), false);
     await page.reload();
@@ -112,22 +117,29 @@ test('reduced motion: display updates at 1 Hz', () =>
 
 test('payday row appears after setting payday and persists', () =>
   withPage(T1412, async (page) => {
+    await openSettings(page);
+    // 发薪日 / 周末开关已从高级设置移到「周末与发薪日」组；高级设置折叠，只剩占位
     const adv = page.getByRole('button', { name: /高级设置/ });
     assert.equal(await adv.getAttribute('aria-expanded'), 'false');
-    await adv.click();
-    assert.equal(await adv.getAttribute('aria-expanded'), 'true');
+    assert.match(await adv.textContent(), /自定义网址：未设置/);
+    assert.equal(await page.getByLabel('发薪日').isVisible(), true, 'payday visible without expanding 高级设置');
+    assert.equal(await page.getByRole('switch', { name: '周末计入上班日' }).isVisible(), true);
     await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
     assert.equal(await text(page, `${card} .card-payday`), '距离发薪日 2 天');
-    assert.match(await adv.textContent(), /发薪日：每月 5 号/);
     await page.getByLabel('发薪日').selectOption({ label: '每月 3 号' });
     assert.equal(await text(page, `${card} .card-payday`), '今天发薪');
     await page.reload();
     assert.equal(await text(page, `${card} .card-payday`), '今天发薪');
+    await openSettings(page);
+    assert.equal(await page.getByLabel('发薪日').inputValue(), '3');
   }));
 
 test('salary edits reflect immediately; invalid input shows error and keeps last valid value', () =>
   withPage(T1412, async (page) => {
+    await openSettings(page);
     const salary = page.getByLabel('月薪');
+    assert.equal(await salary.inputValue(), '6800', '「¥」is decoration outside the input, not part of the value');
+    assert.equal(await page.locator('.input-prefix-sign').textContent(), '¥');
     await salary.fill('7000');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 200.0000');
@@ -148,12 +160,14 @@ test('salary edits reflect immediately; invalid input shows error and keeps last
     await page.getByLabel('下班时间').fill('18:00');
     assert.equal(await text(page, '#err-end'), '');
     await page.reload();
+    await openSettings(page);
     assert.equal(await page.getByLabel('月薪').inputValue(), '7000', 'last valid value saved, not the invalid one');
     assert.equal(await page.getByLabel('下班时间').inputValue(), '18:00');
   }));
 
 test('lunch toggle hides lunch fields; lunch off counts lunch as work time', () =>
   withPage(T1412, async (page) => {
+    await openSettings(page);
     const sw = page.getByRole('switch', { name: '午休' });
     assert.equal(await page.getByLabel('午休开始时间').isVisible(), true);
     await sw.click();
@@ -194,7 +208,7 @@ test('calendar: day menu marks today as paid then unpaid leave; weekend → make
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
   }));
 
-test('calendar shows holiday names, legend, and a banner for years without a built-in table', () =>
+test('calendar shows holiday names, legend, and a summary-row tag for years without a built-in table', () =>
   withPage('2026-10-01T10:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '休息日');
     assert.equal(await text(page, `${card} .card-label`), '今天休息 · 国庆');
@@ -210,11 +224,11 @@ test('calendar shows holiday names, legend, and a banner for years without a bui
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
-    assert.equal(await text(page, '.year-banner'), '2027 年假期未内置，请自行标记');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年假期未内置');
     assertNoTraditional(await bodyText(page), 'rest day + 2027 view');
     await page.getByRole('button', { name: '回到今天' }).click();
     assert.equal(await text(page, '.cal-title'), '2026 年 10 月');
-    assert.equal(await visible(page, '.year-banner'), false);
+    assert.equal(await visible(page, '.cal-year-tag'), false);
   }));
 
 test('2027 (no built-in holiday table): the status card says so', () =>
@@ -257,7 +271,10 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     await page.locator('input[type=file]').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(file) });
     const report = page.locator('.import-report');
     await report.waitFor({ state: 'visible' });
-    assert.equal(await text(page, '.import-report h2'), '已导入 2 项，4 项未导入');
+    assert.equal(await page.getByRole('tab', { name: '基本设置' }).getAttribute('aria-selected'), 'true', 'report shown in 基本设置 › 数据与备份');
+    assert.equal(await page.locator('.section-backup .import-report').count(), 1);
+    assert.equal(await text(page, '.import-report h4'), '已导入 2 项，4 项未导入');
+    assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'H4', 'focus on the report title');
     const rows = await page.locator('.import-report tbody tr').allTextContents();
     const joined = rows.join('\n');
     assert.match(joined, /月薪.*月薪必须是大于 0 的数字.*保留当前值 6800/);
@@ -270,6 +287,12 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     assertNoTraditional(await bodyText(page), 'import report');
     await report.getByRole('button', { name: '知道了' }).click();
     assert.equal(await report.isVisible(), false);
+    // 「去设置里修改」：在同一分页里聚焦对应字段
+    await page.locator('input[type=file]').setInputFiles({ name: 'c.json', mimeType: 'application/json', buffer: Buffer.from('{"salary":-1}') });
+    await report.waitFor({ state: 'visible' });
+    await report.getByRole('button', { name: '去设置里修改' }).click();
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'f-salary');
+    assert.equal(await visible(page, '.import-report'), false);
 
     await page.locator('input[type=file]').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
     await report.waitFor({ state: 'visible' });
@@ -298,8 +321,12 @@ test('import with bad fields lists dropped items with reasons and unknown fields
 
 test('export downloads a backup that round-trips', () =>
   withPage(T1412, async (page) => {
+    assert.equal(await page.locator('header').getByRole('button', { name: /备份/ }).count(), 0, 'backup buttons are no longer in the header');
+    await openSettings(page);
+    assert.equal(await page.locator('.section-backup').getByText('备份文件含月薪，请妥善保管').isVisible(), true);
+    assert.equal(await page.locator('.section-backup').getByRole('button', { name: '导入备份' }).isVisible(), true);
     await page.getByLabel('月薪').fill('7100');
-    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('header').getByRole('button', { name: '导出备份' }).click()]);
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.section-backup').getByRole('button', { name: '导出备份' }).click()]);
     assert.match(dl.suggestedFilename(), /^work-motivator-backup-2026-11-03\.json$/);
     const body = JSON.parse(readFileSync(await dl.path(), 'utf8'));
     assert.equal(body.salary, 7100);
@@ -309,6 +336,7 @@ test('export downloads a backup that round-trips', () =>
 
 test('cheer text is rendered literally, never as HTML', () =>
   withPage(T1412, async (page) => {
+    await openSettings(page);
     await page.getByLabel('鼓励语').fill('<b>x</b>');
     assert.equal(await text(page, `${card} .card-cheer`), '<b>x</b>');
     assert.equal(await page.locator(`${card} .card-cheer b`).count(), 0);
@@ -317,8 +345,14 @@ test('cheer text is rendered literally, never as HTML', () =>
 
 test('storage failure shows the warning bar and the app keeps working', () =>
   withPage(T1412, async (page) => {
+    await openSettings(page);
     await page.getByLabel('月薪').fill('7000');
-    assert.equal(await text(page, '.storage-banner'), '无法保存设置，关闭页面后会丢失。请先导出备份');
+    assert.equal(await text(page, `${errorBar} .banner-text`), '无法保存设置，关闭页面后会丢失。请先导出备份');
+    // 恢复前不可关闭；条内有导出 / 导入快捷按钮
+    assert.equal(await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).count(), 0);
+    assert.equal(await page.locator(errorBar).getByRole('button', { name: '导出备份' }).isVisible(), true);
+    assert.equal(await page.locator(errorBar).getByRole('button', { name: '导入备份' }).isVisible(), true);
+    assert.equal(await page.locator(errorBar).getAttribute('role'), 'alert');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33');
     await page.clock.runFor(1000);
     assert.notEqual(await text(page, `${card} .card-amount`), '¥ 200.0000', 'still ticking');
@@ -326,7 +360,7 @@ test('storage failure shows the warning bar and the app keeps working', () =>
 
 test('storage unreadable at load: warning bar from the start, defaults still tick', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await text(page, '.storage-banner'), '无法保存设置，关闭页面后会丢失。请先导出备份');
+    assert.equal(await text(page, `${errorBar} .banner-text`), '无法保存设置，关闭页面后会丢失。请先导出备份');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
   }, { init: () => { Storage.prototype.getItem = () => { throw new DOMException('denied', 'SecurityError'); }; } }));
 
@@ -334,17 +368,18 @@ const seed = (raw) => ({ init: `if (!sessionStorage.getItem('seeded')) { localSt
 
 test('corrupt saved settings: visible dismissible notice, not a silent first run', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await text(page, '.load-banner span'), '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。');
+    assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。');
+    assert.equal(await page.locator(errorBar).getByRole('button', { name: '导入备份' }).isVisible(), true, 'the bar offers the button its text refers to');
     assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false, 'not treated as first run');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
     assertNoTraditional(await bodyText(page), 'corrupt-load notice');
-    await page.locator('.load-banner').getByRole('button', { name: '关闭提示' }).click();
-    assert.equal(await visible(page, '.load-banner'), false);
+    await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).click();
+    assert.equal(await visible(page, errorBar), false);
   }, seed('{oops')));
 
 test('partly invalid saved settings: notice lists field labels, other fields still loaded', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await text(page, '.load-banner span'), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：发薪日、月历标记 2026-02-30');
+    assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：发薪日、月历标记 2026-02-30');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥428.57', 'valid salary 9000 still loaded');
     assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false);
   }, seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } }))));
@@ -365,6 +400,8 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     p2.setDefaultTimeout(5000);
     p2.on('pageerror', (e) => errors.push(e));
     await p2.goto(server.url);
+    await openSettings(p2);
+    await openSettings(p1);
     await p2.getByLabel('月薪').fill('9000');
     assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57');
     // 第 1 页不重新整理：storage 事件到达后立即反映
@@ -379,6 +416,7 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     await until(p2, `${card} .card-cheer`, '加油');
     assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57', 'tab 2 salary not reverted');
     // 月历标记同样同步
+    await p2.getByRole('tab', { name: '月历' }).click();
     await p2.locator('.cal-grid button[aria-label^="11月3日 "]').click();
     await p2.getByRole('menuitemradio', { name: /^带薪假/ }).click();
     await until(p1, `${card} .card-badge .badge-text`, '带薪假');
@@ -393,14 +431,20 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
 
 test('first successful save shows one-time backup nudge and requests persistence (failure tolerated)', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await visible(page, '.backup-banner'), false);
+    assert.equal(await visible(page, infoBar), true, 'first-run hint');
+    await openSettings(page);
     await page.getByLabel('月薪').fill('7000');
-    assert.match(await text(page, '.backup-banner'), /建议导出/);
+    assert.match(await text(page, infoBar), /建议导出/);
+    assert.equal(await page.locator(infoBar).getAttribute('data-id'), 'backupNudge', 'first-run hint gave way to the nudge');
+    assert.equal(await page.locator(infoBar).getByRole('button', { name: '导出备份' }).isVisible(), true);
     assert.equal(await page.evaluate(() => window.__persistCalls), 1);
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33');
+    await page.locator(infoBar).getByRole('button', { name: '知道了' }).click();
+    assert.equal(await visible(page, infoBar), false);
     await page.reload();
+    await openSettings(page);
     await page.getByLabel('月薪').fill('7100');
-    assert.equal(await visible(page, '.backup-banner'), false, 'nudge is one-time');
+    assert.equal(await visible(page, infoBar), false, 'nudge is one-time');
   }, { init: () => {
     window.__persistCalls = 0;
     Object.defineProperty(navigator.storage, 'persist', { value: () => { window.__persistCalls++; return Promise.reject(new Error('nope')); } });
@@ -419,6 +463,8 @@ test('crossing 00:00 switches the date', () =>
 test('no Traditional characters in visible text or in the shipped file', () =>
   withPage(T1412, async (page) => {
     assertNoTraditional(await bodyText(page), 'default page');
+    await openSettings(page);
+    assertNoTraditional(await bodyText(page), '基本设置');
     await page.getByRole('button', { name: /高级设置/ }).click();
     assertNoTraditional(await bodyText(page), 'advanced settings open');
     const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');

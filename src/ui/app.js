@@ -1,4 +1,4 @@
-// 主分页：组装顶栏 / 提示层 / 状态卡 / 设置 / 月历，负责储存、计时与导入导出。
+// 主分页：组装顶栏 / 提示条 / 状态卡 / 分页（月历、基本设置），负责储存、计时与导入导出。
 import { snapshot } from '../calc.js';
 import { HOLIDAYS_CN } from '../holidays-cn.js';
 import { STORAGE_KEY, loadState, saveState, exportState, importState } from '../settings.js';
@@ -8,6 +8,8 @@ import { renderCard } from './card.js';
 import { createSettingsPanel } from './settings-panel.js';
 import { createCalendar } from './calendar-view.js';
 import { createFloatControl } from './float-control.js';
+import { createTabs } from './tabs.js';
+import { createBanners } from './banners.js';
 import { importReport, fieldLabel } from './import-model.js';
 import { ymd } from './format.js';
 
@@ -51,30 +53,32 @@ export function mountApp(doc, storage, clock) {
   // 当前使用的假期表（R16）：所有计算与月历都用它；替换请走 setTables()。
   let tables = HOLIDAYS_CN;
 
-  // ---- 提示层 ----
-  const storageBanner = h(doc, 'p', { class: 'banner banner-error storage-banner', role: 'alert', hidden: true, text: t.banner.storageFail });
-  // 已保存的设置损坏或部分字段无效：明确告知，不当作首次打开静默处理（spec §2 反目标）
+  // ---- 提示层（spec §13.2：错误通道 + 信息通道）----
+  const banners = createBanners(doc, t);
+  const exportAction = { key: 'export', label: t.settings.backup.export, onClick: () => doExport() };
+  const importAction = { key: 'import', label: t.settings.backup.import, onClick: () => fileInput.click() };
+  // 储存失败：恢复前不可关闭，带导出 / 导入快捷按钮（这两个按钮已不在顶栏）
+  const setStorageFail = (on) => banners.setError('storageFail', on ? t.banner.storageFail : null, { dismissible: false, actions: [exportAction, importAction] });
+  // 已保存的设置损坏或部分字段无效：明确告知，不当作首次打开静默处理（spec §2 反目标）；可关闭
   const issueOf = (r) => (r.corrupt
     ? t.banner.loadCorrupt
     : r.dropped.length
       ? t.banner.loadPartial([...new Set(r.dropped.map((d) => fieldLabel(d.field, t)))])
       : null);
   const loadIssue = issueOf(loaded);
-  const loadText = h(doc, 'span', { text: loadIssue ?? '' });
-  const loadBanner = h(doc, 'div', { class: 'banner banner-error load-banner', role: 'alert', hidden: !loadIssue },
-    loadText,
-    h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': t.banner.dismiss, title: t.banner.dismiss, text: t.banner.closeGlyph, onclick: () => show(loadBanner, false) }));
-  const hintBanner = h(doc, 'div', { class: 'banner banner-info hint-banner', hidden: !(firstRun && !ui.hintDismissed) },
-    h(doc, 'span', { text: t.banner.firstRun }),
-    h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': t.banner.dismiss, title: t.banner.dismiss, text: t.banner.closeGlyph, onclick: dismissHint }));
-  const backupBanner = h(doc, 'div', { class: 'banner banner-info backup-banner', role: 'status', hidden: true },
-    h(doc, 'span', { text: t.banner.backupNudge }),
-    h(doc, 'span', { class: 'banner-actions' },
-      h(doc, 'button', { type: 'button', class: 'btn btn-secondary', text: t.header.export, onclick: doExport }),
-      h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: t.banner.ok, onclick: () => show(backupBanner, false) })));
-  const reportPanel = h(doc, 'section', { class: 'panel import-report', hidden: true, 'aria-live': 'off' });
+  let loadShown = null;
+  const setLoadIssue = (issue) => {
+    loadShown = issue;
+    banners.setError('loadIssue', issue, {
+      dismissible: true,
+      actions: issue === t.banner.loadCorrupt ? [importAction] : [],
+      onDismiss: () => { loadShown = null; },
+    });
+  };
+  let hintShown = false;
+  const reportPanel = h(doc, 'section', { class: 'import-report', hidden: true, 'aria-live': 'off' });
 
-  // ---- 顶栏 ----
+  // ---- 顶栏（只留「悬浮成小窗」；不支持时旁边显示原因）----
   const cardRoot = h(doc, 'div', { id: 'status-card', 'data-size': 'lg' });
   const float = createFloatControl(doc, t, {
     cardRoot,
@@ -85,15 +89,16 @@ export function mountApp(doc, storage, clock) {
   const fileInput = h(doc, 'input', { type: 'file', accept: '.json,application/json', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true', onchange: onFile });
   const header = h(doc, 'header', { class: 'app-header' },
     h(doc, 'h1', { text: t.appTitle }),
-    h(doc, 'div', { class: 'header-actions' },
-      float.button,
-      float.note,
-      h(doc, 'button', { type: 'button', class: 'btn btn-secondary', id: 'btn-export', text: t.header.export, onclick: doExport }),
-      h(doc, 'button', { type: 'button', class: 'btn btn-secondary', id: 'btn-import', text: t.header.import, onclick: () => fileInput.click() }),
-      fileInput));
+    h(doc, 'div', { class: 'header-actions' }, float.note, float.button));
 
-  // ---- 主区 ----
-  const settings = createSettingsPanel(doc, t, { getCfg: () => state.cfg, onChange: (cfg) => commit({ ...state, cfg }, true) });
+  // ---- 主区：左 状态卡｜右 分页「月历」「基本设置」----
+  const settings = createSettingsPanel(doc, t, {
+    getCfg: () => state.cfg,
+    onChange: (cfg) => commit({ ...state, cfg }, true),
+    onExport: () => doExport(),
+    onImport: () => fileInput.click(),
+    report: reportPanel,
+  });
   const calendar = createCalendar(doc, t, {
     getState: () => state,
     getTables: () => tables,
@@ -103,6 +108,18 @@ export function mountApp(doc, storage, clock) {
       toast(msg, () => commit({ ...state, marks: prevMarks }, false));
     },
   });
+  const calendarPanel = h(doc, 'div', { class: 'tabpanel tabpanel-calendar' }, calendar.el);
+  const settingsPanel = h(doc, 'div', { class: 'tabpanel tabpanel-settings' }, settings.el);
+  const tabs = createTabs(doc, {
+    label: t.tabs.label,
+    tabs: [
+      { id: 'calendar', label: t.tabs.calendar, panel: calendarPanel },
+      { id: 'settings', label: t.tabs.settings, panel: settingsPanel },
+    ],
+    initial: 'calendar',
+    onChange: (id) => { if (id !== 'calendar') calendar.hideOverlays(); },
+  });
+  const openSettings = () => tabs.select('settings', { focus: true });
 
   const toastText = h(doc, 'span', { class: 'toast-text' });
   const toastUndo = h(doc, 'button', { type: 'button', class: 'toast-action', text: t.calendar.undo });
@@ -112,11 +129,22 @@ export function mountApp(doc, storage, clock) {
   const app = doc.getElementById('app') ?? doc.body;
   app.replaceChildren(
     header,
-    h(doc, 'div', { class: 'notices' }, storageBanner, loadBanner, hintBanner, backupBanner, reportPanel),
-    h(doc, 'main', { class: 'main-grid' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot, float.placeholder), settings.el),
-    calendar.el,
+    banners.root,
+    h(doc, 'main', { class: 'shell' },
+      h(doc, 'div', { class: 'card-col' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot, float.placeholder)),
+      h(doc, 'div', { class: 'main-panel' }, tabs.root, calendarPanel, settingsPanel)),
+    fileInput,
     toastEl,
     live);
+
+  if (firstRun && !ui.hintDismissed) {
+    hintShown = true;
+    banners.queueInfo('firstRun', t.banner.firstRun, {
+      actions: [{ key: 'goFix', label: t.banner.goFix, link: true, onClick: openSettings }],
+      onDismiss: dismissHint,
+    });
+  }
+  if (loadIssue) setLoadIssue(loadIssue);
 
   // ---- 行为 ----
   let toastTimer = null;
@@ -130,7 +158,7 @@ export function mountApp(doc, storage, clock) {
   }
 
   function dismissHint() {
-    show(hintBanner, false);
+    hintShown = false;
     ui.hintDismissed = true;
     writeUi(storage, ui);
   }
@@ -148,17 +176,21 @@ export function mountApp(doc, storage, clock) {
     state = next;
     const res = saveState(storage, state);
     storageOk = res.ok;
-    show(storageBanner, !storageOk);
+    setStorageFail(!storageOk);
     if (res.ok) {
       if (fromSettings) settings.flashSaved();
       if (!ui.backupNudged) {
         ui.backupNudged = true;
-        show(backupBanner, true);
+        banners.queueInfo('backupNudge', t.banner.backupNudge, {
+          closable: false,
+          actions: [exportAction, { key: 'ok', label: t.banner.ok, onClick: () => banners.dismissInfo('backupNudge') }],
+        });
         requestPersist();
       }
     }
-    if (!hintBanner.hidden) {
-      show(hintBanner, false);
+    if (hintShown) {
+      hintShown = false;
+      banners.dismissInfo('firstRun');
       ui.hintDismissed = true;
     }
     writeUi(storage, ui);
@@ -182,10 +214,12 @@ export function mountApp(doc, storage, clock) {
     reportPanel.replaceChildren();
   }
 
+  // 导入报告放在「基本设置 › 数据与备份」组内：先切到该分页再聚焦标题
   function showReport(titleText, body, actions) {
-    const title = h(doc, 'h2', { tabindex: '-1', text: titleText });
+    const title = h(doc, 'h4', { tabindex: '-1', text: titleText });
     reportPanel.replaceChildren(title, ...body, h(doc, 'div', { class: 'report-actions' }, actions));
     show(reportPanel, true);
+    tabs.select('settings');
     title.focus();
   }
 
@@ -224,7 +258,7 @@ export function mountApp(doc, storage, clock) {
     const firstField = report.rows.find((r) => r.field && !r.field.startsWith('marks'))?.field;
     showReport(report.title, [table], [
       okBtn,
-      firstField ? h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: t.importer.goFix, onclick: () => { closeReport(); settings.focusField(firstField); } }) : null,
+      firstField ? h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: t.importer.goFix, onclick: () => { closeReport(); tabs.select('settings'); settings.focusField(firstField); } }) : null,
     ]);
   }
 
@@ -268,10 +302,10 @@ export function mountApp(doc, storage, clock) {
     const r = loadState(storage);
     state = r.state;
     storageOk = r.storageOk;
-    show(storageBanner, !storageOk);
+    setStorageFail(!storageOk);
     const issue = issueOf(r);
-    if (issue) setText(loadText, issue);
-    show(loadBanner, Boolean(issue) && (issue !== loadIssue || !loadBanner.hidden));
+    // 新的问题照常显示；与开页时相同、且已被关闭的问题不再弹出
+    setLoadIssue(issue && (issue !== loadIssue || loadShown !== null) ? issue : null);
     settings.sync(state.cfg);
     calendar.render();
     tick();
@@ -286,15 +320,15 @@ export function mountApp(doc, storage, clock) {
   win.addEventListener('focus', tick);
 
   settings.sync(state.cfg);
-  show(storageBanner, !storageOk);
+  setStorageFail(!storageOk);
   calendar.render();
   tick();
   start();
 
-  // 齿轮只在小窗显示：收回小窗（同按 X）并滚动到设置区，不依赖聚焦开启者视窗的 API（spec §4.2）
+  // 齿轮只在小窗显示：收回小窗（同按 X）并切到「基本设置」分页，不依赖聚焦开启者视窗的 API（spec §13.1）
   cardRoot.querySelector('.card-gear').addEventListener('click', () => {
     float.close();
-    settings.el.scrollIntoView({ block: 'start' });
+    openSettings();
   });
 
   return {

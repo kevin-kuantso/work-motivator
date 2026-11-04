@@ -66,14 +66,14 @@ test('menuModel: header, previews for denominator-changing options, footer', () 
   assert.equal(sat.header, '11月7日 周六 · 休息日');
   assert.deepEqual(sat.items.map((i) => [i.id, i.label, i.note, i.checked]), [
     ['default', '恢复默认', '当前', true],
-    ['work', '改为上班', '日薪 ¥323.81 → ¥309.09', false],
+    ['work', '改为上班（调休）', '日薪 ¥323.81 → ¥309.09', false],
   ]);
   assert.equal(sat.footer, '多一个上班日，日薪会变低；多一个休息日，日薪会变高（固定月薪 ÷ 当月应出勤天数）');
   const wd = menuModel(at(11, 3), cfg, {}, HOLIDAYS_CN);
   assert.equal(wd.header, '11月3日 周二 · 工作日');
   assert.deepEqual(wd.items.map((i) => [i.id, i.label, i.note]), [
     ['default', '恢复默认', '当前'],
-    ['rest', '改为休息', '日薪 ¥323.81 → ¥340.00'],
+    ['rest', '改为休息（调休）', '日薪 ¥323.81 → ¥340.00'],
     ['paidLeave', '带薪假', '日薪不变'],
     ['unpaidLeave', '无薪假', '日薪不变'],
   ]);
@@ -92,7 +92,7 @@ test('menuModel: header, previews for denominator-changing options, footer', () 
 test('dayTooltipModel: status, source label and pay for every day type', () => {
   const tip = (date, marks = {}, tables = HOLIDAYS_CN, c = cfg) => dayTooltipModel(date, c, marks, tables, at(11, 3));
   const wd = tip(at(11, 4));
-  assert.deepEqual(wd, { title: '11月4日 周三', status: '工作日', source: '来源：按周末规则', pay: '当日计薪 ¥323.81', hint: '点击修改' });
+  assert.deepEqual(wd, { title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改' });
   assert.equal(tip(at(11, 3)).title, '11月3日 周二（今天）');
   const sat = tip(at(11, 7));
   assert.equal(sat.status, '休息日');
@@ -124,7 +124,9 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(tip(at(1, 1, 2027), {}, online).source, '来源：联网更新·官方通知');
   assert.equal(tip(at(1, 1, 2027), {}, online).status, '法定假日（元旦）');
   assert.equal(tip(at(1, 9, 2027), {}, online).status, '调休上班（元旦）');
-  assert.equal(tip(at(1, 1, 2027)).source, '来源：按周末规则', 'no table → weekend rule');
+  assert.equal(tip(at(1, 1, 2027)).source, '来源：按默认规则', 'no table, weekday → default rule');
+  assert.equal(tip(at(1, 2, 2027)).source, '来源：按周末规则', 'no table, Saturday → weekend rule');
+  assert.equal(tip(at(11, 7), {}, HOLIDAYS_CN, { ...cfg, weekends: true }).source, '来源：按默认规则', 'weekend counted as workday');
   assert.equal(tip(at(1, 1, 2027)).status, '工作日');
 });
 

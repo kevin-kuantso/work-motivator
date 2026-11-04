@@ -157,7 +157,7 @@ test('no CJK literals anywhere in src/ outside strings.zh-CN.js (comments exclud
 
 test('strings.zh-CN.js: no Taiwan-only terms or Traditional characters', () => {
   const code = stripComments(readFileSync(join(SRC, 'strings.zh-CN.js'), 'utf8'));
-  for (const w of ['字串', '物件', '文字', '預', '预设', '进阶', '有薪假', '使用者', '档案', '选单', '滑鼠', '萤幕', '点选']) {
+  for (const w of ['字串', '物件', '文字', '預', '预设', '进阶', '有薪假', '使用者', '档案', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用', '套用']) {
     assert.ok(!code.includes(w), `forbidden term ${w}`);
   }
   const trad = [...'設開時賺鐘勵週與請計錢進導電連線標題預覽'].filter((c) => code.includes(c));

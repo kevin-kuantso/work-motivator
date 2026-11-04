@@ -5,7 +5,7 @@ import { startServer, launch, openAt } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
-const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选'];
+const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用'];
 
 let server;
 let browser;
@@ -105,15 +105,15 @@ test('click opens a menu with header, options and footer; keyboard moves; Esc re
 test('click outside closes; clicking the same cell toggles; only one menu at a time', () =>
   withPage(T1412, async (page) => {
     await openMenu(page, '11月7日');
-    await page.locator('#cal-heading').click();
+    await page.locator('.cal-summary-text').click();
     assert.equal(await menu(page).isVisible(), false, 'click outside closes');
     await openMenu(page, '11月7日');
     await cell(page, '11月7日').click();
     assert.equal(await menu(page).isVisible(), false, 'second click on the same cell closes');
     await openMenu(page, '11月7日');
-    await openMenu(page, '11月4日');
+    await openMenu(page, '11月2日'); // 不被 11/7 的菜单盖住的格子
     assert.equal(await page.locator('.day-menu:visible').count(), 1);
-    assert.equal(await text(page, '.day-menu-header'), '11月4日 周三 · 工作日');
+    assert.equal(await text(page, '.day-menu-header'), '11月2日 周一 · 工作日');
     assert.equal(await cell(page, '11月7日').getAttribute('aria-expanded'), 'false');
     // 切换月份时菜单关闭
     await page.getByRole('button', { name: /下月/ }).click();
@@ -208,7 +208,7 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     const desc = await sat.evaluate((b) => b.getAttribute('aria-describedby').split(' ').map((id) => document.getElementById(id).textContent).join(' '));
     assert.equal(desc, '11月7日 周六，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
     // 移开即隐藏
-    await page.locator('#cal-heading').hover();
+    await page.locator('.cal-summary-text').hover();
     assert.equal(await tooltip(page).isVisible(), false);
     // 菜单打开时不显示
     await sat.hover();
@@ -218,7 +218,7 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     assert.equal(await tooltip(page).isVisible(), false, 'hidden while menu open');
     await page.keyboard.press('Escape');
     // 键盘聚焦：立即显示
-    await page.locator('#cal-heading').hover();
+    await page.locator('.cal-summary-text').hover();
     await page.keyboard.press('ArrowLeft');
     assert.equal((await focused(page)).key, '2026-11-06');
     assert.equal(await tooltip(page).isVisible(), true, 'shows immediately on keyboard focus');
@@ -227,7 +227,7 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     assert.equal(await tooltip(page).isVisible(), false, 'Esc hides');
     await page.keyboard.press('ArrowLeft');
     assert.equal(await tooltip(page).isVisible(), true);
-    await page.locator('#cal-heading').click();
+    await page.locator('.cal-summary-text').click();
     assert.equal(await tooltip(page).isVisible(), false, 'blur hides');
     // 节日、调休上班、带薪假的提示
     await page.getByRole('button', { name: /上月/ }).click();
@@ -271,11 +271,11 @@ test('no leaked listeners (and no stray hover timer) after opening and closing 2
       await cell(page, i % 2 ? '11月7日' : '11月4日').hover();
       await openMenu(page, i % 2 ? '11月7日' : '11月4日');
       if (i % 3 === 0) await page.keyboard.press('Escape');
-      else if (i % 3 === 1) await page.locator('#cal-heading').click();
+      else if (i % 3 === 1) await page.locator('.cal-summary-text').click();
       else await page.keyboard.press('Tab');
     }
-    await page.locator('#cal-heading').hover();
-    await page.locator('#cal-heading').click();
+    await page.locator('.cal-summary-text').hover();
+    await page.locator('.cal-summary-text').click();
     assert.deepEqual(await counts(), base, 'document/window listener counts stable');
     await page.clock.runFor(1000);
     assert.equal(await tooltip(page).isVisible(), false, 'no pending hover timer fires after leaving');

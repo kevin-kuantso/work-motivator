@@ -1,5 +1,6 @@
 // 纯函数：月历小菜单的选项、日薪预览与悬停提示内容（spec §12.1 / §12.2）。
-import { dayInfo, workdaysInMonth } from '../calendar.js';
+import { dayInfo } from '../calendar.js';
+import { monthWage } from '../calc.js';
 import { STRINGS } from '../strings.zh-CN.js';
 import { money, ymd } from './format.js';
 
@@ -28,11 +29,8 @@ export function applyOption(marks, date, optionId) {
   return next;
 }
 
-function monthDailyWage(date, cfg, marks, tables) {
-  const denom = workdaysInMonth(date.getFullYear(), date.getMonth(), cfg, marks, tables);
-  const ok = typeof cfg.salary === 'number' && Number.isFinite(cfg.salary) && cfg.salary > 0;
-  return ok && denom > 0 ? cfg.salary / denom : 0;
-}
+const monthDailyWage = (date, cfg, marks, tables) =>
+  monthWage(date.getFullYear(), date.getMonth(), cfg, marks, tables).dailyWage;
 
 // 该选项生效后的当月日薪（固定月薪 ÷ 当月应出勤天数；带薪 / 无薪假不改变分母）。
 export function previewDailyWage(date, cfg, marks, tables, optionId) {
@@ -78,7 +76,8 @@ export function dayTooltipModel(date, cfg, marks, tables, now) {
   return {
     title: `${dayTitle(date)}${isToday ? C.todaySuffix : ''}`,
     status: statusText(info, plain),
-    source: C.tip.source(C.tip.sources[info.source]),
+    // 'rule'：周末按周末规则；其他日子（含「周末计入」时的周末、无内置表年份的平日）按默认规则
+    source: C.tip.source(C.tip.sources[info.source === 'rule' && info.reason !== 'weekend' ? 'default' : info.source]),
     pay: C.tip.pay(yuan(paid ? monthDailyWage(date, cfg, marks, tables) : 0)),
     hint: C.tip.hint,
   };

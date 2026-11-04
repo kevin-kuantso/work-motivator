@@ -4,8 +4,13 @@ export const STRINGS = {
 
   header: {
     float: '悬浮成小窗',
-    export: '导出备份',
-    import: '导入备份',
+  },
+
+  // 右侧分页
+  tabs: {
+    label: '主要内容',
+    calendar: '月历',
+    settings: '基本设置',
   },
 
   // 悬浮小窗（Document PiP）
@@ -72,12 +77,13 @@ export const STRINGS = {
 
   banner: {
     firstRun: '这是默认值，可在设置里修改',
+    goFix: '去修改',
+    sep: ' · ',
     dismiss: '关闭提示',
     closeGlyph: '×',
     backupNudge: '设置已自动保存在这个浏览器里。建议导出一份备份，以防清除浏览数据后丢失。',
     ok: '知道了',
     storageFail: '无法保存设置，关闭页面后会丢失。请先导出备份',
-    yearMissing: (year) => `${year} 年假期未内置，请自行标记`,
     loadCorrupt: '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。',
     loadPartial: (labels) => `已保存的设置中有部分项目无法使用，以下项目已改用默认值：${labels.join('、')}`,
   },
@@ -115,7 +121,7 @@ export const STRINGS = {
     payIn: (n) => `距离发薪日 ${n} 天`,
     payToday: '今天发薪',
     yearMissing: (year) => `${year} 年假期未内置`,
-    gear: '收回小窗并定位到设置',
+    gear: '收回小窗并打开基本设置',
     srSummary: (badge, yuan) => `${badge}，今天已赚 ${yuan} 元`,
   },
 
@@ -124,9 +130,11 @@ export const STRINGS = {
   weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
 
   settings: {
-    title: '设置',
     autosaved: '已自动保存',
-    sections: { pay: '薪资与工时', lunch: '午休', cheer: '鼓励语', advanced: '高级设置' },
+    sections: {
+      pay: '薪资与工时', lunch: '午休', cheer: '鼓励语',
+      weekPay: '周末与发薪日', holiday: '假期数据', backup: '数据与备份', advanced: '高级设置',
+    },
     on: '开',
     off: '关',
     salary: '月薪',
@@ -140,12 +148,18 @@ export const STRINGS = {
     cheer: '鼓励语',
     cheerPlaceholder: '写一句给自己的话',
     cheerCount: (n, max) => `${n}/${max}`,
-    weekends: '周末是否计入',
+    weekends: '周末计入上班日',
     weekendsHint: '开 = 周六、周日也是常规工作日；个别日子调休上班请在月历上标记',
     payday: '发薪日',
     paydayNone: '未设置',
     paydayOption: (d) => `每月 ${d} 号`,
-    advancedSummary: (weekends, payday) => `周末${weekends ? '计入' : '不计入'} · 发薪日：${payday}`,
+    // 高级设置（折叠）标题旁的摘要；本期只有占位，Task 11 接上「自定义网址」
+    advancedSummary: '自定义网址：未设置',
+    backup: {
+      export: '导出备份',
+      import: '导入备份',
+      note: '备份文件含月薪，请妥善保管',
+    },
   },
 
   calendar: {
@@ -153,7 +167,11 @@ export const STRINGS = {
     prev: '‹ 上月',
     next: '下月 ›',
     today: '回到今天',
+    todayBack: (title) => `回到今天 · ${title}`,
     monthTitle: (y, m) => `${y} 年 ${m} 月`,
+    pageKeys: { up: 'PgUp', down: 'PgDn', sep: ' / ', label: ' 切换月份' },
+    summary: (days, wage) => `本月应出勤 ${days} 天 · 日薪 ${wage}`,
+    legendHint: '点日期可标记：调休 · 带薪假 · 无薪假',
     reset: '重置本月标记',
     legend: '图例',
     weekHeads: ['一', '二', '三', '四', '五', '六', '日'],
@@ -190,7 +208,7 @@ export const STRINGS = {
     // 点日期弹出的小菜单
     menu: {
       header: (title, status) => `${title} · ${status}`,
-      options: { default: '恢复默认', work: '改为上班', rest: '改为休息', paidLeave: '带薪假', unpaidLeave: '无薪假' },
+      options: { default: '恢复默认', work: '改为上班（调休）', rest: '改为休息（调休）', paidLeave: '带薪假', unpaidLeave: '无薪假' },
       current: '当前',
       preview: (from, to) => `日薪 ${from} → ${to}`,
       unchanged: '日薪不变',
@@ -199,7 +217,7 @@ export const STRINGS = {
     // 悬停 / 聚焦提示
     tip: {
       source: (label) => `来源：${label}`,
-      sources: { builtin: '内置·官方通知', online: '联网更新·官方通知', manual: '手动标记', rule: '按周末规则' },
+      sources: { builtin: '内置·官方通知', online: '联网更新·官方通知', manual: '手动标记', rule: '按周末规则', default: '按默认规则' },
       pay: (yuan) => `当日计薪 ${yuan}`,
       hint: '点击修改',
       join: (parts) => parts.join('，'),
