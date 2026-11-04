@@ -270,18 +270,19 @@ button, input, select { font: inherit; color: inherit; }
 
 /* 矮视窗（≤ 640px，例如 1280×585 + 错误条 + 信息条）：收紧卡片的垂直留白，默认状态两栏仍不需要内部滚动 */
 @media (max-height: 640px) {
-  .set-col { gap: 8px; }
-  .scard-head { padding-block: 5px; }
-  .scard-body { padding-block: 6px 8px; gap: 5px; }
+  .set-col { gap: 6px; }
+  .scard-head { padding-block: 4px; }
+  .scard-body { padding-block: 6px 7px; gap: 4px; }
   .row { min-height: 30px; }
   .row-hint { margin-top: 0; }
-  .para { line-height: 18px; }
+  .para { line-height: 17px; }
+  .hstatus { min-height: 24px; }
   .adv-head { padding-block: 6px; min-height: 32px; }
 }
 
 /* 基本设置 › 假期数据：年份胶囊 + 上次检查、两颗按钮各带常驻说明、单一结果区（tone：success 绿 / muted 灰 / info 蓝 / warn 黄）、格式示例 */
 .holiday-body { display: grid; gap: 6px; min-width: 0; }
-@media (max-height: 640px) { .holiday-body { gap: 5px; } }
+@media (max-height: 640px) { .holiday-body { gap: 4px; } }
 .hstatus { display: flex; align-items: center; gap: 6px; min-height: 26px; }
 .hstatus-chips { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: var(--radius-full); font-size: 13px; font-weight: 500; white-space: nowrap; font-family: var(--font-num); }

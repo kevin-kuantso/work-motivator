@@ -325,7 +325,7 @@ test('高级设置: aria-expanded toggles; invalid 自定义网址 rejected and 
     const input = page.getByLabel('自定义数据网址');
     assert.equal(await input.isVisible(), true);
     assert.equal(await input.getAttribute('placeholder'), 'https://example.com/{year}.json');
-    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。');
+    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。');
     for (const bad of ['http://mirror.example.org/{year}.json', 'https://mirror.example.org/2027.json']) {
       await input.fill(bad);
       await input.press('Enter');
@@ -671,7 +671,7 @@ test('R47: 高级设置 hint + 「查看格式示例」 expands the example in �
     await page.setViewportSize({ width: 1280, height: 585 });
     await tab(page, '基本设置').click();
     await page.locator('.adv-toggle').click();
-    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。');
+    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。');
     assert.equal(await page.locator('#btn-adv-example').textContent(), '查看格式示例');
     assert.equal(await page.locator('#holiday-example').isVisible(), false);
     assert.deepEqual(await revealedByHelp(page, '#btn-adv-example'), REVEALED);

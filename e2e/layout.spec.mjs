@@ -1003,9 +1003,9 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     assert.equal(await page.locator('#f-cheer').getAttribute('aria-describedby'), 'hint-cheer err-cheer');
     assert.equal(await page.locator('#btn-holiday-check').getAttribute('aria-describedby'), 'hint-holiday-check');
     assert.equal(await text(page, '#hint-holiday-check'), '联网获取新公布的放假安排');
-    assert.equal(await text(page, '#hint-holiday-import'), '打不开网络时，用文件导入');
+    assert.equal(await text(page, '#hint-holiday-import'), '连不上网时，用文件导入');
     assert.equal(await text(page, '.section-backup .scard-desc'), '设置只保存在这个浏览器里，不会上传。');
-    assert.deepEqual(await page.locator('.section-backup .para').allTextContents(), ['导出备份：把月薪、上下班时间、月历标记保存成文件。换电脑或清除浏览数据前，请先导出。', '导入备份：用之前导出的文件恢复这些设置。']);
+    assert.deepEqual(await page.locator('.section-backup .para').allTextContents(), ['导出备份：把月薪、上下班时间、月历标记保存成文件。换电脑或清除浏览数据前，请先导出。', '导入备份：用之前导出的文件恢复这些设置。', '备份不含联网取得或导入的假期表和自定义数据网址。']);
     assert.equal(await text(page, '.section-backup .warn-note'), '备份文件含月薪，请妥善保管');
     assert.equal(await text(page, '.adv-sub'), '一般不用改');
     assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
@@ -1019,8 +1019,8 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     // 高级设置展开：白话说明 + 输入框 + 格式提示
     await page.locator('#adv-toggle').click();
     assert.equal(await page.getByRole('textbox', { name: '自定义数据网址' }).getAttribute('aria-describedby'), 'explain-custom-url hint-custom-url err-custom-url');
-    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。');
-    assert.match(await text(page, '#explain-custom-url'), /^默认先从 jsDelivr、再从 GitHub 获取假期数据/);
+    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。');
+    assert.equal(await text(page, '#explain-custom-url'), '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空 = 使用默认来源。');
   }));
 
 // R47「复制示例」：clipboard.writeText 成功 → 「已复制」（剪贴板里就是示例全文）；被拒绝（CDP 把 clipboard-write 设为 denied）
@@ -1041,7 +1041,8 @@ test('复制示例 (R47): granted → 「已复制」 and the clipboard holds th
       await page.locator('#btn-example').click();
       const code = await page.locator('#holiday-example-code').textContent();
       await page.locator('#btn-example-copy').click();
-      for (let i = 0; i < 40 && !(await text(page, '.example-copy-state')); i++) await new Promise((r) => setTimeout(r, 25));
+      // 结果先清空、100ms 后再写（连续复制会重新朗读）：让暂停的时钟走一点
+      for (let i = 0; i < 40 && !(await text(page, '.example-copy-state')); i++) { await page.clock.runFor(50); await new Promise((r) => setTimeout(r, 25)); }
       const state = page.locator('.example-copy-state');
       assert.equal(await state.getAttribute('role'), 'status', 'one polite live message');
       if (mode === 'granted') {
@@ -1065,7 +1066,7 @@ test('R47: the format help under the example lists year / papers / days / off-da
     await page.locator('#btn-example').click();
     assert.deepEqual(await page.locator('#holiday-example .ex-line').allTextContents(), [
       '文件为 holiday-cn 格式的年度 JSON（例如 2027.json）。',
-      'year：年份，必须和你要导入的年份一致。',
+      'year：年份（数字，例如 2027）；days 里的日期都必须在这一年内。',
       'papers：官方放假通知的网址，必须以 https://www.gov.cn/ 开头，否则整份文件会被拒绝。',
       'days：每一天一条；isOffDay 为 true 表示放假，false 表示调休上班（调休上班日必须是周六或周日）。',
       '文件里至少要有一个放假日，否则会被拒绝。',
@@ -1230,3 +1231,58 @@ test('A3: unsupported browser — float button is aria-disabled (not native disa
     assert.equal(await page.locator('.toast').isVisible(), false, 'no failure toast');
     assert.equal(await b.textContent(), '悬浮成小窗');
   }, { init: NO_PIP }));
+
+// ---- Task 14 fix round 1 · Block B ----
+
+// B1（WCAG 2.4.11）：按下「查看导入文件的格式示例」后，获得焦点的展开钮仍在右栏的可见范围内（示例比右栏高时也一样）
+test('B1: after expanding the example the focused toggle stays inside the right column’s visible rect (1280×585, 1366×650)', () =>
+  withPage(T1412, async (page) => {
+    for (const [w, ht] of [[1280, 585], [1366, 650]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      await tab(page, '基本设置').click();
+      for (const how of ['click', 'keyboard', 'help']) {
+        if (how === 'click') await page.locator('#btn-example').click();
+        else if (how === 'keyboard') { await page.locator('#btn-example').focus(); await page.keyboard.press('Enter'); }
+        else { await page.locator('#adv-toggle').click(); await page.locator('#btn-adv-example').click(); }
+        const r = await page.evaluate(() => {
+          const col = document.querySelectorAll('.set-col')[1].getBoundingClientRect();
+          const t = document.getElementById('btn-example').getBoundingClientRect();
+          return { focus: document.activeElement?.id, t: [Math.round(t.top), Math.round(t.bottom)], col: [Math.round(col.top), Math.round(col.bottom)], inView: t.top >= col.top - 0.5 && t.bottom <= col.bottom + 0.5, exH: Math.round(document.getElementById('holiday-example').getBoundingClientRect().height) };
+        });
+        console.log(`MEASURE ${JSON.stringify({ case: 'B1 toggle in view', w, ht, how, ...r })}`);
+        assert.equal(r.focus, 'btn-example', `${w} ${how}: focus on the toggle`);
+        assert.equal(r.inView, true, `${w} ${how}: focused toggle ${r.t} inside the column ${r.col}`);
+        // 收起，回到初始状态
+        await page.locator('#btn-example').click();
+        if (how === 'help') await page.locator('#adv-toggle').click();
+        await page.evaluate(() => document.querySelectorAll('.set-col').forEach((c) => { c.scrollTop = 0; }));
+      }
+    }
+  }));
+
+test('B minors: chip group has a readable text node; backup card documents what the backup excludes; 复制示例 re-announces on repeated copies', () =>
+  withPage(T1412, async (page) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(server.url).origin });
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await tab(page, '基本设置').click();
+    const st = await page.locator('#holiday-status').evaluate((e) => ({ aria: e.getAttribute('aria-label'), sr: e.querySelector('.visually-hidden')?.textContent ?? null }));
+    assert.equal(st.aria, '假期数据状态：2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03');
+    assert.equal(st.sr, '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03', 'readable text node inside the group');
+    assert.equal(await text(page, '.section-backup .backup-scope'), '备份不含联网取得或导入的假期表和自定义数据网址。');
+    await page.locator('#btn-example').click();
+    await page.evaluate(() => {
+      window.__cs = [];
+      const el = document.querySelector('.example-copy-state');
+      new MutationObserver(() => window.__cs.push(el.textContent)).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    for (let i = 0; i < 2; i++) {
+      await page.locator('#btn-example-copy').click();
+      for (let k = 0; k < 20; k++) { await page.clock.runFor(50); await new Promise((r) => setTimeout(r, 10)); }
+    }
+    const seq = (await page.evaluate(() => window.__cs)).filter((x, i, a) => i === 0 || x !== a[i - 1]);
+    console.log(`MEASURE ${JSON.stringify({ case: 'B copy announcements', seq })}`);
+    assert.deepEqual(seq.filter((x) => x === '已复制').length, 2, `announced twice: ${JSON.stringify(seq)}`);
+    assert.ok(seq.includes(''), 'cleared between announcements');
+    const m = await measure(page);
+    assert.equal(m.scrollH <= m.ih, true);
+  }));

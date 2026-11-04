@@ -11,8 +11,9 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
   // 年份胶囊 + 右侧「上次检查」。整行是一个具名分组，名称就是完整的一句（「假期数据状态：2026 年 · 内置 · …」），
   // 胶囊本身对读屏隐藏，避免相邻胶囊的文字连成一串
   const chips = h(doc, 'span', { class: 'hstatus-chips', 'aria-hidden': 'true' });
+  const statusText = h(doc, 'span', { class: 'visually-hidden' }); // 可读的文字节点（与分组名称同一句）
   const lastCheck = h(doc, 'span', { class: 'chip-note', 'aria-hidden': 'true' });
-  const line = h(doc, 'div', { class: 'hstatus', id: 'holiday-status', role: 'group', 'aria-label': U.statusLabel }, chips, lastCheck);
+  const line = h(doc, 'div', { class: 'hstatus', id: 'holiday-status', role: 'group', 'aria-label': U.statusLabel }, statusText, chips, lastCheck);
   // 检查中用 aria-disabled 而不是 disabled：按钮保留焦点（disabled 会把键盘焦点丢到 body）
   const checkBtn = h(doc, 'button', {
     type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-holiday-check', text: U.check, 'aria-describedby': 'hint-holiday-check',
@@ -51,7 +52,7 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     ...[U.exampleFormat, U.exampleYear, U.examplePapers, U.exampleDays, U.exampleNeedOff].map((x) => h(doc, 'p', { class: 'ex-line', text: x })),
     h(doc, 'p', { class: 'ex-line' }, U.exampleWhereBefore, h(doc, 'span', { class: 'mono', text: U.exampleWhereAddr }), U.exampleWhereAfter),
     h(doc, 'p', { class: 'ex-line ex-official', text: U.exampleOfficial }));
-  const chev = h(doc, 'span', { class: 'chev', 'aria-hidden': 'true', text: '▸' });
+  const chev = h(doc, 'span', { class: 'chev', 'aria-hidden': 'true', text: t.settings.chevronClosed });
   const disclosureText = h(doc, 'span', { text: U.exampleShow });
   const disclosure = h(doc, 'button', {
     type: 'button', class: 'disclosure', id: 'btn-example', 'aria-expanded': 'false', 'aria-controls': 'holiday-example',
@@ -60,16 +61,24 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
   function setExample(open) {
     example.hidden = !open;
     disclosure.setAttribute('aria-expanded', String(open));
-    setText(chev, open ? '▾' : '▸');
+    setText(chev, open ? t.settings.chevronOpen : t.settings.chevronClosed);
     setText(disclosureText, open ? U.exampleHide : U.exampleShow);
-    if (open) example.scrollIntoView({ block: 'nearest' }); // 右栏需要内部滚动时，把展开的内容带进视野
+    if (open) bringIntoView();
+  }
+  // 右栏需要内部滚动时，把展开的示例带进视野——但刚按下（有焦点）的展开钮不能被卷出去（WCAG 2.4.11）：
+  // 示例比剩下的空间高时，改为把展开钮卷到栏顶，示例从它下面开始
+  function bringIntoView() {
+    example.scrollIntoView({ block: 'nearest' });
+    const col = disclosure.closest('.set-col') ?? disclosure.parentElement;
+    const c = col.getBoundingClientRect();
+    const b = disclosure.getBoundingClientRect();
+    if (b.top < c.top || b.bottom > c.bottom) disclosure.scrollIntoView({ block: 'start' });
   }
   // 「查看格式示例」（R47：高级设置的格式提示旁、格式不合格的结果后面）：展开示例、带进右栏视野、焦点移到示例的展开钮
   function revealExample() {
-    setExample(true);
-    disclosure.scrollIntoView({ block: 'nearest' });
-    example.scrollIntoView({ block: 'nearest' });
-    disclosure.focus();
+    if (example.hidden) setExample(true);
+    else bringIntoView();
+    disclosure.focus({ preventScroll: true });
   }
   const showExampleBtn = (id) => h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-xs show-example', id, text: U.showExample, 'aria-controls': 'holiday-example', onclick: revealExample });
   const resultHelp = showExampleBtn('btn-result-example');
@@ -83,10 +92,17 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     sel.removeAllRanges();
     sel.addRange(range);
   }
+  // 先清空、稍后再写：连续复制时读屏会再念一次（同一段文字不变时 live 区域不会重新朗读）
+  let announceTimer = null;
+  function announce(msg) {
+    win.clearTimeout(announceTimer);
+    setText(copyState, '');
+    announceTimer = win.setTimeout(() => setText(copyState, msg), 100);
+  }
   function copyExample() {
     const fail = () => {
       selectCode();
-      setText(copyState, U.exampleCopyFail);
+      announce(U.exampleCopyFail);
     };
     try {
       const p = win.navigator.clipboard?.writeText?.(code.textContent);
@@ -94,7 +110,7 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
         fail();
         return;
       }
-      p.then(() => setText(copyState, U.exampleCopied), fail);
+      p.then(() => announce(U.exampleCopied), fail);
     } catch {
       fail();
     }
@@ -142,6 +158,7 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
         c.kind === 'missing' ? null : icon(doc, 'check'), c.text)));
     setText(lastCheck, m.lastCheck ?? '');
     line.setAttribute('aria-label', U.statusAria(status.line));
+    setText(statusText, status.line);
     show(lastCheck, Boolean(m.lastCheck));
     setText(checkBtn, checking ? U.checking : U.check);
     if (checking) checkBtn.setAttribute('aria-disabled', 'true');
