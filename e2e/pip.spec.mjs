@@ -213,6 +213,33 @@ test('PiP timer keeps updating while the opener is hidden; no ghost timers after
     assert.notEqual(await txt(main), before);
   }, { init: stub() }));
 
+// R46：减少动态模式下，悬浮时由小窗的 setTimeout 对齐整秒驱动；收回后小窗不留计时器，主分页接手
+test('reduced motion while floating: the PiP window drives aligned 1 s ticks; nothing left behind after closing', () =>
+  withPage('2026-11-03T14:12:00.600+08:00', async (page) => {
+    await floatBtn(page).click();
+    await pip(page).locator('#status-card').waitFor();
+    const c = pip(page).locator('#status-card .card-countdown + .sr-text');
+    await page.evaluate(() => {
+      window.__cd = [];
+      const el = window.documentPictureInPicture.window.document.querySelector('#status-card .card-countdown + .sr-text');
+      new MutationObserver(() => window.__cd.push([Date.now(), el.textContent])).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    assert.equal(await txt(c), '距下班 2小时48分0秒');
+    await page.clock.runFor(10000);
+    const cd = await page.evaluate(() => window.__cd);
+    assert.equal(cd.length, 10, 'one change per second');
+    assert.ok(cd.every(([ms]) => ms % 1000 < 20), `aligned to whole seconds: ${cd.map(([ms]) => ms % 1000)}`);
+    assert.equal(cd.at(-1)[1], '距下班 2小时47分50秒');
+    const pending = await page.evaluate(() => window.__pip.wins[0].timeouts.size);
+    assert.equal(pending, 1, 'exactly one pending aligned timeout, owned by the PiP window');
+    await page.evaluate(() => window.documentPictureInPicture.window.close());
+    assert.equal(await page.evaluate(() => window.__pip.wins[0].timeouts.size), 0, 'PiP timeout cleared on close');
+    const main = page.locator('#status-card .card-countdown + .sr-text');
+    const before = await txt(main);
+    await page.clock.runFor(1000);
+    assert.notEqual(await txt(main), before, 'main page ticks again');
+  }, { init: stub(), reducedMotion: true }));
+
 // 高度随内容（spec §4.2）：开窗前量好，小窗内不出现卷轴
 async function floatFits(page) {
   await floatBtn(page).click();
