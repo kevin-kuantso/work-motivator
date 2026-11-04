@@ -99,32 +99,63 @@ test('the notice never replaces the calendar undo toast: it waits until the undo
     assert.equal(await notices(page), 1);
   }));
 
-test('tab hidden > 5 s: notice on return (not while hidden); a tick gap while hidden is shown once on return', async () => {
-  await withPage(T1412, async (page) => {
+// R43：只是切走分页再回来、tick 照常 → 不提示；只有真的停过（tick 间隔 > 5 秒或 resume）才提示
+test('R43: 8 s hidden with ticks still firing normally → no notice on return', () =>
+  withPage(T1412, async (page) => {
     await watchToasts(page);
     await setVisibility(page, 'hidden');
-    await page.clock.runFor(6000);
-    assert.equal(await notices(page), 0);
+    await page.clock.runFor(8000);
     await setVisibility(page, 'visible');
-    assert.equal(await notices(page), 1);
-  });
-  await withPage(T1412, async (page) => {
+    await page.clock.runFor(200);
+    assert.equal(await notices(page), 0, 'plain tab switch: nothing');
+  }));
+
+test('R43: stall while hidden → nothing while hidden, exactly one notice the moment the page becomes visible', () =>
+  withPage(T1412, async (page) => {
     await watchToasts(page);
     await setVisibility(page, 'hidden');
     await page.clock.fastForward(60000);
+    await page.clock.runFor(1000);
     assert.equal((await toastState(page)).visible, false, 'not shown while hidden');
+    assert.equal(await notices(page), 0);
     await setVisibility(page, 'visible');
-    assert.deepEqual(await toastState(page), { visible: true, text: NOTICE, undo: false });
-    assert.equal(await notices(page), 1, 'gap + visibility on the same return → one notice');
-  });
-  await withPage(T1412, async (page) => {
+    assert.deepEqual(await toastState(page), { visible: true, text: NOTICE, undo: false }, 'shown on becoming visible');
+    assert.equal(await notices(page), 1);
+  }));
+
+test('R43: freeze/resume while hidden is held until visible', () =>
+  withPage(T1412, async (page) => {
     await watchToasts(page);
     await setVisibility(page, 'hidden');
-    await page.clock.runFor(3000);
+    await page.evaluate(() => document.dispatchEvent(new Event('resume')));
+    assert.equal(await notices(page), 0);
     await setVisibility(page, 'visible');
-    assert.equal(await notices(page), 0, 'short hide: nothing');
-  });
-});
+    assert.equal(await notices(page), 1);
+  }));
+
+test('R43: stall while visible → immediate notice; two stalls within 10 min → one notice', () =>
+  withPage(T1412, async (page) => {
+    await watchToasts(page);
+    await page.clock.fastForward(30000);
+    assert.equal(await notices(page), 1, 'immediate');
+    await page.clock.runFor(60000);
+    await page.clock.fastForward(30000);
+    assert.equal(await notices(page), 1, 'second stall within 10 min: no second notice');
+  }));
+
+// R42：macOS 休眠时 performance.now() 可能不走，但墙上时钟走了：只跳 Date（setSystemTime 不动 performance.now）也要提示
+test('R42: wall-clock-only jump (monotonic clock not advanced) is detected as a stall', () =>
+  withPage(T1412, async (page) => {
+    await watchToasts(page);
+    const p0 = await page.evaluate(() => [performance.now(), Date.now()]);
+    await page.clock.setSystemTime(new Date(p0[1] + 60000));
+    const p1 = await page.evaluate(() => [performance.now(), Date.now()]);
+    assert.ok(p1[0] - p0[0] < 1000, `performance.now did not jump (${p1[0] - p0[0]})`);
+    assert.ok(p1[1] - p0[1] >= 60000, 'Date.now jumped');
+    await page.clock.runFor(100);
+    assert.deepEqual(await toastState(page), { visible: true, text: NOTICE, undo: false });
+    assert.equal(await notices(page), 1);
+  }));
 
 test('PiP: opening / closing and hiding the opener while the card ticks in PiP show no notice', () =>
   withPage(T1412, async (page) => {

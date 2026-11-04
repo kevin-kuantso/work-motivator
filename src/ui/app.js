@@ -15,14 +15,14 @@ import { ymd } from './format.js';
 import { HOLIDAYS_STORAGE_KEY } from '../holiday-store.js';
 import { startHolidayUpdate } from './holiday-update.js';
 import { createHolidayPanel } from './holiday-panel.js';
+import { readTicks, isStall } from './pause-model.js';
 
 const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、备份提示已显示），与设置分开存放
 const TICK_MS = 100;
 const TICK_MS_REDUCED = 1000;
 const ANNOUNCE_MS = 60000;
-// R34：两次 tick 之间（performance.now，不用可注入的 clock）超过 5 秒、Page Lifecycle resume、
-// 或分页隐藏超过 5 秒后回来 = 页面被暂停过，数字会一下子跳到当前时间：不打扰地提示一次，10 分钟内最多一次。
-const PAUSE_GAP_MS = 5000;
+// R34 / R42 / R43：只有真的停过才提示——两次 tick 之间超过 5 秒（单调时钟与墙上时钟取较大者，见 pause-model.js），
+// 或 Page Lifecycle resume。单纯切走分页再回来（tick 照常）不提示。数字会一下子跳到当前时间：不打扰地提示一次，10 分钟内最多一次。
 const PAUSE_NOTICE_EVERY_MS = 10 * 60 * 1000;
 
 function readUi(storage) {
@@ -311,13 +311,13 @@ export function mountApp(doc, storage, clock) {
 
   // ---- 页面暂停提示（R34）----
   const perf = win.performance;
-  let lastTickPerf = null; // null = 还没 tick 过（第一次 tick 不提示）
+  const readTick = readTicks(() => perf.now(), () => Date.now()); // 全域 Date，不是可注入的 clock
+  let lastTick = null; // null = 还没 tick 过（第一次 tick 不提示）
   let skipGap = false; // 小窗开 / 关搬动计时器造成的间隔不算暂停
   let lastPauseNotice = -Infinity;
   let pausePending = false; // 分页隐藏时发现的暂停：回到前台再提示
-  let hiddenAt = null;
   function notePaused() {
-    if (lastTickPerf === null) return;
+    if (lastTick === null) return;
     if (doc.visibilityState === 'hidden') {
       pausePending = true;
       return;
@@ -329,20 +329,13 @@ export function mountApp(doc, storage, clock) {
     quietToast(t.notice.paused, true);
   }
   function checkGap() {
-    const p = perf.now();
-    if (lastTickPerf !== null && !skipGap && p - lastTickPerf > PAUSE_GAP_MS) notePaused();
+    const cur = readTick();
+    if (!skipGap && isStall(lastTick, cur)) notePaused();
     skipGap = false;
-    lastTickPerf = p;
+    lastTick = cur;
   }
   function onVisibility() {
-    if (doc.visibilityState === 'hidden') {
-      if (hiddenAt === null) hiddenAt = perf.now();
-      return;
-    }
-    // 卡片在小窗里一直在跑（计时器在 PiP 视窗），开启者分页隐藏不代表数字停过
-    const long = hiddenAt !== null && perf.now() - hiddenAt > PAUSE_GAP_MS && timerHost === win;
-    hiddenAt = null;
-    if (long || pausePending) notePaused();
+    if (doc.visibilityState !== 'hidden' && pausePending) notePaused();
   }
 
   // ---- 计时 ----
