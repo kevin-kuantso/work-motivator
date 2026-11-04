@@ -55,12 +55,22 @@ export function createBanners(doc, t) {
     renderErrors();
   }
 
+  // 错误条的按钮只在「按钮组合」改变时才重建：焦点停在「导出备份」等按钮上时，
+  // 保存 / 其他分页的事件触发重画不会把焦点丢到 body（R27）。按钮点击时才查当下的处理函数。
+  const errHandlers = new Map();
+  let errKeys = null;
   function renderErrors() {
     const m = mergeErrors(errors, b.sep);
     show(errorBar, Boolean(m));
     errorBar.dataset.ids = m ? m.ids.join(' ') : '';
     setText(errorText, m ? m.text : '');
-    errorActions.replaceChildren(...(m ? actionButtons(m.actions) : []), ...(m?.dismissible ? [closeButton(dismissErrors)] : []));
+    errHandlers.clear();
+    for (const a of m ? m.actions : []) errHandlers.set(a.key, a.onClick);
+    const keys = m ? [...m.actions.map((a) => `${a.key}:${a.label}`), m.dismissible ? 'close' : ''].join('|') : '';
+    if (keys === errKeys) return;
+    errKeys = keys;
+    const buttons = m ? actionButtons(m.actions.map((a) => ({ ...a, onClick: (e) => errHandlers.get(a.key)?.(e) }))) : [];
+    errorActions.replaceChildren(...buttons, ...(m?.dismissible ? [closeButton(dismissErrors)] : []));
   }
 
   let shownInfo = null;

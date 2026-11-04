@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mergeErrors, pickInfo } from '../src/ui/banners.js';
+import { STRINGS } from '../src/strings.zh-CN.js';
 
 const SEP = ' · ';
 
@@ -84,6 +85,13 @@ test('cell tag colours (假 / 班 / 带薪 / 无薪) have ≥ 4.5:1 contrast on 
     assert.ok(r >= 4.5, `${fg} ${tokens[fg]} on ${bg} ${tokens[bg]} = ${r.toFixed(2)}`);
   }
   assert.ok(ruleUses('.kind-unpaid', 'background', '--state-unpaid-stripe'), 'stripe colour comes from the token');
+});
+
+test('M1 / R27: partial-invalid banner lists at most 3 labels, then 「…等 N 项」', () => {
+  const f = STRINGS.banner.loadPartial;
+  assert.equal(f(['月薪']), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：月薪');
+  assert.equal(f(['A', 'B', 'C']), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：A、B、C');
+  assert.equal(f(['A', 'B', 'C', 'D', 'E']), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：A、B、C…等 5 项');
 });
 
 test('info channel: holiday diff notice sits between firstRun and backupNudge, queued', () => {
