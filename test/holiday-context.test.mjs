@@ -62,13 +62,15 @@ test('no-table current / future years (tag shown in the same row): ranges only, 
 test('no-table PAST years: no tag; the pill states what the app marked (R49: fixed-only wording for 2025, never 「待公布」)', () => {
   const oct = ctx(2025, 10);
   assert.equal(oct.text, '国庆 10/1–10/3 放假');
-  assert.equal(oct.sub, '· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
+  assert.equal(oct.sub, null, 'round 2: basis in title only, same as current / future years');
+  assert.equal(oct.title, '国庆 10/1–10/3 放假 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
   const mar = ctx(2025, 3);
   assert.equal(mar.text, '本月没有已标出的法定假日');
-  assert.equal(mar.sub, '· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
+  assert.equal(mar.sub, null);
+  assert.equal(mar.title, '本月没有已标出的法定假日 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
   assert.doesNotMatch(oct.title + mar.title, /待公布|国务院/);
   // 2027 也会变成过去：今天是 2028 年时
-  assert.equal(ctx(2027, 1, HOLIDAYS_CN, new Date(2028, 0, 5)).sub, '· 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出', 'a past lunar year keeps the lunar wording');
+  assert.equal(ctx(2027, 1, HOLIDAYS_CN, new Date(2028, 0, 5)).title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出', 'a past lunar year keeps the lunar wording (title)');
 });
 
 test('years before 2025 without a table: nothing is marked and the pill says so', () => {
@@ -135,11 +137,11 @@ test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and t
     assert.equal(c.text, text, `${y}-${m}`);
     assert.equal(tag?.kind ?? null, tagKind, `${y}-${m} tag`);
     assert.match(c.title, /只标出固定日期的法定假日；其余假日和补假、调休未标出$/, `${y}-${m} title`);
+    assert.equal(c.sub, null, 'basis in title for every no-table kind (round 2)');
     if (tag) {
-      assert.equal(c.sub, null, 'tag shown: basis in title');
       assert.equal(tag.text, `${y} 年仅标固定日期的法定假日`);
       assert.match(tag.title, /只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）/);
-    } else assert.equal(c.sub, '· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
+    }
     all.push(c.title, c.sub ?? '', tag?.title ?? '', tag?.text ?? '');
   }
   const joined = all.join('|');
