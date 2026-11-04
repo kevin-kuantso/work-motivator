@@ -812,7 +812,7 @@ const pill = (page) => page.locator('.cal-summary .cal-note').evaluate((e) => ({
 const tagText = (page) => page.locator('.cal-summary .cal-year-tag').evaluate((e) => (e.hidden ? null : e.textContent));
 const summaryOneLine = (page) => page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
 
-test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up day), past no-table year 2025 (no tag, no claim)', () =>
+test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up day), past no-table year 2025 (qualifier tag, no official claim)', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     const nov = await pill(page);
@@ -837,7 +837,7 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
     assert.equal(past.cut, false, 'fits at 1280');
     assert.doesNotMatch(past.text + past.title, /国务院|待公布|依据/);
     assert.equal(past.check, false);
-    assert.equal(await tagText(page), null, 'R41: no tag for a past year');
+    assert.equal(await tagText(page), '2025 年仅标固定日期的法定假日', 'round 3 (R41 amended): past no-table years show the visible qualifier too');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /上月/ }).click();
     assert.equal((await pill(page)).text, '本月没有已标出的法定假日');
@@ -1585,3 +1585,73 @@ test('A round 2: while floating, the placeholder follows the live card when its 
     assert.ok(after > before, `placeholder grew (${before} → ${after})`);
     assert.ok(Math.abs(after - card) <= 1, `placeholder ${after} = card after recall ${card}`);
   }, { init: FLOAT_STUB }));
+
+// ---- Task 14 fix round 3 · C ----
+
+// 每个无表年份（过去或将来）摘要行都有看得见的简短标签；胶囊与标签都不被截断（1000×700 + 四种视窗）
+test('C round 3: every no-table year (2024 / 2025 / 2027 / 2036) shows a visible qualifier tag in the summary row; nothing truncated at 1000×700 and the four viewports', () =>
+  withPage(T1412, async (page) => {
+    const cases = [
+      ['2025-10', '2025 年仅标固定日期的法定假日'], ['2025-11', '2025 年仅标固定日期的法定假日'],
+      ['2027-05', '2027 年仅标法定假日'], ['2036-10', '2036 年仅标固定日期的法定假日'], ['2024-05', '2024 年未标法定假日'],
+    ];
+    const rows = [];
+    for (const [w, ht] of [[1000, 700], ...VIEWPORTS]) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [ym, tagWant] of cases) {
+        const [y, m] = ym.split('-').map(Number);
+        await page.locator('.cal-today').click();
+        const diff = (y - 2026) * 12 + (m - 11);
+        for (let i = 0; i < Math.abs(diff); i++) await page.getByRole('button', { name: diff < 0 ? /上月/ : /下月/ }).click();
+        const r = await page.evaluate(() => {
+          const row = document.querySelector('.cal-summary');
+          const tag = row.querySelector('.cal-year-tag');
+          const note = row.querySelector('.cal-note');
+          const cut = (e) => e.scrollWidth > e.clientWidth + 0.5 || [...e.querySelectorAll('*')].some((c) => c.scrollWidth > c.clientWidth + 0.5);
+          const rr = row.getBoundingClientRect();
+          const inside = (e) => { const b = e.getBoundingClientRect(); return b.right <= rr.right + 0.5 && b.bottom <= rr.bottom + 0.5; };
+          return { tag: tag.hidden ? null : tag.textContent, tagCut: !tag.hidden && cut(tag), noteText: note.textContent, noteCut: cut(note), inside: inside(note) && (tag.hidden || inside(tag)), h: Math.round(rr.height) };
+        });
+        rows.push({ w, ym, ...r });
+        assert.equal(r.tag, tagWant, `${ym} @${w}: visible qualifier`);
+        assert.equal(r.tagCut, false, `${ym} @${w}: tag not truncated`);
+        assert.equal(r.noteCut, false, `${ym} @${w}: pill not truncated (${r.noteText})`);
+        assert.equal(r.inside, true, `${ym} @${w}: pill and tag inside the row`);
+      }
+    }
+    console.log(`MEASURE ${JSON.stringify({ case: 'C r3 qualifier', rows })}`);
+    const m = await measure(page);
+    assert.ok(m.scrollH <= m.ih);
+  }));
+
+// 窄格子（< 1240px）里「周X」与「计薪 ¥…」是不可拆的单位：只在单位之间换行，仍不截断
+test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「计薪 ¥…」 never split; no truncation (1000×700, 1100×700)', () =>
+  withPage(T1412, async (page) => {
+    const bad = [];
+    for (const [w, ht] of [[1000, 700], [1100, 700]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [move, keys] of [[null, ['2026-11-03', '2026-11-18', '2026-11-28']], [/上月/, ['2026-10-10', '2026-10-01', '2026-10-17']]]) {
+        await page.locator('.cal-today').click();
+        if (move) await page.getByRole('button', { name: move }).click();
+        for (const key of keys) {
+          await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
+          await page.clock.runFor(450);
+          const r = await page.evaluate(() => {
+            const tip = document.querySelector('.day-tooltip');
+            const lines = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
+            const title = lines[0];
+            const wk = [...title.querySelectorAll('.u')].find((u) => /^周/.test(u.textContent));
+            const pay = tip.querySelector('.tip-pay');
+            return {
+              weekday: wk ? wk.getClientRects().length : -1, pay: pay.getClientRects().length, payText: pay.textContent,
+              cut: lines.filter((x) => x.scrollWidth > x.clientWidth + 0.5).map((x) => x.textContent), vclip: tip.scrollHeight > tip.clientHeight + 0.5,
+            };
+          });
+          await page.mouse.move(0, 0);
+          if (r.weekday !== 1 || r.pay !== 1 || r.cut.length || r.vclip) bad.push(`${w} ${key}: ${JSON.stringify(r)}`);
+        }
+      }
+    }
+    console.log(`MEASURE ${JSON.stringify({ case: 'C r3 units', bad })}`);
+    assert.deepEqual(bad, []);
+  }));

@@ -19,7 +19,8 @@ export function createDayTooltip(doc) {
     const cell = btn.parentElement;
     if (!btn.isConnected || !cell) return;
     el.replaceChildren(
-      h(doc, 'span', { class: 'tip-title', text: m.titleShort }),
+      // 「11月18日」「周三」各是不可拆的单位：窄格子换行时只在单位之间换（round 3）
+      h(doc, 'span', { class: 'tip-title' }, m.titleShort.split(' ').flatMap((u, i) => [i ? ' ' : null, h(doc, 'span', { class: 'u', text: u })])),
       h(doc, 'span', { class: 'tip-status', text: m.statusShort }),
       h(doc, 'span', { class: 'tip-source', text: m.sourceLabel }),
       h(doc, 'span', { class: 'tip-pay', text: m.payShort }));

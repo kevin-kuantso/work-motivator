@@ -74,7 +74,8 @@ test('no-table PAST years: no tag; the pill states what the app marked (R49: fix
 });
 
 test('years before 2025 without a table: nothing is marked and the pill says so', () => {
-  assert.deepEqual(ctx(2024, 10), { tone: 'unknown', check: false, text: '没有 2024 年的假期数据，未标出假日', sub: null, title: '没有 2024 年的假期数据，未标出假日' });
+  // round 3：同一行有「2024 年未标法定假日」标签，胶囊只写本月事实，长说明在 title
+  assert.deepEqual(ctx(2024, 10), { tone: 'unknown', check: false, text: '本月没有已标出的法定假日', sub: null, title: '没有 2024 年的假期数据，未标出假日' });
 });
 
 test('collisions and grouping: 2028-10-03 (国庆 + 中秋) once as 国庆; same name split into two runs; several names in a month', () => {
@@ -100,9 +101,9 @@ test('monthHolidays ignores manual marks and the weekends switch (pure table / s
   assert.deepEqual(h.makeup, [{ name: '国庆', day: 10 }]);
 });
 
-test('R41 missing-table tag: only current and future years; wording follows what is actually marked; clock-driven', () => {
+test('R41 (amended round 3) missing-table tag: every no-table year, past or future; wording follows what is actually marked', () => {
   assert.equal(missingTableTag(2026, NOW, HOLIDAYS_CN, t), null, 'has a table');
-  assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t), null, 'past year: no tag');
+  assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t).text, '2025 年仅标固定日期的法定假日', 'past year: visible qualifier too (round 3)');
   assert.deepEqual(missingTableTag(2027, NOW, HOLIDAYS_CN, t), {
     kind: 'lunar', text: '2027 年仅标法定假日',
     title: '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
@@ -114,7 +115,7 @@ test('R41 missing-table tag: only current and future years; wording follows what
   assert.match(f.title, /元旦、劳动节、国庆/);
   assert.ok([...f.text].filter((c) => /\p{Script=Han}/u.test(c)).length <= 14, '≤ 14 CJK characters');
   assert.equal(missingTableTag(2035, new Date(2035, 5, 1), HOLIDAYS_CN, t).kind, 'lunar');
-  assert.equal(missingTableTag(2027, new Date(2028, 0, 1), HOLIDAYS_CN, t), null, 'a year becomes past with the injected clock');
+  assert.equal(missingTableTag(2027, new Date(2028, 0, 1), HOLIDAYS_CN, t).kind, 'lunar', 'a past lunar year keeps its tag');
   assert.equal(missingTableTag(2025, new Date(2025, 5, 1), HOLIDAYS_CN, t).kind, 'fixed', '2025 current (clock in 2025): fixed days only');
   assert.equal(missingTableTag(2024, new Date(2024, 5, 1), HOLIDAYS_CN, t).text, '2024 年未标法定假日');
   assert.deepEqual([2024, 2025, 2026, 2027, 2035, 2036].map(noTableKind), ['none', 'fixed', 'fixed', 'lunar', 'lunar', 'fixed']);
@@ -125,8 +126,8 @@ test('R41 missing-table tag: only current and future years; wording follows what
 test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and tag agree; fixed years never claim lunar days', () => {
   const all = [];
   for (const [y, m, today, text, tagKind] of [
-    [2025, 1, NOW, '元旦 1/1 放假', null],
-    [2025, 10, NOW, '国庆 10/1–10/3 放假', null],
+    [2025, 1, NOW, '元旦 1/1 放假', 'fixed'],
+    [2025, 10, NOW, '国庆 10/1–10/3 放假', 'fixed'],
     [2036, 1, NOW, '元旦 1/1 放假', 'fixed'],
     [2036, 5, NOW, '劳动节 5/1–5/2 放假', 'fixed'],
     [2036, 7, NOW, '本月没有已标出的法定假日', 'fixed'],

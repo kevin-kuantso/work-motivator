@@ -18,7 +18,8 @@ export function noTableKind(year) {
 // 有表（内置 / 联网 / 导入）→ null。
 export function missingTableTag(year, today, tables, t) {
   if (has(tables, year) && tables[year]) return null;
-  if (!(today instanceof Date) || year < today.getFullYear()) return null;
+  // round 3：过去的无表年份也显示（不再「过去不显示」，R41 修订）——三种措辞都只说 app 标了什么，对过去同样成立
+  if (!(today instanceof Date)) return null;
   const c = t.card;
   switch (noTableKind(year)) {
     case 'lunar': return { kind: 'lunar', text: c.yearMissing(year), title: c.yearMissingLong(year) };
@@ -87,8 +88,8 @@ export function monthContext(year, monthIndex, tables, today, t) {
   else basis = noTableKind(year) === 'lunar' ? C.basis.lunar : C.basis.fixed; // R49：说 app 标了什么，过去 / 将来同一句
   
   if (!table && noTableKind(year) === 'none') {
-    const text = C.noData(year);
-    return { tone: 'unknown', check: false, text, sub: null, title: text };
+    // 同一行已有「{年} 年未标法定假日」标签：胶囊只写本月的事实，长说明放 title（round 3，窄视窗不截断）
+    return { tone: 'unknown', check: false, text: C.noneMarked, sub: null, title: C.noData(year) };
   }
   const text = marked ? C.join(parts) : table ? C.noHoliday : C.noneMarked;
   // 有表的放假月份：照设计稿只写区间（「依据」放 title）；其余情况把「依据」写出来，缺表标签已显示时改放 title
