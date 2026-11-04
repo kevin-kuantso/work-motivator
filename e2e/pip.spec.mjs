@@ -112,6 +112,47 @@ test('placeholder click, header button and gear all close the PiP; gear opens �
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab-settings', 'focus on the 基本设置 tab');
   }, { init: stub() }));
 
+// R45：齿轮先 window.focus()（开启者视窗，Chrome 123+ 在小窗内的点击手势下会把开启者带到前面），再收回小窗，再切到「基本设置」
+async function gearOrder(page, focusImpl) {
+  await page.evaluate((mode) => {
+    window.__order = [];
+    window.focus = () => {
+      window.__order.push('focus');
+      if (mode === 'throw') throw new Error('focus blocked');
+    };
+    const tab = document.getElementById('tab-settings');
+    new MutationObserver(() => { if (tab.getAttribute('aria-selected') === 'true') window.__order.push('select'); })
+      .observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
+  }, focusImpl);
+  await floatBtn(page).click();
+  await pip(page).locator('#status-card').waitFor();
+  await page.evaluate(() => {
+    const w = window.documentPictureInPicture.window;
+    const orig = w.close;
+    w.close = () => { window.__order.push('close'); orig(); };
+  });
+  await pip(page).locator('#status-card .card-gear').click();
+  await page.evaluate(() => new Promise((r) => queueMicrotask(r))); // MutationObserver 回调
+  return page.evaluate(() => window.__order);
+}
+
+test('R45: gear calls window.focus() first, then closes the PiP, then selects 基本设置 (focused)', () =>
+  withPage(T1412, async (page) => {
+    assert.deepEqual(await gearOrder(page, 'ok'), ['focus', 'close', 'select']);
+    assert.equal(await page.evaluate(() => window.documentPictureInPicture.window), null, 'PiP closed');
+    assert.equal(await page.locator('#card-slot #status-card').count(), 1);
+    assert.equal(await page.getByRole('tab', { name: '基本设置' }).getAttribute('aria-selected'), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab-settings');
+  }, { init: stub() }));
+
+test('R45: a throwing window.focus() does not prevent closing the PiP and the tab switch', () =>
+  withPage(T1412, async (page) => {
+    assert.deepEqual(await gearOrder(page, 'throw'), ['focus', 'close', 'select']);
+    assert.equal(await page.evaluate(() => window.documentPictureInPicture.window), null);
+    assert.equal(await page.getByRole('tab', { name: '基本设置' }).getAttribute('aria-selected'), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab-settings');
+  }, { init: stub() }));
+
 test('PiP timer keeps updating while the opener is hidden; no ghost timers after reopen', () =>
   withPage(T1412, async (page) => {
     // 在主视窗计时器上加记录（所有存活的 interval id，包括 stub 转来的 PiP 计时器）
