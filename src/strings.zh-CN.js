@@ -116,7 +116,8 @@ export const STRINGS = {
     ok: '知道了',
     storageFail: '无法保存设置，关闭页面后会丢失。请先导出备份',
     loadCorrupt: '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。',
-    loadPartial: (labels) => `已保存的设置中有部分项目无法使用，以下项目已改用默认值：${labels.join('、')}`,
+    // 最多列 3 项，其余写「…等 N 项」（R27：保证错误条最坏情况仍有余量）
+    loadPartial: (labels) => `已保存的设置中有部分项目无法使用，以下项目已改用默认值：${labels.slice(0, 3).join('、')}${labels.length > 3 ? `…等 ${labels.length} 项` : ''}`,
   },
 
   status: {

@@ -515,3 +515,69 @@ test('changing numbers use tabular digits in the font Chrome actually uses (same
     console.log(`MEASURE ${JSON.stringify({ case: 'platformFonts', fonts })}`);
   }));
 
+// ---- Task 12 遗留（在 Task 11 修）----
+
+test('M6: 「回到今天」 quiet state looks clickable, not disabled: border ≥ 3:1 against the panel, pointer cursor, enabled', () =>
+  withPage(T1412, async (page) => {
+    const c = await page.locator('.cal-today').evaluate((b) => {
+      const cs = getComputedStyle(b);
+      return { border: cs.borderTopColor, bg: getComputedStyle(document.querySelector('.main-panel')).backgroundColor, btnBg: cs.backgroundColor, color: cs.color, cursor: cs.cursor, disabled: b.disabled, aria: b.getAttribute('aria-disabled') };
+    });
+    const r = ratio(c.border, c.bg);
+    console.log(`MEASURE ${JSON.stringify({ case: 'contrast', what: '回到今天 quiet border', fg: c.border, bg: c.bg, ratio: +r.toFixed(2) })}`);
+    assert.ok(r >= 3, `border contrast ${r.toFixed(2)} ≥ 3:1`);
+    assert.ok(ratio(c.color, c.btnBg) >= 4.5, 'text contrast ≥ 4.5:1');
+    assert.equal(c.cursor, 'pointer');
+    assert.equal(c.disabled, false);
+    assert.equal(c.aria, null);
+  }));
+
+test('M3: at 1000px the PgUp / PgDn hint is never clipped (this month and while viewing another month)', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    const probe = () => page.evaluate(() => {
+      const k = document.querySelector('.cal-keys');
+      const tb = document.querySelector('.cal-toolbar');
+      const kr = k.getBoundingClientRect();
+      const tr = tb.getBoundingClientRect();
+      return { sw: k.scrollWidth, cw: k.clientWidth, right: kr.right, tbRight: tr.right, kbd: [...k.querySelectorAll('kbd')].map((x) => x.textContent), tbOverflow: tb.scrollWidth - tb.clientWidth };
+    });
+    for (const away of [false, true]) {
+      if (away) await page.getByRole('button', { name: /下月/ }).click();
+      const m = await probe();
+      console.log(`MEASURE ${JSON.stringify({ case: 'pgkeys@1000', away, ...m })}`);
+      assert.ok(m.sw <= m.cw, `hint not clipped (${m.sw} > ${m.cw})`);
+      assert.ok(m.right <= m.tbRight + 0.5, 'hint inside the toolbar');
+      assert.equal(m.tbOverflow, 0, 'toolbar does not overflow');
+      assert.deepEqual(m.kbd, ['PgUp', 'PgDn'], 'keys still shown');
+    }
+    await page.setViewportSize({ width: 1280, height: 585 });
+    assert.match(await page.locator('.cal-keys').innerText(), /切换月份/, 'full hint at 1280');
+  }));
+
+test('M2: focus stays on the error-bar button when the bar re-renders (save attempt while storage fails)', () =>
+  withPage(T1412, async (page) => {
+    await tab(page, '基本设置').click();
+    await page.evaluate(() => { window.__fail = true; });
+    await page.getByLabel('月薪').fill('7000');
+    const exportBtn = page.locator(`${errorBar} button[data-action="export"]`);
+    assert.equal(await exportBtn.isVisible(), true);
+    await exportBtn.focus();
+    // 不移动焦点地触发一次保存（例如自动保存 / 其他分页事件）：错误条会重画
+    await page.evaluate(() => {
+      const i = document.getElementById('f-salary');
+      i.value = '7100';
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    assert.equal(await page.evaluate(() => document.activeElement?.dataset?.action ?? document.activeElement?.tagName), 'export', 'focus not lost to BODY');
+    // 按钮组合真的变了才重建（储存恢复 → 错误条消失）
+    await page.evaluate(() => { window.__fail = false; });
+    await page.getByLabel('月薪').fill('7200');
+    assert.equal(await page.locator(errorBar).isVisible(), false);
+  }, { init: () => {
+    const orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (window.__fail && k === 'work-motivator-v1') throw new DOMException('quota', 'QuotaExceededError');
+      return orig.call(this, k, v);
+    };
+  } }));
