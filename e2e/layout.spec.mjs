@@ -353,8 +353,8 @@ test('summary row: workdays and daily wage live; missing-table tag in the summar
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
   });
   await withPage('2027-01-04T10:00:00+08:00', async (page) => {
-    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年假期未内置');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 20 天 · 日薪 ¥340.00');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标固定法定日');
     assert.equal(await page.locator('.cal-toolbar .cal-year-tag').count(), 0, 'not in the toolbar');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);

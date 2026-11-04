@@ -317,9 +317,27 @@ test('clock rollover while the menu is open keeps it usable; 2027 days use the p
     assert.equal(await page.getByRole('menuitemradio').count(), 2);
     await page.keyboard.press('Escape');
     await openMenu(page, '1月1日');
-    assert.equal(await text(page, '.day-menu-header'), '1月1日 周五 · 工作日');
+    assert.equal(await text(page, '.day-menu-header'), '1月1日 周五 · 法定假日（元旦）', 'R39: fixed-date statutory holiday');
+    assert.equal(await page.getByRole('menuitemradio').count(), 2);
+    await page.keyboard.press('Escape');
+    await openMenu(page, '1月4日');
+    assert.equal(await text(page, '.day-menu-header'), '1月4日 周一 · 工作日');
     assert.equal(await page.getByRole('menuitemradio').count(), 4);
     assertMainland(await menu(page).innerText(), '2027 menu');
+  }));
+
+test('R39: 2027 fixed-date holidays carry the 「法定日期（《放假办法》）」 source in tooltip and aria; unknown days do not', () =>
+  withPage('2027-01-04T10:00:00+08:00', async (page) => {
+    const desc = (label) => cell(page, label).evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent);
+    assert.equal(await desc('1月1日'), '1月1日 周五，法定假日（元旦），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    assert.match(await desc('1月4日'), /工作日，来源：按默认规则，当日计薪 ¥340\.00/);
+    await cell(page, '1月1日').hover();
+    await page.clock.runFor(450);
+    assert.match(await tooltip(page).innerText(), /来源：法定日期（《放假办法》）/);
+    await page.locator('.cal-summary-text').hover();
+    // 2 月（春节）不猜：2027-02-06 只是普通周六
+    await page.getByRole('button', { name: /下月/ }).click();
+    assert.match(await desc('2月6日'), /休息日，来源：按周末规则/);
   }));
 
 test('rollover inside the same month refreshes an open menu in place', () =>

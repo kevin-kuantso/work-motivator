@@ -197,8 +197,9 @@ const t2027 = { 2027: { off: { '2027-01-01': '元旦' }, makeup: { '2027-01-02':
 test('tables param drives dayInfo / workdaysInMonth / snapshot; default unchanged', () => {
   const d = new Date(2027, 0, 1);
   assert.equal(dayInfo(d, cfg, {}).tableMissing, true);
-  assert.equal(dayInfo(d, cfg, {}).source, 'rule');
-  assert.equal(dayInfo(d, cfg, {}).base, 'work');
+  assert.equal(dayInfo(d, cfg, {}).source, 'statutory');
+  assert.equal(dayInfo(d, cfg, {}).base, 'rest');
+  assert.equal(dayInfo(new Date(2027, 0, 4), cfg, {}).source, 'rule');
   const i = dayInfo(d, cfg, {}, t2027);
   assert.equal(i.base, 'rest');
   assert.equal(i.source, 'online');
@@ -206,7 +207,7 @@ test('tables param drives dayInfo / workdaysInMonth / snapshot; default unchange
   assert.equal(dayInfo(d, cfg, { '2027-01-01': 'work' }, t2027).source, 'manual');
   assert.equal(dayInfo(new Date(2026, 0, 1), cfg, {}).source, 'builtin');
   assert.equal(dayInfo(new Date(2026, 0, 5), cfg, {}).source, 'rule');
-  assert.notEqual(workdaysInMonth(2027, 0, cfg, {}), workdaysInMonth(2027, 0, cfg, {}, { 2027: { ...t2027[2027], makeup: {} } }));
+  assert.notEqual(workdaysInMonth(2027, 0, cfg, {}, t2027), workdaysInMonth(2027, 0, cfg, {}, { 2027: { ...t2027[2027], makeup: {} } }));
   assert.equal(snapshot(new Date(2027, 0, 1, 10), { salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' }, {}, t2027).status, 'restDay');
 });
 
