@@ -53,7 +53,7 @@ export const STRINGS = {
     notObject: '文件内容的结构不正确',
     labels: {
       start: '上班时间', end: '下班时间', lunchStart: '午休开始时间', lunchEnd: '午休结束时间',
-      lunchOn: '午休开关', weekends: '周末开关',
+      lunchOn: '午休开关', weekends: '周末上班',
     },
   },
 
@@ -98,7 +98,7 @@ export const STRINGS = {
     checking: '检查中…',
     importFile: '导入假期表文件',
     checkHint: '联网获取新公布的放假安排',
-    importHint: '打不开网络时，用文件导入',
+    importHint: '连不上网时，用文件导入',
     // 「查看导入文件的格式示例」（R47）：示例是一份完整、能通过校验的最小文件，内容取自 2026 年真实数据
     // （出处链接 = holiday-cn 2026.json 的 papers；01-01 元旦放假、01-04 周日调休上班）；复制的就是显示的这份
     exampleShow: '查看导入文件的格式示例',
@@ -109,7 +109,7 @@ export const STRINGS = {
     exampleCopyFail: '已选中示例，请按 Ctrl+C 复制',
     exampleCode: '{"year":2026,\n "papers":[\n  "https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm"],\n "days":[\n  {"name":"元旦","date":"2026-01-01",\n   "isOffDay":true},\n  {"name":"元旦","date":"2026-01-04",\n   "isOffDay":false}]}',
     exampleFormat: '文件为 holiday-cn 格式的年度 JSON（例如 2027.json）。',
-    exampleYear: 'year：年份，必须和你要导入的年份一致。',
+    exampleYear: 'year：年份（数字，例如 2027）；days 里的日期都必须在这一年内。',
     examplePapers: 'papers：官方放假通知的网址，必须以 https://www.gov.cn/ 开头，否则整份文件会被拒绝。',
     exampleDays: 'days：每一天一条；isOffDay 为 true 表示放假，false 表示调休上班（调休上班日必须是周六或周日）。',
     exampleNeedOff: '文件里至少要有一个放假日，否则会被拒绝。',
@@ -132,9 +132,9 @@ export const STRINGS = {
     importNoYear: '文件里没有可用的年份和放假数据，未导入',
     importBuiltin: (y) => `${y} 年假期已内置，未采用导入的数据`,
     customUrl: '自定义数据网址',
-    customUrlExplain: '默认先从 jsDelivr、再从 GitHub 获取假期数据。如果你的网络打不开，可以填写你自己存放文件的网址。留空 = 使用默认来源。',
+    customUrlExplain: '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空 = 使用默认来源。',
     customUrlPlaceholder: 'https://example.com/{year}.json',
-    customUrlHint: '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。',
+    customUrlHint: '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。',
     customUrlSummary: (host) => `自定义数据网址：${host ?? '未设置'}`,
     customUrlError: '网址必须以 https:// 开头，并包含 {year}',
     customUrlChars: '网址里只能用半角字母、数字和常见符号，不能有空格、不可见字符或中文',
@@ -214,6 +214,9 @@ export const STRINGS = {
     holidayDesc: (years) => `法定节假日与调休。内置 ${years.join('、')} 年；之后的年份可联网更新，或导入文件。`,
     backupDesc: '设置只保存在这个浏览器里，不会上传。',
     advancedSub: '一般不用改',
+    // 展开 / 收起的小三角（与 banner.closeGlyph 一样放在文案里）
+    chevronClosed: '▸',
+    chevronOpen: '▾',
     salaryUnit: '元 / 月',
     workTime: '上下班时间',
     lunchTime: '午休时间',
@@ -246,6 +249,8 @@ export const STRINGS = {
       exportText: '把月薪、上下班时间、月历标记保存成文件。换电脑或清除浏览数据前，请先导出。',
       importLead: '导入备份：',
       importText: '用之前导出的文件恢复这些设置。',
+      // 只是说明现状（备份内容不变，Kevin 2026-11-04）
+      scope: '备份不含联网取得或导入的假期表和自定义数据网址。',
     },
   },
 

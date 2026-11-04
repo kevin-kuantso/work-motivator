@@ -60,3 +60,21 @@ test('the format example is the real 2026 excerpt and passes the app\'s own shap
   assert.equal(new Date(2026, 0, 4).getDay(), 0, 'make-up day on a weekend (validation would reject a weekday)');
   assert.ok(ex.papers.every((u) => u.startsWith('https://www.gov.cn/')));
 });
+
+// Task 14 fix round 1 · Block B
+test('B: no hard-coded disclosure glyphs outside strings; weekends switch uses one wording in UI, import report and reasons', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../src/ui/', import.meta.url);
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+    const code = readFileSync(new URL(f, dir), 'utf8').replace(/\/\/.*$/gm, '');
+    assert.doesNotMatch(code, /[▸▾]/, `${f}: glyphs must come from strings`);
+  }
+  assert.equal(STRINGS.settings.chevronClosed, '▸');
+  assert.equal(STRINGS.settings.chevronOpen, '▾');
+  assert.equal(STRINGS.settings.weekends, '周末上班');
+  assert.equal(STRINGS.reasons.labels.weekends, '周末上班');
+  assert.equal(STRINGS.reasons.switchValue(STRINGS.reasons.labels.weekends), '周末上班只能是开或关');
+  assert.equal(STRINGS.holidayUpdate.exampleYear, 'year：年份（数字，例如 2027）；days 里的日期都必须在这一年内。');
+  assert.equal(STRINGS.holidayUpdate.importHint, '连不上网时，用文件导入');
+  assert.doesNotMatch(STRINGS.holidayUpdate.customUrlExplain, /网络打不开/);
+});

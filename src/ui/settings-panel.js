@@ -76,7 +76,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
 
   // 高级设置（折叠，APG 手风琴：标题里放按钮）：卡头整个是按钮，右侧摘要「自定义数据网址：未设置 / 主机名」
   const advBody = h(doc, 'div', { class: 'scard-body adv-body', id: 'adv-body', hidden: true }, holiday ? holiday.advBody : null);
-  const advChev = h(doc, 'span', { class: 'chev', 'aria-hidden': 'true', text: '▸' });
+  const advChev = h(doc, 'span', { class: 'chev', 'aria-hidden': 'true', text: s.chevronClosed });
   const advCard = h(doc, 'section', { class: 'scard section-adv', 'aria-labelledby': 'adv-title' });
   const advToggle = h(doc, 'button', {
     type: 'button', class: 'adv-toggle adv-head', id: 'adv-toggle', 'aria-expanded': 'false', 'aria-controls': 'adv-body',
@@ -85,7 +85,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
       advBody.hidden = !open;
       advToggle.setAttribute('aria-expanded', String(open));
       advCard.classList.toggle('is-open', open);
-      setText(advChev, open ? '▾' : '▸');
+      setText(advChev, open ? s.chevronOpen : s.chevronClosed);
       if (open) advBody.scrollIntoView({ block: 'nearest' }); // 右栏需要内部滚动时，把展开的内容带进视野
     },
   }, advChev, h(doc, 'span', { class: 'adv-title', id: 'adv-title', text: s.sections.advanced }),
@@ -119,6 +119,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
         card('backup', 'data', s.sections.backup, s.backupDesc,
           h(doc, 'p', { class: 'para' }, h(doc, 'b', { text: b.exportLead }), b.exportText),
           h(doc, 'p', { class: 'para' }, h(doc, 'b', { text: b.importLead }), b.importText),
+          h(doc, 'p', { class: 'para backup-scope', text: b.scope }),
           h(doc, 'div', { class: 'btn-row backup-actions' },
             h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', text: b.export, onclick: onExport }),
             h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: b.import, onclick: onImport }),
