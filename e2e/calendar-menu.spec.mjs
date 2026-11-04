@@ -334,10 +334,10 @@ test('R39: 2027 fixed-date holidays carry the 「法定日期（《放假办法�
     await cell(page, '1月1日').hover();
     await page.clock.runFor(450);
     assert.match(await tooltip(page).innerText(), /来源：法定日期（《放假办法》）/);
-    await page.locator('.cal-summary-text').hover();
-    // 2 月（春节）不猜：2027-02-06 只是普通周六
+    // R40：2027-02-06（周六）是春节初一：法定假日，来源「法定日期」；补假不猜，2 月 9 日仍是普通工作日
     await page.getByRole('button', { name: /下月/ }).click();
-    assert.match(await desc('2月6日'), /休息日，来源：按周末规则/);
+    assert.equal(await desc('2月6日'), '2月6日 周六，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    assert.match(await desc('2月9日'), /工作日，来源：按默认规则/);
   }));
 
 test('rollover inside the same month refreshes an open menu in place', () =>

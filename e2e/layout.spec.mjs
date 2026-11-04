@@ -354,7 +354,7 @@ test('summary row: workdays and daily wage live; missing-table tag in the summar
   });
   await withPage('2027-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 20 天 · 日薪 ¥340.00');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标固定法定日');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标法定假日');
     assert.equal(await page.locator('.cal-toolbar .cal-year-tag').count(), 0, 'not in the toolbar');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
@@ -367,6 +367,31 @@ test('summary row: workdays and daily wage live; missing-table tag in the summar
     assertCalendarFits(m, '2027-05 at 1280x585');
   });
 });
+
+// R40：2027 年 2 月（无表）：春节 2/5–2/8 标「假 春节」，周末也标；补假 / 调休不猜
+test('2027-02 (no table): 春节 2/5-2/8 marked, summary 18 days, tag text, fits at 1280x585', () =>
+  withPage('2027-02-04T10:00:00+08:00', async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
+    for (const [label, wd] of [['2月5日', '周五'], ['2月6日', '周六'], ['2月7日', '周日'], ['2月8日', '周一']]) {
+      assert.match(await cell(page, label).getAttribute('aria-label'), new RegExp(`^${label} ${wd}，法定假日（春节）`), label);
+      assert.match(await cell(page, label).textContent(), /假.*春节|春节.*假/s, `${label} badge`);
+    }
+    assert.match(await cell(page, '2月9日').getAttribute('aria-label'), /^2月9日 周二，工作日/, 'no invented compensation day');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标法定假日');
+    assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2027 年放假安排未公布：已按《放假办法》标出法定假日本身；补假、调休和延长的假日待公布');
+    assert.ok((await text(page, '.cal-summary .cal-year-tag')).length <= 14, 'tag <= 14 chars');
+    const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(h <= 30, `summary row stays one line (${h})`);
+    const m = await measure(page);
+    console.log(`MEASURE ${JSON.stringify({ case: '2027-02 春节', tab: 'calendar', ...m })}`);
+    assertFits(m, '2027-02 at 1280x585'); // 2027-02 只有 4 周，不是 6 周月份
+    assert.equal(m.weeks, 4);
+    assert.equal(m.lastRowInside, true);
+    assert.equal(m.clippedCells, 0);
+    await page.screenshot({ path: new URL('../.superpowers/sdd/plan/task-16-feb2027.png', import.meta.url).pathname });
+  }));
 
 // WCAG 对比度：由浏览器实际算出的颜色计算（rgb）
 const ratio = (a, b) => {

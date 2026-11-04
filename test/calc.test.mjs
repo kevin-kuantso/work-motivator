@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSchedule, snapshot } from '../src/calc.js';
+import { validateSchedule, snapshot, monthWage } from '../src/calc.js';
 
 const cfg = {
   salary: 6800, start: '08:30', end: '17:00', lunchOn: true,
@@ -185,4 +185,16 @@ test('R39: 2027-01-04 10:00 (no table): Jan 1 is a statutory rest day -> 20 work
   const f = snapshot(new Date(2027, 0, 1, 10, 0, 0), cfg, {});
   assert.equal(f.status, 'restDay');
   assert.equal(f.earned, 0);
+});
+
+test('R40: 2027 daily wages with the lunar / solar-term legal days (no table)', () => {
+  const expected = { 1: 18, 2: 23, 6: 22, 7: 22, 10: 22 }; // month index -> workdays
+  for (const [m, n] of Object.entries(expected)) {
+    const w = monthWage(2027, Number(m), cfg, {});
+    assert.equal(w.workdays, n, `month index ${m}`);
+    near(w.dailyWage, 6800 / n, 1e-9);
+  }
+  near(monthWage(2027, 1, cfg, {}).dailyWage, 377.78, 0.005);
+  near(monthWage(2027, 2, cfg, {}).dailyWage, 295.65, 0.005);
+  near(monthWage(2027, 6, cfg, {}).dailyWage, 309.09, 0.005);
 });
