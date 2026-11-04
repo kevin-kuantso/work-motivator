@@ -15,9 +15,11 @@ export function createFloatControl(doc, t, { cardRoot, onOpen, onClose, onFail }
   const note = h(doc, 'p', { class: 'float-note is-warn', id: 'float-note', hidden: supported, text: f.unsupported });
   const keepOpen = h(doc, 'p', { class: 'float-note', id: 'float-keep', hidden: true, text: f.keepOpen });
   const label = h(doc, 'span', { class: 'float-label', text: t.header.float });
+  // 不支持：aria-disabled（不用原生 disabled），按钮仍可聚焦、读屏读得到原因（R52）；按下什么都不做
   const button = h(doc, 'button', {
     type: 'button', class: 'btn btn-primary float-btn', id: 'btn-float',
-    disabled: !supported, 'aria-describedby': supported ? undefined : 'float-note', onclick: toggle,
+    'aria-disabled': supported ? undefined : 'true', 'aria-describedby': supported ? undefined : 'float-note',
+    onclick: () => { if (supported) toggle(); },
   }, icon(doc, 'pip'), label);
   // 整张占位卡是一个按钮；不显示金额，避免两处同时跳动与重复朗读（design §4.4）
   // 可访问名称 = 「已悬浮 · 点此收回」；说明作为描述
@@ -41,6 +43,27 @@ export function createFloatControl(doc, t, { cardRoot, onOpen, onClose, onFail }
     if (on) button.setAttribute('aria-describedby', 'float-keep');
     else button.removeAttribute('aria-describedby');
   }
+
+  // 卡片在主分页时该有的高度（R52）：悬浮中卡片在小窗里，用一份不可见的复本在占位位置量（同步，不会绘制）
+  function liveCardHeight() {
+    if (cardRoot.ownerDocument === doc && cardRoot.isConnected) return cardRoot.offsetHeight;
+    const slot = placeholder.parentNode;
+    if (!slot) return 0;
+    const clone = cardRoot.cloneNode(true);
+    for (const el of [clone, ...clone.querySelectorAll('[id]')]) el.removeAttribute('id');
+    clone.dataset.size = 'lg';
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;width:100%';
+    slot.append(clone);
+    const height = clone.offsetHeight;
+    clone.remove();
+    return height;
+  }
+  function syncPlaceholder() {
+    if (!pipWin) return;
+    placeholder.style.minHeight = `${liveCardHeight()}px`;
+  }
+  win.addEventListener('resize', syncPlaceholder);
 
   async function open() {
     if (opening) return;

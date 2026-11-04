@@ -698,7 +698,7 @@ for (const [state, init, act] of floatStates) {
     withPage(T1412, async (page) => {
       await act(page);
       const notes = await page.evaluate(() => [...document.querySelectorAll('.float-control .float-note')].filter((n) => !n.hidden).map((n) => n.textContent));
-      const btn = await page.locator('#btn-float').evaluate((b) => ({ text: b.textContent, disabled: b.disabled, desc: b.getAttribute('aria-describedby') }));
+      const btn = await page.locator('#btn-float').evaluate((b) => ({ text: b.textContent, disabled: b.disabled || b.getAttribute('aria-disabled') === 'true', desc: b.getAttribute('aria-describedby') }));
       if (state === 'default') {
         assert.deepEqual(notes, []);
         assert.deepEqual(btn, { text: '悬浮成小窗', disabled: false, desc: null });
@@ -1128,3 +1128,105 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
     check(await grab(page, ['#float-note', '#btn-float']));
   }, { init: NO_PIP });
 });
+
+// ---- Task 14 fix round 1 · Block A（R51 / R52）----
+
+// A1：1000–1199px 宽时设置分页变成单栏：所有卡片都必须能在分页内部滚动到（分页标签不动、页面不滚）
+async function scrollSettingsToBottom(page) {
+  return page.evaluate(() => {
+    const sp = document.getElementById('panel-settings');
+    for (const el of [sp, ...sp.querySelectorAll('*')]) if (el.scrollHeight > el.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) el.scrollTop = el.scrollHeight;
+    const pr = sp.getBoundingClientRect();
+    const adv = document.querySelector('.section-adv').getBoundingClientRect();
+    const tl = document.querySelector('[role=tablist]').getBoundingClientRect();
+    return {
+      panel: [Math.round(pr.top), Math.round(pr.bottom)], adv: [Math.round(adv.top * 10) / 10, Math.round(adv.bottom * 10) / 10],
+      advVisible: adv.top >= pr.top - 0.5 && adv.bottom <= pr.bottom + 0.5,
+      tabs: tl.top >= 0 && tl.bottom <= innerHeight, pageScroll: document.documentElement.scrollHeight > innerHeight,
+    };
+  });
+}
+test('A1: at 1100×700, 1093×535 and 1000×600 every settings card is reachable by scrolling inside the panel; 1024×468 never scrolls the page', () =>
+  withPage(T1412, async (page) => {
+    for (const [w, ht] of [[1100, 700], [1093, 535], [1000, 600]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      await tab(page, '基本设置').click();
+      const r = await scrollSettingsToBottom(page);
+      console.log(`MEASURE ${JSON.stringify({ case: 'A1 settings scroll to bottom', w, ht, ...r })}`);
+      assert.equal(r.advVisible, true, `${w}x${ht}: 高级设置 fully visible after scrolling (adv ${r.adv} panel ${r.panel})`);
+      assert.equal(r.tabs, true, `${w}x${ht}: tab labels visible`);
+      assert.equal(r.pageScroll, false, `${w}x${ht}: page does not scroll`);
+    }
+    // 1024×468（设置分页）：页面不滚动。月历分页在这个高度放不下 6 行 × 40px 的最小行高（spec §13.1），只记录量测值
+    await page.setViewportSize({ width: 1024, height: 468 });
+    for (const tb of ['基本设置', '月历']) {
+      await tab(page, tb).click();
+      const s = await page.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: innerHeight }));
+      console.log(`MEASURE ${JSON.stringify({ case: 'A1 1024x468', tab: tb, ...s })}`);
+      if (tb === '基本设置') {
+        assert.ok(s.sh <= s.ih, `1024x468 ${tb}: page does not scroll (${s.sh} > ${s.ih})`);
+        const r = await scrollSettingsToBottom(page);
+        assert.equal(r.advVisible, true, '1024x468: 高级设置 reachable');
+      }
+    }
+  }));
+
+// A2：Windows 常驻卷轴（12 / 17px）+ 错误条 + 信息条，1280×585 默认状态左栏不得溢出
+for (const sb of [17, 12]) {
+  test(`A2: classic ${sb}px scrollbars at 1280×585 with error + info banners: the left settings column does not overflow`, () =>
+    withPage(T1412, async (page) => {
+      await page.setViewportSize({ width: 1280, height: 585 });
+      await page.addStyleTag({ content: `::-webkit-scrollbar{width:${sb}px;height:${sb}px;background:#eee}::-webkit-scrollbar-thumb{background:#999}` });
+      await tab(page, '基本设置').click();
+      await page.getByLabel('月薪').fill('7000');
+      await page.getByLabel('月薪').fill('6800');
+      assert.equal(await page.locator(errorBar).isVisible(), true);
+      assert.equal(await page.locator(infoBar).isVisible(), true);
+      const m = await measure(page);
+      const heads = await page.evaluate(() => [...document.querySelectorAll('.scard-head')].map((h) => Math.round(h.getBoundingClientRect().height)));
+      console.log(`MEASURE ${JSON.stringify({ case: `A2 scrollbar ${sb}px`, colOverflow: m.settingsColOverflow, colSlack: m.settingsColSlack, heads })}`);
+      assert.deepEqual(m.settingsColOverflow, [0, 0], `${sb}px scrollbar: no column overflow`);
+      assert.equal(await page.locator('#hint-cheer').evaluate((e) => {
+        const c = e.closest('.set-col').getBoundingClientRect();
+        return e.getBoundingClientRect().bottom <= c.bottom + 0.5;
+      }), true, '#hint-cheer inside the column');
+    }, corruptThenQuota));
+}
+
+// A3（R52）：悬浮中占位卡的高度跟着「此刻」卡片该有的高度（视窗跨过 640px 时不跳）；不支持时按钮是 aria-disabled 且可聚焦
+test('A3: while floating the placeholder height follows the live card height across the 640px breakpoint (no jump on recall)', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await page.locator('#btn-float').click();
+    await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
+    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; }); // stub 视窗盖在左下，会挡住按钮的点击
+    const ph = () => page.locator('.pip-placeholder').evaluate((e) => Math.round(e.getBoundingClientRect().height * 10) / 10);
+    const tall = await ph();
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await page.clock.runFor(100); // resize 事件在下一次渲染更新时派发：让暂停的时钟走一点
+    await new Promise((r) => setTimeout(r, 100));
+    const short = await ph();
+    await page.locator('#btn-float').click(); // 收回
+    const card = await page.locator('#status-card').evaluate((e) => Math.round(e.getBoundingClientRect().height * 10) / 10);
+    console.log(`MEASURE ${JSON.stringify({ case: 'A3 placeholder height', tall, short, cardAfterRecall: card })}`);
+    assert.ok(Math.abs(short - card) <= 1, `placeholder ${short} = card after recall ${card} (no jump)`);
+    assert.ok(tall > short, 'the placeholder did follow the breakpoint');
+  }, { init: FLOAT_STUB }));
+
+test('A3: unsupported browser — float button is aria-disabled (not native disabled), keyboard-focusable, described by the reason; activating does nothing', () =>
+  withPage(T1412, async (page) => {
+    const b = page.locator('#btn-float');
+    assert.equal(await b.evaluate((e) => e.disabled), false, 'not native disabled');
+    assert.equal(await b.getAttribute('aria-disabled'), 'true');
+    assert.equal(await b.getAttribute('aria-describedby'), 'float-note');
+    await b.focus();
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'btn-float', 'focusable');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press(' ');
+    await b.click({ force: true }); // Playwright 把 aria-disabled 视为不可点：强制派发真实点击
+    await b.evaluate((e) => e.click());
+    assert.equal(await page.locator('#card-slot #status-card').count(), 1, 'nothing happened');
+    assert.equal(await page.locator('.pip-placeholder').isVisible(), false);
+    assert.equal(await page.locator('.toast').isVisible(), false, 'no failure toast');
+    assert.equal(await b.textContent(), '悬浮成小窗');
+  }, { init: NO_PIP }));

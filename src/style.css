@@ -72,7 +72,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .btn-primary { background: var(--color-brand-600); color: #fff; }
 .btn-primary:hover { background: var(--color-brand-700); }
-.btn-primary:disabled { background: var(--color-border-subtle); color: var(--color-text-600); border-color: var(--color-border-control); cursor: not-allowed; }
+.btn-primary:disabled, .btn-primary[aria-disabled="true"] { background: var(--color-border-subtle); color: var(--color-text-600); border-color: var(--color-border-control); cursor: not-allowed; }
 .btn-secondary { border-color: var(--color-border-control); background: var(--color-surface); }
 .btn-secondary:hover, .btn-ghost:hover { background: var(--color-brand-50); }
 .btn-ghost { color: var(--color-text-600); }
@@ -128,7 +128,7 @@ button, input, select { font: inherit; color: inherit; }
 .tabpanel-settings { container-type: inline-size; }
 
 /* StatusCard */
-.card-slot { container-type: inline-size; }
+.card-slot { container-type: inline-size; position: relative; }
 .status-card {
   --tone-bg: var(--state-working-bg); --tone-fg: var(--state-working-fg);
   position: relative; overflow: hidden; background: var(--color-surface);
@@ -188,19 +188,23 @@ button, input, select { font: inherit; color: inherit; }
 /* Settings（基本设置分页，Task 14 / redesign-v3）：两栏 = 两种用途；每组是有边框的卡片，卡头灰底 + 标题 + 一句用途说明。
    默认状态两栏都放得下；展开「格式示例」或「高级设置」放不下时，只让该栏自己内部滚动（决定 1），页面与分页标签不动。 */
 .tabpanel-settings { overflow: hidden; }
-.settings { height: 100%; min-height: 0; }
-/* 「已自动保存」放在分页标签那一行的右侧（相对 .main-panel 定位，不被分页的 overflow 裁掉，也不盖住卡片文字） */
+.settings { position: relative; height: 100%; min-height: 0; overflow: hidden; }
+/* position: relative：分页内的绝对定位元素（看不见的文件输入框等）以滚动区为包含块，被它裁剪，不会把整页撑出卷轴 */
+/* 「已自动保存」放在分页标签那一行的右侧（app.js 把它放在 .main-panel 下、相对它定位，不被分页的 overflow 裁掉，也不盖住卡片文字） */
 .autosave { position: absolute; top: 14px; right: 16px; z-index: 1; font-size: var(--fs-caption); line-height: 20px; color: var(--color-brand-700); background: var(--color-surface); animation: fade-out 1.5s var(--ease) forwards; }
 @keyframes fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .autosave { animation: none; } }
 .set-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); height: 100%; min-height: 0; align-items: stretch; }
-.set-col { display: grid; gap: 10px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-right: 2px; }
+.set-col { display: grid; gap: 10px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 2px; }
+/* 不预留卷轴槽（R51 A2）：Windows 常驻卷轴（12–17px）只在真的需要滚动时才占宽，默认状态不会因此把卡头挤成两行 */
+/* 分页较窄（1000–1199px 宽的视窗）改单栏：整个设置内容在分页内部滚动（R51 A1），每张卡都滚得到，分页标签与页面不动 */
 @container (max-width: 760px) {
+  .settings { overflow-y: auto; }
   .set-grid { grid-template-columns: minmax(0, 1fr); height: auto; }
   .set-col { overflow: visible; }
 }
 @media (max-width: 999px) {
-  .tabpanel-settings { overflow: visible; }
+  .tabpanel-settings, .settings { overflow: visible; }
   .settings, .set-grid { height: auto; }
   .set-col { overflow: visible; }
 }
