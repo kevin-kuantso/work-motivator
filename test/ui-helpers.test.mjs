@@ -166,7 +166,7 @@ test('strings.zh-CN.js: no Taiwan-only terms or Traditional characters', () => {
   assert.deepEqual(trad, []);
 });
 
-test('Task 17: 已下班 gets the wrap-up label and 本月进度; every other status keeps the old copy', () => {
+test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other status keeps the old copy', () => {
   const d = (m, day, h, mi = 0) => {
     const now = at(m, day, h, mi);
     return cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
@@ -174,7 +174,7 @@ test('Task 17: 已下班 gets the wrap-up label and 本月进度; every other st
   const done = d(11, 4, 18); // 2026-11-04 周三 18:00：今天 323.8095、本月累计 971.43
   assert.equal(done.status, 'afterWork');
   assert.equal(done.label, '今天辛苦了，收工！');
-  assert.equal(done.rateLabel, '本月进度');
+  assert.equal(done.rateLabel, '已赚占月薪');
   assert.equal(done.rate, '14%');
   assert.equal(done.month, '¥971.43');
   assert.equal(done.amount.toFixed(4), '323.8095');

@@ -42,12 +42,12 @@ async function openLoadedAt(iso, reducedMotion = false) {
   return { context, page };
 }
 
-test('18:00 on the verification day: wrap-up label, 本月进度 14%, amount and 本月累计 unchanged', () =>
+test('18:00 on the verification day: wrap-up label, 已赚占月薪 14%, amount and 本月累计 unchanged', () =>
   withPage('2026-11-04T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '已下班');
     assert.equal(await text(page, `${card} .card-label`), '今天辛苦了，收工！');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '本月进度');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪');
     assert.equal(await text(page, `${card} .metric-rate .metric-value`), '14%');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥971.43');
     assert.equal(await text(page, `${card} .metric-month .metric-label`), '本月累计');
@@ -69,7 +69,7 @@ test('other statuses keep the old copy (working, lunch, before, rest day, paid l
   await withPage('2026-11-07T18:00:00+08:00', async (page) => { // 周六
     assert.equal(await text(page, `${card} .card-badge`), '休息日');
     const body = await page.evaluate(() => document.body.innerText);
-    assert.ok(!body.includes('收工') && !body.includes('本月进度'), 'no wrap-up copy on a rest day');
+    assert.ok(!body.includes('收工') && !body.includes('已赚占月薪'), 'no wrap-up copy on a rest day');
     assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
   });
   const mark = (v) => ({ content: `localStorage.setItem('work-motivator-v1', JSON.stringify({ version: 1, marks: { '2026-11-04': '${v}' } }))` });
@@ -78,12 +78,12 @@ test('other statuses keep the old copy (working, lunch, before, rest day, paid l
     assert.equal(await text(page, `${card} .card-label`), '今天一共赚了');
     assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
     const body = await page.evaluate(() => document.body.innerText);
-    assert.ok(!body.includes('收工') && !body.includes('本月进度'), 'no wrap-up copy on paid leave');
+    assert.ok(!body.includes('收工') && !body.includes('已赚占月薪'), 'no wrap-up copy on paid leave');
   }, { init: mark('paidLeave') });
   await withPage('2026-11-04T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '无薪假');
     const body = await page.evaluate(() => document.body.innerText);
-    assert.ok(!body.includes('收工') && !body.includes('本月进度'), 'no wrap-up copy on unpaid leave');
+    assert.ok(!body.includes('收工') && !body.includes('已赚占月薪'), 'no wrap-up copy on unpaid leave');
   }, { init: mark('unpaidLeave') });
 });
 
@@ -105,6 +105,19 @@ test('transition 16:59:58 -> 17:00:02 applies the highlight class once, then rem
     assert.ok(off > on, 'class removed afterwards');
     assert.equal(seen.indexOf(true, off), -1, 'applied once only');
     assert.ok(off - on >= 11 && off - on <= 13, `about 1.2 s (${off - on} steps)`);
+  }));
+
+test('a >5 s clock jump across 17:00 (hidden tab / sleep) does not apply the highlight', () =>
+  withPage('2026-11-04T16:59:58+08:00', async (page) => {
+    assert.equal(await text(page, `${card} .card-badge`), '上班中');
+    await page.clock.fastForward(10000); // 一次跳过 17:00，下一次绘制距上次 > 5 s
+    await page.clock.runFor(100);
+    assert.equal(await text(page, `${card} .card-badge`), '已下班');
+    assert.equal(await text(page, `${card} .card-label`), '今天辛苦了，收工！');
+    for (let i = 0; i < 25; i++) {
+      assert.equal(await celebrating(page), false, `step ${i}`);
+      await page.clock.runFor(100);
+    }
   }));
 
 test('page load after hours never applies the highlight', async () => {
@@ -163,10 +176,22 @@ test('layout: 已下班 card height equals the old-copy card at 4 viewports, no 
         rate.textContent = '¥0.0000 /秒';
         const old = ht();
         label.textContent = l; rateLabel.textContent = rl; rate.textContent = rv;
+        const amt = c.querySelector('.card-amount');
+        const posBefore = amt.getBoundingClientRect();
+        const textLeft = (() => { const g = document.createRange(); g.selectNodeContents(amt); return g.getBoundingClientRect().left; })();
+        amt.classList.add('is-celebrating');
+        const box = amt.getBoundingClientRect();
+        const withClass = ht();
+        const inset = textLeft - box.left;
+        const shifted = Math.abs(box.left - posBefore.left) > 6.01 || Math.abs(textLeft - (() => { const g = document.createRange(); g.selectNodeContents(amt); return g.getBoundingClientRect().left; })()) > 0.01;
+        amt.classList.remove('is-celebrating');
         const de = document.documentElement;
-        return { wrap, old, scrollX: de.scrollWidth > de.clientWidth, scrollY: de.scrollHeight > de.clientHeight };
+        return { withClass, inset, shifted, wrap, old, scrollX: de.scrollWidth > de.clientWidth, scrollY: de.scrollHeight > de.clientHeight };
       });
       assert.equal(r.wrap, r.old, `card height unchanged at ${w}x${h}`);
+      assert.equal(r.withClass, r.wrap, `highlight does not change card height at ${w}x${h}`);
+      assert.ok(r.inset >= 6, `highlight box leaves >= 6px inset (${r.inset}) at ${w}x${h}`);
+      assert.equal(r.shifted, false, `text does not move when highlight is applied at ${w}x${h}`);
       assert.equal(r.scrollX || r.scrollY, false, `no page scroll at ${w}x${h}`);
     }, { viewport: { width: w, height: h } });
   }
@@ -181,7 +206,13 @@ test('layout: 已下班 card height equals the old-copy card at 4 viewports, no 
       const label = c.querySelector('.card-label');
       const rateLabel = c.querySelector('.metric-rate .metric-label');
       const rate = c.querySelector('.metric-rate .metric-value');
-      const wrap = { h: ht(), trunc: trunc(), single: label.getBoundingClientRect().height < 24 && rateLabel.getBoundingClientRect().height < 24 };
+      const amt = c.querySelector('.card-amount');
+      const tl = () => { const g = document.createRange(); g.selectNodeContents(amt); return g.getBoundingClientRect().left; };
+      const t0 = tl();
+      amt.classList.add('is-celebrating');
+      const cel = { hc: ht(), inset: t0 - amt.getBoundingClientRect().left, moved: Math.abs(tl() - t0) > 0.01 };
+      amt.classList.remove('is-celebrating');
+      const wrap = { cel, h: ht(), trunc: trunc(), single: label.getBoundingClientRect().height < 24 && rateLabel.getBoundingClientRect().height < 24 };
       const [l, rl, rv] = [label.textContent, rateLabel.textContent, rate.textContent];
       label.textContent = '今天一共赚了'; rateLabel.textContent = '当前赚钱速度'; rate.textContent = '¥0.0000 /秒';
       const old = ht();
@@ -191,6 +222,9 @@ test('layout: 已下班 card height equals the old-copy card at 4 viewports, no 
     assert.deepEqual(r.trunc, [], 'nothing truncated at 340 px');
     assert.equal(r.single, true, 'label and metric label stay on one line');
     assert.equal(r.h, r.old, 'PiP-width card height unchanged');
+    assert.equal(r.cel.hc, r.h, 'highlight keeps 340 px card height');
+    assert.ok(r.cel.inset >= 6, `340 px inset ${r.cel.inset}`);
+    assert.equal(r.cel.moved, false, 'text does not move at 340 px');
   });
 });
 

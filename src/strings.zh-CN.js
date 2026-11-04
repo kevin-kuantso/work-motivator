@@ -174,7 +174,7 @@ export const STRINGS = {
     earnedTotal: '今天一共赚了',
     // 已下班（排定的工作日收工后）的正反馈：换掉标签与「当前赚钱速度」格，不加行
     dayDone: '今天辛苦了，收工！',
-    monthProgress: '本月进度',
+    monthProgress: '已赚占月薪',
     monthProgressValue: (pct) => `${pct}%`,
     resting: '今天休息',
     restingHoliday: (name) => `今天休息 · ${name}`,
