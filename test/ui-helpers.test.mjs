@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { STRINGS as t } from '../src/strings.zh-CN.js';
 import { money, heroParts, duration, hours, minutesCeil, dateLine, ymd } from '../src/ui/format.js';
 import { cardModel } from '../src/ui/card-model.js';
-import { nextMark, cellKind, monthGrid } from '../src/ui/calendar-model.js';
+import { cellKind, monthGrid } from '../src/ui/calendar-model.js';
 import { importReport } from '../src/ui/import-model.js';
 import { snapshot } from '../src/calc.js';
 import { DEFAULTS, importState } from '../src/settings.js';
@@ -91,18 +91,9 @@ test('card model per status', () => {
   assert.equal(cardModel(snapshot(at(11, 3, 10), payToday, {}), payToday, t).payday, '今天发薪');
 });
 
-test('calendar click cycle depends on the unmarked base type', () => {
-  const wd = at(11, 3);
-  assert.equal(nextMark(wd, cfg, {}), 'paidLeave');
-  assert.equal(nextMark(wd, cfg, { '2026-11-03': 'paidLeave' }), 'unpaidLeave');
-  assert.equal(nextMark(wd, cfg, { '2026-11-03': 'unpaidLeave' }), undefined);
-  assert.equal(nextMark(wd, cfg, { '2026-11-03': 'rest' }), undefined, 'foreign mark resets to default');
-  const sat = at(11, 7);
-  assert.equal(nextMark(sat, cfg, {}), 'work');
-  assert.equal(nextMark(sat, cfg, { '2026-11-07': 'work' }), undefined);
-  assert.equal(nextMark(at(10, 1), cfg, {}), 'work', 'holiday is a rest base');
-  assert.equal(nextMark(at(9, 20), cfg, {}), 'paidLeave', 'makeup day is a work base');
-  assert.equal(nextMark(sat, { ...cfg, weekends: true }, {}), 'paidLeave');
+test('calendar cell aria label says Enter opens the menu', () => {
+  const s = t.calendar.cellAria({ month: 11, day: 7, weekday: '周六', kind: '周末', holidayName: null, manual: false, today: false });
+  assert.equal(s, '11月7日 周六，周末，按回车打开选单');
 });
 
 test('cell kinds', () => {
