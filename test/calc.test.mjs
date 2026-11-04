@@ -175,3 +175,14 @@ test('monthWage: shared daily-wage helper used by snapshot and the calendar prev
   assert.equal(monthWage(2026, 10, { ...cfg, salary: NaN }, {}).dailyWage, 0);
   assert.equal(monthWage(2026, 9, cfg, {}).workdays, 18);
 });
+
+test('R39: 2027-01-04 10:00 (no table): Jan 1 is a statutory rest day -> 20 workdays, daily wage 340', () => {
+  const s = snapshot(new Date(2027, 0, 4, 10, 0, 0), cfg, {});
+  assert.equal(s.tableMissing, true);
+  near(s.dailyWage, 340, 1e-9);
+  near(s.earned, 340 * 5400 / 25200, 1e-6); // 72.8571…
+  near(s.monthTotal, 340 * 5400 / 25200, 1e-6); // Jan 1 rest -> 0; today = earned
+  const f = snapshot(new Date(2027, 0, 1, 10, 0, 0), cfg, {});
+  assert.equal(f.status, 'restDay');
+  assert.equal(f.earned, 0);
+});

@@ -260,7 +260,7 @@ test('2027: year note shows in the PiP card and the window is not clipped', () =
     await setCheerAndPayday(page);
     await floatFits(page);
     assert.equal(await pip(page).locator('.card-year').isVisible(), true);
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年假期未内置');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年仅标固定法定日');
   }, { init: stub() }));
 
 test('2026: no year note in the PiP card', () =>

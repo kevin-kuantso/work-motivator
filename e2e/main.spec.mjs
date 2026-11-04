@@ -223,12 +223,12 @@ test('calendar shows holiday names, legend, and a summary-row tag for years with
     assert.match(await todayCell(page, '10月10日').textContent(), /班/);
     assert.match(await todayCell(page, '10月10日').getAttribute('aria-label'), /调休上班/);
     assert.match(await text(page, '.cal-legend'), /图例/);
-    assert.equal(await page.getByText('年假期未内置').count(), 0);
+    assert.equal(await page.getByText('年仅标固定法定日').count(), 0);
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年假期未内置');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标固定法定日');
     assertNoTraditional(await bodyText(page), 'rest day + 2027 view');
     await page.getByRole('button', { name: '回到今天' }).click();
     assert.equal(await text(page, '.cal-title'), '2026 年 10 月');
@@ -238,7 +238,14 @@ test('calendar shows holiday names, legend, and a summary-row tag for years with
 test('2027 (no built-in holiday table): the status card says so', () =>
   withPage('2027-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await visible(page, `${card} .card-year`), true);
-    assert.equal(await text(page, `${card} .card-year`), '2027 年假期未内置');
+    assert.equal(await text(page, `${card} .card-year`), '2027 年仅标固定法定日');
+    assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2027 年放假安排未公布：已标出固定日期的法定假日，其余待公布');
+    // R39：1/1 是固定法定假日 → 1 月 20 个工作日、日薪 340.00；10:00 已赚 340 × 5400/25200 = 72.8571
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 72.8571');
+    assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥340.00');
+    assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥72.86');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 20 天 · 日薪 ¥340.00');
+    assert.match(await page.locator('.cal-grid button[data-key="2027-01-01"]').getAttribute('aria-label'), /^1月1日 周五，法定假日（元旦）/);
     assertNoTraditional(await bodyText(page), '2027 card');
   }));
 

@@ -149,8 +149,8 @@ test('2027-01-04 (current year missing): status card year tag disappears once th
 test('2027-01-04 offline: the card shows the missing-table tag and the plain weekday rule (control for the test above)', () =>
   withPage(JAN4, async (page, { autoUrls }) => {
     assert.equal(autoUrls.length, 3, 'three mirrors tried, all aborted');
-    assert.equal(await text(page, '#status-card .card-year'), '2027 年假期未内置');
-    assert.equal(await text(page, '#status-card .metric-value >> nth=3'), '¥323.81');
+    assert.equal(await text(page, '#status-card .card-year'), '2027 年仅标固定法定日');
+    assert.equal(await text(page, '#status-card .metric-value >> nth=3'), '¥340.00', 'R39: 6800 / 20 (1/1 is a statutory rest day)');
   }));
 
 test('empty upstream 2027 file → 「数据来源暂未发布」 info (not an error), nothing applied, no toast', () =>
@@ -165,7 +165,7 @@ test('empty upstream 2027 file → 「数据来源暂未发布」 info (not an e
     assert.equal(await page.locator('.notices .banner-error').isVisible(), false);
     await tab(page, '月历').click();
     await goMonth(page, 2);
-    assert.equal(await text(page, '.cal-year-tag'), '2027 年假期未内置', 'never treated as "no holidays"');
+    assert.equal(await text(page, '.cal-year-tag'), '2027 年仅标固定法定日', 'never treated as "no holidays"');
     assert.deepEqual(await holidayRecord(page).then((r) => r.years), {}, 'nothing saved (only lastCheck)');
     // 手动检查同样是信息提示
     await checkNow(page);
@@ -234,7 +234,7 @@ test('manual update does not clear manual marks; 「已更新：新增 2027 年�
     await goMonth(page, 2);
     assert.equal(await yearTag(page).isVisible(), true);
     await page.locator('.cal-grid button[data-key="2027-01-01"]').click();
-    await page.getByRole('menuitemradio', { name: /改为休息/ }).click();
+    await page.getByRole('menuitemradio', { name: /改为上班/ }).click(); // R39: 1/1 is already a statutory rest day
     await page.locator('.cal-grid button[data-key="2027-01-04"]').click();
     await page.getByRole('menuitemradio', { name: /无薪假/ }).click();
     await page.unrouteAll();
@@ -242,7 +242,7 @@ test('manual update does not clear manual marks; 「已更新：新增 2027 年�
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已更新：新增 2027 年假期表', detail: '' });
     const marks = await page.evaluate(() => JSON.parse(localStorage.getItem('work-motivator-v1')).marks);
-    assert.deepEqual(marks, { '2027-01-01': 'rest', '2027-01-04': 'unpaidLeave' });
+    assert.deepEqual(marks, { '2027-01-01': 'work', '2027-01-04': 'unpaidLeave' });
     await tab(page, '月历').click();
     assert.equal(await yearTag(page).isVisible(), false);
     assert.match(await page.locator('.cal-grid button[data-key="2027-01-04"]').getAttribute('aria-label'), /无薪假.*已手动标记/);
