@@ -507,3 +507,44 @@ test('no Traditional characters in visible text or in the shipped file', () =>
     assert.ok(html.includes('这是默认值，可在设置里修改'), 'dist keeps raw UTF-8 Chinese (charset utf8)');
     assertNoTraditional(decode(html), 'dist/work-motivator.html (decoded)');
   }));
+
+// Task 14 fix round 1 · D1：运行中切换减少动态（reduce → 关 → reduce），时钟在 change 事件送到之前就走：
+// 每次观察都恰好一个计时器（100 ms 的 setInterval 或对齐整秒的 setTimeout），金额更新没有超过 1 秒的空档
+test('D1: toggling reduced motion at runtime keeps exactly one ticker and no gap > 1 s (ticks may land before the change event)', () =>
+  withPage(T1412, async (page) => {
+    await page.evaluate(() => {
+      const live = new Map();
+      const si = window.setInterval.bind(window);
+      const ci = window.clearInterval.bind(window);
+      const st = window.setTimeout.bind(window);
+      const ct = window.clearTimeout.bind(window);
+      window.setInterval = (fn, ms, ...a) => { const id = si(fn, ms, ...a); if (ms === 100) live.set(id, 'i'); return id; };
+      window.clearInterval = (id) => { live.delete(id); ci(id); };
+      // 对齐计时的延迟落在 20–1000 ms；测试期间没有其他这种延迟的计时（不悬停、不复制）
+      window.setTimeout = (fn, ms, ...a) => {
+        const aligned = ms >= 20 && ms <= 1000;
+        const id = st((...x) => { live.delete(id); fn(...x); }, ms, ...a);
+        if (aligned) live.set(id, 't');
+        return id;
+      };
+      window.clearTimeout = (id) => { live.delete(id); ct(id); };
+      window.__live = live;
+      window.__upd = [];
+      const el = document.querySelector('#status-card .amount-tail');
+      new MutationObserver(() => window.__upd.push(Date.now())).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    // 让主分页按包装后的计时函数重建计时器
+    await page.evaluate(() => { window.__mq = new Promise((r) => matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', r, { once: true })); });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => window.__mq); // change 事件是异步派发的（不经过被暂停的假时钟）
+    const obs = [];
+    const look = async (what) => obs.push([what, await page.evaluate(() => [...window.__live.values()].join(''))]);
+    for (const v of ['no-preference', 'reduce', 'no-preference', 'reduce']) {
+      await page.emulateMedia({ reducedMotion: v });
+      for (let i = 0; i < 6; i++) { await page.clock.runFor(250); await look(`${v}#${i}`); }
+    }
+    const gaps = await page.evaluate(() => window.__upd.slice(1).map((x, i) => x - window.__upd[i]));
+    console.log(`MEASURE ${JSON.stringify({ case: 'D1 runtime toggle', obs: obs.map((o) => o[1]).join(','), maxGap: Math.max(...gaps) })}`);
+    for (const [what, kinds] of obs) assert.equal(kinds.length, 1, `${what}: exactly one live ticker (got ${kinds || 'none'})`);
+    assert.ok(Math.max(...gaps) <= 1000, `no update gap > 1 s (max ${Math.max(...gaps)})`);
+  }));

@@ -141,7 +141,7 @@ test('dist: the bundled source URLs are exactly the three defaults (no extra end
 
 // ---- Task 14 E2：结构检查（成品里的网络 / 解码 API 与 SCHEME 用法固定不变） ----
 // 成品不得出现这些（任何一个出现都可能被用来拼出或送出隐藏的网址）
-export const FORBIDDEN_TOKENS = Object.freeze(['fromCharCode', 'atob(', 'WebSocket', 'EventSource', 'sendBeacon']);
+export const FORBIDDEN_TOKENS = Object.freeze(['fromCharCode', 'fromCodePoint', 'atob(', 'WebSocket', 'EventSource', 'sendBeacon', 'XMLHttpRequest', 'new Image']);
 // 已存假期年份的 source 校验（holiday-store.js）用正则字面量写协议，成品里是转义后的 https:\/\/；只允许这一处
 const ESCAPED_SCHEME = /https?:\\\/\\\//gi;
 
@@ -181,6 +181,9 @@ test('structural checker flags each violation (negative proofs)', () => {
     'WebSocket': `${ok}\nnew WebSocket(u)`,
     'EventSource': `${ok}\nnew EventSource(u)`,
     'sendBeacon': `${ok}\nnavigator.sendBeacon(u, d)`,
+    'fromCodePoint': `${ok}\nString.fromCodePoint(104, 116)`,
+    'XMLHttpRequest': `${ok}\nconst x = new XMLHttpRequest();`,
+    'new Image': `${ok}\nnew Image().src = u;`,
     'second escaped scheme regex': `${ok}\nconst Q = /http:\\/\\/x/;`,
     'escaped scheme regex removed': ok.replace('const R = /^https:\\/\\/[^/\\s]/;', ''),
   };
