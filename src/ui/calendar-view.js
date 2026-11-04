@@ -1,12 +1,17 @@
-// 月历：切换月份、图例常驻、点日期循环切换（修改即存）、无内置假期表的年份显示提示条。
+// 月历：切换月份、图例常驻、点日期弹出小选单（修改即存）、悬停 / 聚焦提示、无内置假期表的年份显示提示条。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
-import { monthGrid, nextMark } from './calendar-model.js';
+import { monthGrid } from './calendar-model.js';
+import { applyOption, menuModel, dayTooltipModel, tooltipText } from './day-options.js';
+import { createDayMenu } from './day-menu.js';
+import { createDayTooltip } from './day-tooltip.js';
 
 const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid' };
-const MARK_KIND = { paidLeave: 'paid', unpaidLeave: 'unpaid', work: 'makeup' };
+const MARK_KIND = { paidLeave: 'paid', unpaidLeave: 'unpaid', work: 'makeup', rest: 'rest' };
+const HOVER_MS = 400;
 
-export function createCalendar(doc, t, { getState, getToday, onMarks }) {
+// getTables：当前使用的假期表（app.js 持有，替换后调用 render 即可）。
+export function createCalendar(doc, t, { getState, getTables, getToday, onMarks }) {
   const c = t.calendar;
   const today0 = getToday();
   let view = { y: today0.getFullYear(), m: today0.getMonth() };
@@ -41,6 +46,9 @@ export function createCalendar(doc, t, { getState, getToday, onMarks }) {
       reset),
     legend,
     grid);
+  const menu = createDayMenu(doc, el, { onChoose: apply });
+  const tooltip = createDayTooltip(doc, el);
+  el.append(menu.el, tooltip.el);
 
   function move(delta) {
     const d = new Date(view.y, view.m + delta, 1);
@@ -61,18 +69,41 @@ export function createCalendar(doc, t, { getState, getToday, onMarks }) {
     onMarks(next, c.resetDone, marks);
   }
 
-  function cycle(cell) {
-    const { cfg, marks } = getState();
-    const mark = nextMark(cell.date, cfg, marks);
-    const next = { ...marks };
-    if (mark === undefined) delete next[cell.key];
-    else next[cell.key] = mark;
-    const md = `${cell.date.getMonth() + 1}/${cell.day}`;
-    focusKey = cell.key;
+  function apply(key, id) {
+    const { marks } = getState();
+    const [y, m, d] = key.split('-').map(Number);
+    const next = applyOption(marks, new Date(y, m - 1, d), id);
+    const mark = next[key];
+    if (mark === marks[key]) return; // 选了当前项：不改动、不弹提示
+    focusKey = key;
+    const md = `${m}/${d}`;
     onMarks(next, mark === undefined ? c.cleared(md) : c.marked(md, c.kinds[MARK_KIND[mark]]), marks);
   }
 
+  function toggleMenu(cell, btn) {
+    tooltip.hide();
+    if (menu.key() === cell.key) {
+      menu.close(true);
+      return;
+    }
+    const { cfg, marks } = getState();
+    menu.open(btn, cell.key, menuModel(cell.date, cfg, marks, getTables()));
+  }
+
+  // 键盘聚焦才立即显示；鼠标点击后的程序聚焦不弹提示（悬停另有 0.4 秒延迟）
+  const keyboardFocus = (btn) => {
+    try {
+      return btn.matches(':focus-visible');
+    } catch {
+      return true;
+    }
+  };
+
   function onKey(e, cell) {
+    if (e.key === 'Escape') {
+      tooltip.hide();
+      return;
+    }
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
     if (!step) return;
     e.preventDefault();
@@ -101,7 +132,9 @@ export function createCalendar(doc, t, { getState, getToday, onMarks }) {
     const refocus = active && grid.contains(active) ? active.dataset.key : focusKey;
     focusKey = null;
 
-    const model = monthGrid(view.y, view.m, cfg, marks, today);
+    const tables = getTables();
+    const model = monthGrid(view.y, view.m, cfg, marks, today, tables);
+    tooltip.hide();
     setText(title, c.monthTitle(view.y, view.m + 1));
     show(banner, model.tableMissing);
     setText(banner, model.tableMissing ? t.banner.yearMissing(view.y) : '');
@@ -116,6 +149,8 @@ export function createCalendar(doc, t, { getState, getToday, onMarks }) {
       h(doc, 'div', { class: 'cal-row', role: 'row' },
         week.map((cell) => {
           if (!cell) return h(doc, 'span', { class: 'cal-cell is-empty', role: 'gridcell' });
+          const tip = dayTooltipModel(cell.date, cfg, marks, tables, today);
+          const descId = `day-desc-${cell.key}`;
           const btn = h(doc, 'button', {
             type: 'button',
             class: `day kind-${cell.kind}${cell.today ? ' is-today' : ''}${cell.manual ? ' is-manual' : ''}`,
@@ -126,18 +161,39 @@ export function createCalendar(doc, t, { getState, getToday, onMarks }) {
               month: cell.date.getMonth() + 1, day: cell.day, weekday: t.weekdays[cell.weekday],
               kind: c.kinds[cell.kind], holidayName: cell.holidayName, manual: cell.manual, today: cell.today,
             }),
-            onclick: () => cycle(cell),
+            'aria-describedby': descId,
+            'aria-haspopup': 'menu',
+            'aria-expanded': 'false',
+            onclick: () => toggleMenu(cell, btn),
             onkeydown: (e) => onKey(e, cell),
+            onmouseenter: () => { if (!menu.isOpen()) tooltip.later(btn, tip, HOVER_MS); },
+            onmouseleave: () => tooltip.hide(),
+            onfocus: () => { if (!menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip); },
+            onblur: () => tooltip.hide(),
           },
           h(doc, 'span', { class: 'day-num', text: String(cell.day) }),
           tag(cell.kind),
           cell.holidayName ? h(doc, 'span', { class: 'day-name', text: cell.holidayName }) : null,
           cell.manual ? h(doc, 'span', { class: 'day-dot', title: c.manualTitle }) : null);
           if (cell.key === refocus) toFocus = btn;
-          return h(doc, 'span', { class: 'cal-cell', role: 'gridcell' }, btn);
+          return h(doc, 'span', { class: 'cal-cell', role: 'gridcell' }, btn,
+            h(doc, 'span', { id: descId, hidden: true, text: tooltipText(tip) }));
         })));
+    const menuHadFocus = menu.hasFocus();
     grid.replaceChildren(head, ...rows);
     if (toFocus) toFocus.focus();
+    // 选单打开时重绘（跨日、其他分页改了设置）：日期仍在画面上就原地更新，否则关闭且不丢焦点
+    if (menu.isOpen()) {
+      const key = menu.key();
+      const anchor = grid.querySelector(`button[data-key="${key}"]`);
+      const cell = cells.find((x) => x.key === key);
+      if (anchor && cell) {
+        menu.refresh(anchor, menuModel(cell.date, cfg, marks, tables));
+      } else {
+        menu.close(false);
+        if (menuHadFocus) grid.querySelector('button[tabindex="0"]')?.focus();
+      }
+    }
   }
 
   return { el, render };
