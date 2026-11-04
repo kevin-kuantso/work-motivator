@@ -51,6 +51,11 @@ button, input, select { font: inherit; color: inherit; }
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+/* 数字格旁边给读屏用的完整文字：不可选取，复制时不会重复一份 */
+.sr-text { user-select: none; -webkit-user-select: none; }
+/* 固定宽度数字格（R33）：--digit-w 由 digits.js 按实际字体量出最宽的数字；量不到时 0.62em */
+.digits { white-space: nowrap; }
+.digit { display: inline-block; width: var(--digit-w, 0.62em); text-align: center; }
 
 /* Shell（spec §13.1）：≥1000px 时整页固定在视窗内，右侧面板吃掉剩余高度，月历行高弹性吸收提示条 */
 #app { position: relative; max-width: 1600px; min-width: 0; margin: 0 auto; padding: var(--space-3) var(--space-4) var(--space-4); }
