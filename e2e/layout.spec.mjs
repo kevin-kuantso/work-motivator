@@ -831,13 +831,17 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
     for (let i = 0; i < 12; i++) await page.getByRole('button', { name: /上月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2025 年 10 月');
     const past = await pill(page);
-    assert.equal(past.text, '国庆 10/1–10/3 放假· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
+    // round 2：所有无表年份的「依据」都只放在 title（与当年以后的年份同一种写法）
+    assert.equal(past.text, '国庆 10/1–10/3 放假');
+    assert.equal(past.title, '国庆 10/1–10/3 放假 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
     assert.equal(past.cut, false, 'fits at 1280');
     assert.doesNotMatch(past.text + past.title, /国务院|待公布|依据/);
+    assert.equal(past.check, false);
     assert.equal(await tagText(page), null, 'R41: no tag for a past year');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /上月/ }).click();
-    assert.equal((await pill(page)).text, '本月没有已标出的法定假日· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
+    assert.equal((await pill(page)).text, '本月没有已标出的法定假日');
+    assert.equal((await pill(page)).title, '本月没有已标出的法定假日 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
     assert.equal((await pill(page)).check, false, 'no ✓ without a table');
   }));
 
@@ -1480,6 +1484,81 @@ test('C3: today circle — digit optically centred (≤ 1px), circle inside the 
         assert.ok(Math.abs(t.offTop - o.offTop) <= 0.5 && Math.abs(t.offLeft - o.offLeft) <= 0.5, `today number at the same place as other cells (${t.offTop},${t.offLeft} vs ${o.offTop},${o.offLeft})`);
         assert.ok(Math.abs(o.dx) <= 1 && Math.abs(o.dy) <= 1, `other number centred in its box (dx ${o.dx}, dy ${o.dy})`);
         if ((w === 1280 || w === 1920) && todayKey === '2026-11-04') await shot(page, `task-14-c3-today-${w}x${ht}.png`);
+      }
+    });
+  }
+});
+
+// ---- Task 14 fix round 2 · Block C ----
+
+// 支持的最窄宽度（≥ 1000px）也不得截断：窄格子里允许换行 / 小一号字（≥ 1280 保持原样）；同时不得被纵向裁切
+test('C round 2: tooltip never truncates or clips at 1000×700, 1100×700, 1150×700 (and the four target viewports)', () =>
+  withPage(T1412, async (page) => {
+    await cell(page, '11月5日').click();
+    await page.getByRole('menuitemradio', { name: /^带薪假/ }).click();
+    const sets = [
+      ['2026-11', ['2026-11-03', '2026-11-05', '2026-11-18', '2026-11-28']],
+      ['2026-10', ['2026-10-01', '2026-10-10', '2026-10-31']],
+      ['2026-09', ['2026-09-20', '2026-09-25']],
+      ['2026-05', ['2026-05-01', '2026-05-09']],
+      ['2026-02', ['2026-02-14', '2026-02-15']],
+    ];
+    const bad = [];
+    const sizes = [];
+    for (const [w, ht] of [[1000, 700], [1100, 700], [1150, 700], ...VIEWPORTS]) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [ym, keys] of sets) {
+        const [y, m] = ym.split('-').map(Number);
+        await page.locator('.cal-today').click();
+        const diff = (y - 2026) * 12 + (m - 11);
+        for (let i = 0; i < Math.abs(diff); i++) await page.getByRole('button', { name: diff < 0 ? /上月/ : /下月/ }).click();
+        for (const key of keys) {
+          const c = page.locator(`.cal-grid button[data-key="${key}"]`);
+          await c.hover();
+          await page.clock.runFor(450);
+          const r = await page.evaluate(() => {
+            const tip = document.querySelector('.day-tooltip');
+            const lines = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
+            return {
+              w: Math.round(tip.getBoundingClientRect().width), h: Math.round(tip.getBoundingClientRect().height),
+              vclip: tip.scrollHeight > tip.clientHeight + 0.5,
+              cut: lines.filter((x) => x.scrollWidth > x.clientWidth + 0.5).map((x) => x.textContent),
+              last: lines.at(-1).textContent, n: lines.length, fs: getComputedStyle(lines[0]).fontSize,
+            };
+          });
+          await page.mouse.move(0, 0);
+          if (r.vclip || r.cut.length || !/^计薪/.test(r.last)) bad.push(`${w}x${ht} ${key}: ${JSON.stringify(r)}`);
+          if (key === '2026-10-10') sizes.push({ w, ht, cell: [r.w, r.h], lines: r.n, dateFont: r.fs });
+        }
+      }
+    }
+    console.log(`MEASURE ${JSON.stringify({ case: 'C r2 narrow tooltip', sizes, bad })}`);
+    assert.deepEqual(bad, [], 'no truncated / clipped tooltip at any supported width');
+  }));
+
+// 2 位数日期：数字两侧离圆边 ≥ 2px，圆仍是正圆，居中 ≤ 1px
+test('C round 2: today circle with 2 digits has ≥ 2px side room, stays round and centred', async () => {
+  for (const [iso, key] of [['2026-11-18T10:00:00+08:00', '2026-11-18'], ['2026-11-30T10:00:00+08:00', '2026-11-30'], ['2026-11-04T10:00:00+08:00', '2026-11-04']]) {
+    await withPage(iso, async (page) => {
+      for (const [w, ht] of VIEWPORTS) {
+        await page.setViewportSize({ width: w, height: ht });
+        const g = await numGeometry(page, key);
+        const side = await page.locator(`.cal-grid button[data-key="${key}"] .day-num`).evaluate((num) => {
+          const nr = num.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(num);
+          const tr = range.getBoundingClientRect();
+          const cs = getComputedStyle(num);
+          const ctx = document.createElement('canvas').getContext('2d');
+          ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const m = ctx.measureText(num.textContent);
+          return { l: tr.left - m.actualBoundingBoxLeft - nr.left, r: nr.right - (tr.left + m.actualBoundingBoxRight) };
+        });
+        console.log(`MEASURE ${JSON.stringify({ case: 'C r2 circle', w, key, ...g, side })}`);
+        assert.ok(side.l >= 2 && side.r >= 2, `${key} @${w}: ink ≥ 2px from the circle edge (${side.l.toFixed(1)}, ${side.r.toFixed(1)})`);
+        assert.ok(Math.abs(g.circle[0] - g.circle[1]) <= 0.5, `round (${g.circle})`);
+        assert.ok(Math.abs(g.dx) <= 1 && Math.abs(g.dy) <= 1, `centred (${g.dx}, ${g.dy})`);
+        assert.ok(g.clearTop >= 2 && g.clearLeft >= 2);
       }
     });
   }

@@ -85,15 +85,16 @@ export function monthContext(year, monthIndex, tables, today, t) {
   if (table) basis = typeof C.basis[table.source] === 'function' ? C.basis[table.source](year) : null; // 来源不明：不写依据
   else if (noTableKind(year) === 'none') basis = null;
   else basis = noTableKind(year) === 'lunar' ? C.basis.lunar : C.basis.fixed; // R49：说 app 标了什么，过去 / 将来同一句
-  const tag = missingTableTag(year, today, tables, t);
-
+  
   if (!table && noTableKind(year) === 'none') {
     const text = C.noData(year);
     return { tone: 'unknown', check: false, text, sub: null, title: text };
   }
   const text = marked ? C.join(parts) : table ? C.noHoliday : C.noneMarked;
   // 有表的放假月份：照设计稿只写区间（「依据」放 title）；其余情况把「依据」写出来，缺表标签已显示时改放 title
-  const showSub = basis !== null && !(table && marked) && !tag;
+  // 「依据」只在有表且本月真的没有假日时写进胶囊（「本月没有法定假日 · 依据 …」）；其余情况（有放假的月份、所有无表年份）
+  // 一律放在 title（round 2：无表年份不再分「过去 / 当年以后」两种写法；当年以后同一行另有缺表标签）
+  const showSub = basis !== null && Boolean(table) && !marked;
   return {
     tone: marked ? 'holiday' : table ? 'none' : 'unknown',
     check: Boolean(table) && !marked && basis !== null,
