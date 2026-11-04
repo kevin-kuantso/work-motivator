@@ -171,11 +171,39 @@ export const STRINGS = {
     manualTitle: '已手动标记',
     tags: { holiday: '假', makeup: '班', paid: '带薪', unpaid: '无薪' },
     cellAria: ({ month, day, weekday, kind, holidayName, manual, today }) =>
-      `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车切换`,
+      `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车打开选单`,
     marked: (md, label) => `${md} 已标记为${label}`,
     cleared: (md) => `${md} 已恢复默认`,
     resetDone: '已重置本月标记',
     undo: '撤销',
+    dayTitle: (month, day, weekday) => `${month}月${day}日 ${weekday}`,
+    todaySuffix: '（今天）',
+    // 日期的状态文字（选单标题与提示共用）
+    status: {
+      workday: '工作日',
+      rest: '休息日',
+      holiday: (name) => (name ? `法定假日（${name}）` : '法定假日'),
+      makeup: (name) => (name ? `调休上班（${name}）` : '调休上班'),
+      paid: '带薪假',
+      unpaid: '无薪假',
+    },
+    // 点日期弹出的小选单
+    menu: {
+      header: (title, status) => `${title} · ${status}`,
+      options: { default: '恢复默认', work: '改为上班', rest: '改为休息', paidLeave: '带薪假', unpaidLeave: '无薪假' },
+      current: '当前',
+      preview: (from, to) => `日薪 ${from} → ${to}`,
+      unchanged: '日薪不变',
+      footer: '多一个上班日，日薪会变低；多一个休息日，日薪会变高（固定月薪 ÷ 当月应出勤天数）',
+    },
+    // 悬停 / 聚焦提示
+    tip: {
+      source: (label) => `来源：${label}`,
+      sources: { builtin: '内置·官方通知', online: '联网更新·官方通知', manual: '手动标记', rule: '按周末规则' },
+      pay: (yuan) => `当日计薪 ${yuan}`,
+      hint: '点击修改',
+      join: (parts) => parts.join('，'),
+    },
   },
 
   importer: {
