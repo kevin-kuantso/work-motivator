@@ -163,3 +163,15 @@ test('validateSchedule', () => {
   // lunch ignored when off
   assert.equal(bad({ lunchOn: false, lunchStart: '20:00', lunchEnd: '21:00' }).ok, true);
 });
+
+test('monthWage: shared daily-wage helper used by snapshot and the calendar previews', async () => {
+  const { monthWage } = await import('../src/calc.js');
+  const nov = monthWage(2026, 10, cfg, {});
+  assert.equal(nov.workdays, 21);
+  near(nov.dailyWage, 6800 / 21);
+  near(snapshot(at(11, 3, 10), cfg, {}).dailyWage, nov.dailyWage);
+  assert.equal(monthWage(2026, 10, cfg, { '2026-11-07': 'work' }).workdays, 22);
+  assert.equal(monthWage(2026, 10, { ...cfg, salary: 0 }, {}).dailyWage, 0);
+  assert.equal(monthWage(2026, 10, { ...cfg, salary: NaN }, {}).dailyWage, 0);
+  assert.equal(monthWage(2026, 9, cfg, {}).workdays, 18);
+});

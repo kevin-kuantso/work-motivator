@@ -53,6 +53,12 @@ function paydayIn(now, payday) {
   return dayDiff(now, t);
 }
 
+// 日薪 = 月薪 ÷ 当月应出勤天数（spec §5）。状态卡、月历摘要行与菜单预览共用这一份公式。
+export function monthWage(year, monthIndex, cfg, marks, tables) {
+  const workdays = workdaysInMonth(year, monthIndex, cfg, marks, tables);
+  return { workdays, dailyWage: validSalary(cfg.salary) && workdays > 0 ? cfg.salary / workdays : 0 };
+}
+
 export function snapshot(now, cfg, marks, tables) {
   const info = dayInfo(now, cfg, marks, tables);
   const year = now.getFullYear();
@@ -70,8 +76,7 @@ export function snapshot(now, cfg, marks, tables) {
   const lunchSec = lunchOk ? overlap(ls, le, s, e) : 0;
   const totalSec = scheduleOk ? e - s - lunchSec : 0;
 
-  const denom = workdaysInMonth(year, month, cfg, marks, tables);
-  const dailyWage = validSalary(cfg.salary) && denom > 0 ? cfg.salary / denom : 0;
+  const { dailyWage } = monthWage(year, month, cfg, marks, tables);
   const hourlyWage = totalSec > 0 ? dailyWage / (totalSec / 3600) : 0;
   const perSec = totalSec > 0 ? dailyWage / totalSec : 0;
 
