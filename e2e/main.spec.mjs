@@ -548,3 +548,59 @@ test('D1: toggling reduced motion at runtime keeps exactly one ticker and no gap
     for (const [what, kinds] of obs) assert.equal(kinds.length, 1, `${what}: exactly one live ticker (got ${kinds || 'none'})`);
     assert.ok(Math.max(...gaps) <= 1000, `no update gap > 1 s (max ${Math.max(...gaps)})`);
   }));
+
+// Task 14 fix round 2 · D：一般模式 → 减少动态，change 事件被扣住（matches 已翻转、事件未送达）：
+// 100 ms 的 interval 在下一次 tick 时自己交接给对齐整秒的链；每次观察恰好一个计时器
+const GATE_MQ = `(() => {
+  const add = MediaQueryList.prototype.addEventListener;
+  const queued = [];
+  window.__gate = false;
+  window.__release = () => { while (queued.length) queued.shift()(); };
+  MediaQueryList.prototype.addEventListener = function (type, fn, opts) {
+    if (type !== 'change') return add.call(this, type, fn, opts);
+    return add.call(this, type, (e) => { if (window.__gate) queued.push(() => fn(e)); else fn(e); }, opts);
+  };
+})();`;
+test('D round 2: off → reduce with the change event withheld — the 100 ms interval hands over to the aligned chain by itself', () =>
+  withPage(T1412, async (page) => {
+    await page.evaluate(() => {
+      const live = new Map();
+      const si = window.setInterval.bind(window);
+      const ci = window.clearInterval.bind(window);
+      const st = window.setTimeout.bind(window);
+      const ct = window.clearTimeout.bind(window);
+      window.setInterval = (fn, ms, ...a) => { const id = si(fn, ms, ...a); if (ms === 100) live.set(id, 'i'); return id; };
+      window.clearInterval = (id) => { live.delete(id); ci(id); };
+      window.setTimeout = (fn, ms, ...a) => {
+        const id = st((...x) => { live.delete(id); fn(...x); }, ms, ...a);
+        if (ms >= 20 && ms <= 1000) live.set(id, 't');
+        return id;
+      };
+      window.clearTimeout = (id) => { live.delete(id); ct(id); };
+      window.__live = live;
+      window.__ticks = [];
+      const el = document.querySelector('#status-card .amount-tail');
+      new MutationObserver(() => window.__ticks.push(Date.now())).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    // 先让 app 用包装后的计时函数重建一次（不扣事件）：reduce → 关
+    for (const v of ['reduce', 'no-preference']) {
+      await page.evaluate(() => { window.__mq = new Promise((r) => matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', r, { once: true })); });
+      await page.emulateMedia({ reducedMotion: v });
+      await page.evaluate(() => window.__mq);
+    }
+    assert.equal(await page.evaluate(() => [...window.__live.values()].join('')), 'i');
+    await page.evaluate(() => { window.__gate = true; });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), true, 'matches flipped');
+    const obs = [];
+    await page.evaluate(() => { window.__ticks.length = 0; });
+    for (let i = 0; i < 12; i++) { await page.clock.runFor(250); obs.push(await page.evaluate(() => [...window.__live.values()].join(''))); }
+    const ticks = await page.evaluate(() => window.__ticks);
+    console.log(`MEASURE ${JSON.stringify({ case: 'D r2 off->reduce gated', obs: obs.join(','), ticks: ticks.length, phases: ticks.map((x) => x % 1000) })}`);
+    assert.ok(obs.every((o) => o.length === 1), `exactly one live ticker at every observation: ${obs}`);
+    assert.ok(obs.slice(1).every((o) => o === 't'), `handed over to the aligned chain while the change event is withheld: ${obs}`);
+    assert.ok(ticks.length <= 4, `no 100 ms cadence any more (${ticks.length} updates in 3 s)`);
+    await page.evaluate(() => { window.__gate = false; window.__release(); });
+    await page.clock.runFor(1000);
+    assert.equal(await page.evaluate(() => [...window.__live.values()].join('')), 't', 'after the late change event: still exactly one');
+  }, { init: GATE_MQ }));

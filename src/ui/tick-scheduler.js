@@ -37,10 +37,27 @@ export function createTicker({ tick, reduced, now }) {
         // tick 里可能已经重启（例如搬到小窗）：世代号变了就不再接续
         if (g === gen && timeout === null && interval === null) {
           if (reduced()) scheduleAligned(g);
-          else interval = host.setInterval(tick, TICK_MS); // 已不再减少动态：交接给 100 ms，不留空档
+          else startInterval(g); // 已不再减少动态：交接给 100 ms，不留空档
         }
       }
     }, alignedDelay(now()));
+  }
+
+  // 一般模式：每次 tick 后也按「此刻」的 reduced() 检查（round 2，与上面的方向对称）：
+  // 已改成减少动态、change 事件还没到时，清掉 interval，交接给对齐整秒的链
+  function startInterval(g) {
+    interval = host.setInterval(() => {
+      if (g !== gen) return;
+      try {
+        tick();
+      } finally {
+        if (g === gen && interval !== null && reduced()) {
+          host.clearInterval(interval);
+          interval = null;
+          scheduleAligned(g);
+        }
+      }
+    }, TICK_MS);
   }
 
   function start(nextHost = host) {
@@ -48,7 +65,7 @@ export function createTicker({ tick, reduced, now }) {
     host = nextHost;
     if (!host) return;
     if (reduced()) scheduleAligned(gen);
-    else interval = host.setInterval(tick, TICK_MS);
+    else startInterval(gen);
   }
 
   return { start, stop };

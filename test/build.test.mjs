@@ -158,7 +158,7 @@ export function structuralProblems(html) {
   return problems;
 }
 
-test('dist structure: SCHEME used exactly 3 times (decl + two startsWith); no fromCharCode / atob( / WebSocket / EventSource / sendBeacon', () => {
+test('dist structure: SCHEME used exactly 3 times (decl + two startsWith); no fromCharCode / fromCodePoint / atob( / WebSocket / EventSource / sendBeacon / XMLHttpRequest / new Image', () => {
   execFileSync('node', ['build.mjs'], { cwd: root, stdio: 'pipe' });
   const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');
   assert.deepEqual(structuralProblems(html), []);
