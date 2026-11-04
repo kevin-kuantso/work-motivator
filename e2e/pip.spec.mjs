@@ -71,9 +71,13 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
 
     // 主分页：占位卡出现，按钮文案变「收回小窗」
     assert.equal(await placeholder(page).isVisible(), true);
-    assert.equal(await txt(page.locator('.pip-placeholder-note')), '请保持本页开启：关闭本页，小窗也会一起关闭');
+    assert.equal(await txt(page.locator('.pip-placeholder-note')), '状态卡正显示在悬浮小窗里');
     assert.equal(await placeholder(page).getAttribute('aria-describedby'), 'pip-placeholder-note');
     assert.equal(await txt(floatBtn(page)), '收回小窗');
+    // R38：「请保持本页开启」在左栏按钮下方，悬浮时才出现，并作为按钮的描述
+    assert.equal(await txt(page.locator('.card-col #float-keep')), '请保持本页开启：关闭本页，小窗也会一起关闭');
+    assert.equal(await page.locator('#float-keep').isVisible(), true);
+    assert.equal(await floatBtn(page).getAttribute('aria-describedby'), 'float-keep');
     assert.ok(!(await page.locator('#card-slot').innerText()).includes('194'), 'placeholder shows no amount');
 
     // 使用者按 PiP 的 X：浏览器触发 pagehide
@@ -82,11 +86,13 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     assert.equal(await page.locator('#status-card').getAttribute('data-size'), 'lg');
     assert.equal(await placeholder(page).isVisible(), false);
     assert.equal(await txt(floatBtn(page)), '悬浮成小窗');
+    assert.equal(await page.locator('#float-keep').isVisible(), false, 'keep-open note gone after closing');
+    assert.equal(await floatBtn(page).getAttribute('aria-describedby'), null);
     assert.equal(await page.locator('#status-card .metric-hourly').isVisible(), true);
     assert.equal(await page.locator('#status-card .card-gear').isVisible(), false);
   }, { init: stub() }));
 
-test('placeholder click, header button and gear all close the PiP; gear opens 基本设置', () =>
+test('placeholder click, the float button and gear all close the PiP; gear opens 基本设置', () =>
   withPage(T1412, async (page) => {
     await floatBtn(page).click();
     await pip(page).locator('#status-card').waitFor();

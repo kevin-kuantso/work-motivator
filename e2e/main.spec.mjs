@@ -150,9 +150,9 @@ test('payday row appears after setting payday and persists', () =>
     // 发薪日 / 周末开关已从高级设置移到「周末与发薪日」组；高级设置折叠，只剩占位
     const adv = page.getByRole('button', { name: /高级设置/ });
     assert.equal(await adv.getAttribute('aria-expanded'), 'false');
-    assert.match(await adv.textContent(), /自定义网址：未设置/);
+    assert.match(await adv.textContent(), /自定义数据网址：未设置/);
     assert.equal(await page.getByLabel('发薪日').isVisible(), true, 'payday visible without expanding 高级设置');
-    assert.equal(await page.getByRole('switch', { name: '周末计入上班日' }).isVisible(), true);
+    assert.equal(await page.getByRole('switch', { name: '周末上班' }).isVisible(), true);
     await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
     assert.equal(await text(page, `${card} .card-payday`), '距离发薪日 2 天');
     await page.getByLabel('发薪日').selectOption({ label: '每月 3 号' });
@@ -183,15 +183,15 @@ test('salary edits reflect immediately; invalid input shows error and keeps last
     assert.equal(await text(page, '#err-salary'), '请输入大于 0 的数字，只用半角数字、不加逗号，例如 6800');
     assert.equal(await salary.getAttribute('aria-invalid'), 'true');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33', 'last valid kept');
-    await page.getByLabel('下班时间').fill('08:00');
+    await page.getByLabel('下班时间', { exact: true }).fill('08:00');
     assert.equal(await text(page, '#err-end'), '下班时间必须晚于上班时间');
     assert.equal(await text(page, `${card} .card-countdown`), '距下班 2小时48分0秒');
-    await page.getByLabel('下班时间').fill('18:00');
+    await page.getByLabel('下班时间', { exact: true }).fill('18:00');
     assert.equal(await text(page, '#err-end'), '');
     await page.reload();
     await openSettings(page);
     assert.equal(await page.getByLabel('月薪').inputValue(), '7000', 'last valid value saved, not the invalid one');
-    assert.equal(await page.getByLabel('下班时间').inputValue(), '18:00');
+    assert.equal(await page.getByLabel('下班时间', { exact: true }).inputValue(), '18:00');
   }));
 
 test('lunch toggle hides lunch fields; lunch off counts lunch as work time', () =>
@@ -309,8 +309,8 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     await report.waitFor({ state: 'visible' });
     assert.equal(await page.getByRole('tab', { name: '基本设置' }).getAttribute('aria-selected'), 'true', 'report shown in 基本设置 › 数据与备份');
     assert.equal(await page.locator('.section-backup .import-report').count(), 1);
-    assert.equal(await text(page, '.import-report h4'), '已导入 2 项，4 项未导入');
-    assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'H4', 'focus on the report title');
+    assert.equal(await text(page, '.import-report h3'), '已导入 2 项，4 项未导入');
+    assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'H3', 'focus on the report title');
     const rows = await page.locator('.import-report tbody tr').allTextContents();
     const joined = rows.join('\n');
     assert.match(joined, /月薪.*月薪必须是大于 0 的数字.*保留当前值 6800/);

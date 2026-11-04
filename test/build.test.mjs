@@ -11,19 +11,22 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 //  - 三个假期数据来源模板（只有按「检查更新」或自动检查条件成立时才会请求）
 //  - 校验用的 gov.cn 前缀（只做字符串比较，从不请求）
 //  - 自定义网址的输入框占位示例（example.com 是 RFC 2606 保留的示例域名，从不请求）
+//  - 「导入文件的格式示例」里的出处链接（holiday-cn 2026.json 的 papers；只作显示 / 复制的文字，从不请求；Task 14 / R47）
 export const URL_ALLOWLIST = Object.freeze([
   'https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json',
   'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
   'https://fastly.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
   'https://www.gov.cn/',
   'https://example.com/{year}.json',
+  'https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm',
 ]);
-// 不带主机名的 "https://" 只允许出现在这两个固定上下文里（R31），且成品里各恰好一次（见下方 dist 测试）。
+// 不带主机名的 "https://" 只允许出现在这两个固定上下文里（R31），且成品里出现的次数固定（见下方 dist 测试）。
 // 其他任何裸 "https://"（例如 "https://" + host 的拼接）都会被当成 URL 报出来。
 export const BARE_SCHEME_CONTEXTS = Object.freeze([
   'var SCHEME = "https://";', // holiday-data.js：校验自定义网址的前缀
-  '必须以 https:// 开头', // strings：自定义网址的错误提示
+  '必须以 https:// 开头', // strings：自定义网址的错误提示 + 高级设置里常驻的格式提示（Task 14）
 ]);
+const BARE_SCHEME_COUNTS = Object.freeze({ 'var SCHEME = "https://";': 1, '必须以 https:// 开头': 2 });
 const BARE_SCHEME = /https?:\/\/(?![A-Za-z0-9])/gi;
 
 export function findExternalRefs(html) {
@@ -123,10 +126,11 @@ test('bare "https://" is allowed only in its two fixed contexts (R31)', () => {
   assert.ok(findExternalRefs('<script>var SCHEME = "https://"; fetch("https://" + x)</script>').length > 0, 'a second bare scheme next to the allowed one is still flagged');
 });
 
-test('dist: bare "https://" occurs exactly in the two fixed contexts, once each (any new occurrence fails)', () => {
+test('dist: bare "https://" occurs exactly in the two fixed contexts, a fixed number of times each (any new occurrence fails)', () => {
   const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');
-  assert.equal((html.match(BARE_SCHEME) ?? []).length, BARE_SCHEME_CONTEXTS.length);
-  for (const ctx of BARE_SCHEME_CONTEXTS) assert.equal(html.split(ctx).length - 1, 1, ctx);
+  const total = Object.values(BARE_SCHEME_COUNTS).reduce((a, b) => a + b, 0);
+  assert.equal((html.match(BARE_SCHEME) ?? []).length, total);
+  for (const ctx of BARE_SCHEME_CONTEXTS) assert.equal(html.split(ctx).length - 1, BARE_SCHEME_COUNTS[ctx], ctx);
 });
 
 test('dist: the bundled source URLs are exactly the three defaults (no extra endpoint slipped in)', () => {

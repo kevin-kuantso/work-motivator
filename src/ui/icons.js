@@ -13,6 +13,10 @@ const PATHS = {
   holiday: [['path', { d: 'M4 14V2.5' }], ['path', { d: 'M4 3h7.5l-1.8 2.5 1.8 2.5H4' }]],
   check: [['path', { d: 'M3.5 8.5l3 3 6-7' }]],
   reset: [['path', { d: 'M3.2 8a4.8 4.8 0 1 0 1.4-3.4' }], ['path', { d: 'M4.2 2.2v2.6h2.6' }]],
+  pip: [['rect', { x: 2, y: 3, width: 12, height: 10, rx: 1.5 }], ['rect', { x: 8, y: 8, width: 4.5, height: 3.5, rx: 0.8, fill: 'currentColor', stroke: 'none' }]],
+  wallet: [['rect', { x: 2, y: 4, width: 12, height: 9, rx: 1.5 }], ['path', { d: 'M2 6.5h12M10.5 9.5h1' }]],
+  data: [['ellipse', { cx: 8, cy: 4, rx: 5, ry: 2 }], ['path', { d: 'M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2' }]],
+  lock: [['rect', { x: 3.5, y: 7, width: 9, height: 6.5, rx: 1.2 }], ['path', { d: 'M5.5 7V5a2.5 2.5 0 0 1 5 0v2' }]],
   gear: [['circle', { cx: 8, cy: 8, r: 2.2 }], ['path', { d: 'M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4' }]],
 };
 

@@ -1,6 +1,7 @@
 // 设置分区：自动保存，无保存按钮。验证失败的字段不写入，保留上一个有效值并就地显示错误。
 import { validateSchedule } from '../calc.js';
 import { h, show, setText } from './dom.js';
+import { icon } from './icons.js';
 
 const CHEER_MAX = 40;
 
@@ -9,96 +10,122 @@ function parseSalary(s) {
   return /^\d+(\.\d+)?$/.test(v) ? Number(v) : NaN;
 }
 
-// holiday：{ body, advBody, advSummary }（假期数据组的内容与高级设置里的自定义网址，见 holiday-panel.js）
-export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImport, report = null, holiday = null }) {
+// 版面（Task 14，redesign-v3）：两栏、有边框的卡片。左「工资与上班时间」（标签对齐同一条竖线）；
+// 右「假期数据」「数据与备份」「高级设置」（折叠：整个卡头是展开按钮）。每张卡是 <section aria-labelledby> + 标题。
+// holiday：{ body, advBody, advSummary }（假期数据卡的内容与高级设置里的自定义网址，见 holiday-panel.js）
+export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImport, report = null, holiday = null, builtinYears = [] }) {
   const s = t.settings;
   const win = doc.defaultView;
   const inputs = {};
   const errors = {};
 
   function fieldError(field) {
-    errors[field] = h(doc, 'p', { class: 'field-error', id: `err-${field}`, role: 'alert' });
+    errors[field] = h(doc, 'p', { class: 'field-error row-msg', id: `err-${field}`, role: 'alert' });
     return errors[field];
   }
+  const hint = (id, text) => h(doc, 'p', { class: 'row-hint', id, text });
+  const describe = (...ids) => ids.filter(Boolean).join(' ');
 
-  function textField(field, label, attrs = {}, extra = null) {
-    const { prefix, ...rest } = attrs;
-    inputs[field] = h(doc, 'input', { id: `f-${field}`, name: field, 'aria-describedby': `err-${field}`, ...rest });
-    // extra（字数计数）放在输入框右侧；有 extra 的字段，组标题已写明用途，标签只给屏幕阅读器（省一行高度）
-    return h(doc, 'div', { class: 'field' },
-      h(doc, 'label', { for: `f-${field}`, class: extra ? 'visually-hidden' : undefined, text: label }),
-      // 「¥」是输入框外的装饰，不进 value（不猜测修补用户的输入）
-      prefix ? h(doc, 'div', { class: 'input-prefix' }, h(doc, 'span', { class: 'input-prefix-sign', 'aria-hidden': 'true', text: prefix }), inputs[field])
-        : extra ? h(doc, 'div', { class: 'input-with-extra' }, inputs[field], extra) : inputs[field],
-      fieldError(field));
+  function input(field, attrs = {}) {
+    inputs[field] = h(doc, 'input', { id: `f-${field}`, name: field, 'aria-describedby': describe(attrs.hintId, `err-${field}`), ...attrs, hintId: undefined });
+    return inputs[field];
   }
 
-  function switchField(field, label, hint) {
+  // 一行：标签 | 控件；提示与错误放在控件下方（同一条竖线）
+  const row = (labelEl, ctrl, ...below) => h(doc, 'div', { class: 'row' }, labelEl, h(doc, 'div', { class: 'row-ctrl' }, ctrl), ...below);
+  const label = (field, text) => h(doc, 'label', { class: 'row-label', for: `f-${field}`, text });
+
+  function switchRow(field, text, hintText) {
     const stateText = h(doc, 'span', { class: 'switch-state', 'aria-hidden': 'true' });
-    inputs[field] = h(doc, 'input', { type: 'checkbox', role: 'switch', id: `f-${field}`, name: field, class: 'switch', 'aria-describedby': hint ? `hint-${field}` : undefined });
+    inputs[field] = h(doc, 'input', {
+      type: 'checkbox', role: 'switch', id: `f-${field}`, name: field, class: 'switch', 'aria-describedby': describe(hintText ? `hint-${field}` : null, `err-${field}`),
+    });
     inputs[field].stateText = stateText;
-    return h(doc, 'div', { class: 'field field-switch' },
-      h(doc, 'label', { for: `f-${field}`, text: label }),
-      h(doc, 'span', { class: 'switch-wrap' }, inputs[field], stateText),
-      hint ? h(doc, 'p', { class: 'field-hint', id: `hint-${field}`, text: hint }) : null,
-      fieldError(field));
+    return row(label(field, text), [inputs[field], stateText], hintText ? hint(`hint-${field}`, hintText) : null, fieldError(field));
   }
 
-  const group = (title, ...children) =>
-    h(doc, 'fieldset', { class: 'section' }, h(doc, 'legend', { text: title }), ...children);
-  const block = (cls, title, ...children) =>
-    h(doc, 'section', { class: `section ${cls}`, 'aria-labelledby': `${cls}-title` },
-      h(doc, 'h3', { class: 'section-title', id: `${cls}-title`, text: title }), ...children);
+  // 两个时间（上下班 / 午休）：一行一组；分组名称 = 行标签，输入框各有自己的名称
+  function timePair(id, groupLabel, a, aLabel, b, bLabel) {
+    const lab = h(doc, 'span', { class: 'row-label', id: `lbl-${id}`, text: groupLabel });
+    const r = row(lab, [
+      input(a, { type: 'time', class: 'inp inp-time', 'aria-label': aLabel }),
+      h(doc, 'span', { class: 'to', 'aria-hidden': 'true', text: s.to }),
+      input(b, { type: 'time', class: 'inp inp-time', 'aria-label': bLabel }),
+    ], fieldError(a), fieldError(b));
+    r.setAttribute('role', 'group');
+    r.setAttribute('aria-labelledby', `lbl-${id}`);
+    return r;
+  }
+
+  const card = (id, iconName, title, desc, ...body) =>
+    h(doc, 'section', { class: `scard section-${id}`, 'aria-labelledby': `card-${id}-title` },
+      h(doc, 'div', { class: 'scard-head' },
+        h(doc, 'h2', { class: 'scard-title', id: `card-${id}-title` }, icon(doc, iconName), title),
+        desc ? h(doc, 'p', { class: 'scard-desc', text: desc }) : null),
+      h(doc, 'div', { class: 'scard-body' }, ...body));
 
   const cheerCount = h(doc, 'span', { class: 'cheer-count', 'aria-live': 'off' });
-  const paydaySelect = h(doc, 'select', { id: 'f-payday', name: 'payday', 'aria-describedby': 'err-payday' },
+  const paydaySelect = h(doc, 'select', { id: 'f-payday', name: 'payday', class: 'sel', 'aria-describedby': 'hint-payday err-payday' },
     h(doc, 'option', { value: '', text: s.paydayNone }),
     Array.from({ length: 31 }, (_, i) => h(doc, 'option', { value: String(i + 1), text: s.paydayOption(i + 1) })));
   inputs.payday = paydaySelect;
 
   const autosave = h(doc, 'span', { class: 'autosave', hidden: true, role: 'status', text: s.autosaved });
-  const lunchTimes = h(doc, 'div', { class: 'field-row' },
-    textField('lunchStart', s.lunchStart, { type: 'time' }),
-    textField('lunchEnd', s.lunchEnd, { type: 'time' }));
-  // 高级设置（折叠）：自定义网址；标题旁显示「自定义网址：未设置 / 主机名」
-  const advBody = h(doc, 'div', { class: 'adv-body', id: 'adv-body', hidden: true }, holiday ? holiday.advBody : null);
+  const lunchTimes = timePair('lunch', s.lunchTime, 'lunchStart', s.lunchStart, 'lunchEnd', s.lunchEnd);
+  const sep = () => h(doc, 'div', { class: 'group-sep', 'aria-hidden': 'true' });
+
+  // 高级设置（折叠，APG 手风琴：标题里放按钮）：卡头整个是按钮，右侧摘要「自定义数据网址：未设置 / 主机名」
+  const advBody = h(doc, 'div', { class: 'scard-body adv-body', id: 'adv-body', hidden: true }, holiday ? holiday.advBody : null);
+  const advChev = h(doc, 'span', { class: 'chev', 'aria-hidden': 'true', text: '▸' });
+  const advCard = h(doc, 'section', { class: 'scard section-adv', 'aria-labelledby': 'adv-title' });
   const advToggle = h(doc, 'button', {
-    type: 'button', class: 'adv-toggle', 'aria-expanded': 'false', 'aria-controls': 'adv-body',
+    type: 'button', class: 'adv-toggle adv-head', id: 'adv-toggle', 'aria-expanded': 'false', 'aria-controls': 'adv-body',
     onclick: () => {
       const open = advBody.hidden;
       advBody.hidden = !open;
       advToggle.setAttribute('aria-expanded', String(open));
+      advCard.classList.toggle('is-open', open);
+      setText(advChev, open ? '▾' : '▸');
+      if (open) advBody.scrollIntoView({ block: 'nearest' }); // 右栏需要内部滚动时，把展开的内容带进视野
     },
-  }, h(doc, 'span', { class: 'adv-title', text: s.sections.advanced }), holiday ? holiday.advSummary : null);
+  }, advChev, h(doc, 'span', { class: 'adv-title', id: 'adv-title', text: s.sections.advanced }),
+  h(doc, 'span', { class: 'adv-sub', text: s.advancedSub }), holiday ? holiday.advSummary : null);
+  advCard.append(h(doc, 'h2', { class: 'adv-heading' }, advToggle), advBody);
 
+  const b = s.backup;
   const el = h(doc, 'div', { class: 'settings', id: 'settings' },
     autosave,
-    h(doc, 'div', { class: 'settings-cols' },
-      h(doc, 'div', { class: 'settings-col' },
-        group(s.sections.pay,
-          textField('salary', s.salary, { type: 'text', inputmode: 'decimal', autocomplete: 'off', prefix: t.currency }),
-          h(doc, 'div', { class: 'field-row' },
-            textField('start', s.start, { type: 'time' }),
-            textField('end', s.end, { type: 'time' }))),
-        group(s.sections.lunch,
-          switchField('lunchOn', s.lunchOn, s.lunchOffHint),
-          lunchTimes),
-        group(s.sections.cheer,
-          textField('cheer', s.cheer, { type: 'text', placeholder: s.cheerPlaceholder, autocomplete: 'off' }, cheerCount))),
-      h(doc, 'div', { class: 'settings-col' },
-        group(s.sections.weekPay,
-          switchField('weekends', s.weekends, s.weekendsHint),
-          h(doc, 'div', { class: 'field' },
-            h(doc, 'label', { for: 'f-payday', text: s.payday }), paydaySelect, fieldError('payday'))),
-        block('section-holiday', s.sections.holiday, holiday ? holiday.body : null),
-        block('section-backup', s.sections.backup,
-          // 旁注与按钮同一行（放不下时自动换行），省一行高度给假期数据的结果区
-          h(doc, 'div', { class: 'backup-actions' },
-            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', text: s.backup.export, onclick: onExport }),
-            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: s.backup.import, onclick: onImport }),
-            h(doc, 'p', { class: 'field-hint backup-note', text: s.backup.note })),
+    h(doc, 'div', { class: 'set-grid settings-cols' },
+      h(doc, 'div', { class: 'set-col settings-col' },
+        card('pay', 'wallet', s.sections.pay, s.payDesc,
+          row(label('salary', s.salary), [
+            h(doc, 'span', { class: 'input-prefix-sign', 'aria-hidden': 'true', text: t.currency }),
+            // 「¥」是输入框外的装饰，不进 value（不猜测修补用户的输入）
+            input('salary', { type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'inp inp-money' }),
+            h(doc, 'span', { class: 'unit', 'aria-hidden': 'true', text: s.salaryUnit }),
+          ], fieldError('salary')),
+          row(label('payday', s.payday), paydaySelect, hint('hint-payday', s.paydayHint), fieldError('payday')),
+          sep(),
+          timePair('work', s.workTime, 'start', s.start, 'end', s.end),
+          switchRow('lunchOn', s.lunchOn, s.lunchOffHint),
+          lunchTimes,
+          switchRow('weekends', s.weekends, s.weekendsHint),
+          sep(),
+          row(label('cheer', s.cheer), [
+            input('cheer', { type: 'text', placeholder: s.cheerPlaceholder, autocomplete: 'off', class: 'inp inp-wide', hintId: 'hint-cheer' }),
+            cheerCount,
+          ], hint('hint-cheer', s.cheerHint), fieldError('cheer')))),
+      h(doc, 'div', { class: 'set-col settings-col' },
+        card('holiday', 'holiday', s.sections.holiday, s.holidayDesc(builtinYears), holiday ? holiday.body : null),
+        card('backup', 'data', s.sections.backup, s.backupDesc,
+          h(doc, 'p', { class: 'para' }, h(doc, 'b', { text: b.exportLead }), b.exportText),
+          h(doc, 'p', { class: 'para' }, h(doc, 'b', { text: b.importLead }), b.importText),
+          h(doc, 'div', { class: 'btn-row backup-actions' },
+            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', text: b.export, onclick: onExport }),
+            h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: b.import, onclick: onImport }),
+            h(doc, 'span', { class: 'warn-note backup-note' }, icon(doc, 'lock'), b.note)),
           report),
-        h(doc, 'div', { class: 'section section-adv' }, advToggle, advBody))));
+        advCard)));
 
   const readers = {
     salary: (i) => parseSalary(i.value),

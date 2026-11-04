@@ -1,5 +1,6 @@
 // 纯函数：Snapshot → 状态卡要显示的内容（design-spec §6.2）。
 import { money, duration, hours, minutesCeil } from './format.js';
+import { missingTableTag } from './holiday-context.js';
 
 const TONE = {
   working: 'working', lunch: 'lunch', beforeWork: 'before', afterWork: 'after',
@@ -33,6 +34,7 @@ export function cardModel(snap, cfg, t) {
   if (snap.paydayInDays === 0) payday = c.payToday;
   else if (Number.isInteger(snap.paydayInDays)) payday = c.payIn(snap.paydayInDays);
 
+  const yearTag = snap.tableMissing && snap.now instanceof Date ? missingTableTag(snap.now.getFullYear(), snap.now, {}, t) : null;
   return {
     status: s,
     tone: TONE[s],
@@ -52,9 +54,9 @@ export function cardModel(snap, cfg, t) {
     hourly: `${t.currency}${money(snap.hourlyWage)}`,
     daily: `${t.currency}${money(snap.dailyWage)}`,
     payday,
-    // 无内置假期表的年份：日薪按周一至周五估算，卡片上要看得出来（R15）
-    yearNote: snap.tableMissing && snap.now instanceof Date ? c.yearMissing(snap.now.getFullYear()) : null,
-    yearTitle: snap.tableMissing && snap.now instanceof Date ? c.yearMissingLong(snap.now.getFullYear()) : '',
+    // 没有假期表的年份（R15 / R41）：卡片上要看得出来；措辞按该年实际标出的日子（状态卡永远是当年）
+    yearNote: yearTag?.text ?? null,
+    yearTitle: yearTag?.title ?? '',
     cheer,
     srSummary: c.srSummary(t.status[s], Math.floor(Number.isFinite(snap.earned) ? snap.earned : 0)),
   };

@@ -73,13 +73,18 @@ export function dayTooltipModel(date, cfg, marks, tables, now) {
   const plain = dayInfo(date, cfg, {}, tables);
   const paid = info.base === 'work' && info.leave !== 'unpaid';
   const isToday = now && ymd(now) === ymd(date);
+  // 'rule'：周末按周末规则；其他日子（含「周末计入」时的周末、无内置表年份的平日）按默认规则
+  const sourceLabel = C.tip.sources[info.source === 'rule' && info.reason !== 'weekend' ? 'default' : info.source];
+  const pay = yuan(paid ? monthDailyWage(date, cfg, marks, tables) : 0);
   return {
     title: `${dayTitle(date)}${isToday ? C.todaySuffix : ''}`,
     status: statusText(info, plain),
-    // 'rule'：周末按周末规则；其他日子（含「周末计入」时的周末、无内置表年份的平日）按默认规则
-    source: C.tip.source(C.tip.sources[info.source === 'rule' && info.reason !== 'weekend' ? 'default' : info.source]),
-    pay: C.tip.pay(yuan(paid ? monthDailyWage(date, cfg, marks, tables) : 0)),
+    source: C.tip.source(sourceLabel),
+    pay: C.tip.pay(pay),
     hint: C.tip.hint,
+    // 盖在格子上的提示用短写（设计稿）：来源只写类别、「计薪 ¥x」；完整句子仍在 aria-describedby
+    sourceLabel,
+    payShort: C.tip.payShort(pay),
   };
 }
 

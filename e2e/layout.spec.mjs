@@ -3,7 +3,17 @@
 // 量测结果以 `MEASURE {...}` 打印，供报告引用（数字都是本次实际量到的）。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer, launch, openAt, expectedAutoUrls } from './harness.mjs';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harness.mjs';
+
+// 截图只在设了 WM_SHOTS=目录 时才写（默认不写任何文件，Task 14 E3）
+const SHOTS = process.env.WM_SHOTS || null;
+async function shot(page, name) {
+  if (!SHOTS) return;
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: join(SHOTS, name) });
+}
 
 const T1412 = '2026-11-03T14:12:00+08:00'; // 2026-11：周一为首共 6 周
 const VIEWPORTS = [[1280, 585], [1366, 650], [1536, 730], [1920, 950]];
@@ -51,6 +61,7 @@ const measure = (page) => page.evaluate(() => {
   const tablist = r(document.querySelector('[role=tablist]'));
   const sp = document.querySelector('#panel-settings');
   const cols = [...document.querySelectorAll('.settings-col')];
+  const leftCol = document.querySelector('.card-col');
   return {
     vw: innerWidth,
     ih: innerHeight,
@@ -62,9 +73,14 @@ const measure = (page) => page.evaluate(() => {
     lastRowInside: rows.length ? r(rows.at(-1)).bottom <= panel.bottom + 0.5 : null,
     clippedCells: days.filter((d) => d.scrollHeight > d.clientHeight + 0.5).length,
     cardBottom: Math.round(r(document.querySelector('#card-slot')).bottom),
+    // 左栏 = 状态卡（或占位卡）+「悬浮成小窗」按钮 + 按钮下的说明（R38）
+    leftBottom: Math.round(r(leftCol).bottom * 10) / 10,
+    floatBottom: Math.round(r(document.querySelector('#btn-float')).bottom * 10) / 10,
     banners: [...document.querySelectorAll('.notices .banner:not([hidden])')].map((b) => Math.round(r(b).height)),
     tablistVisible: tablist.top >= 0 && tablist.bottom <= innerHeight,
-    settingsInnerOverflow: sp.hidden ? null : sp.scrollHeight - sp.clientHeight,
+    // 分页本身 + 每一栏（两栏各自可内部滚动，决定 1）：默认状态都必须是 0
+    settingsInnerOverflow: sp.hidden ? null : Math.max(sp.scrollHeight - sp.clientHeight, ...cols.map((c) => c.scrollHeight - c.clientHeight)),
+    settingsColOverflow: sp.hidden ? null : cols.map((c) => c.scrollHeight - c.clientHeight),
     settingsColSlack: sp.hidden ? null : cols.map((c) => Math.round(r(sp).bottom - r(c.lastElementChild).bottom)),
   };
 });
@@ -73,6 +89,8 @@ function assertFits(m, where) {
   assert.ok(m.panelBottom <= m.ih - 12, `${where}: panel bottom ${m.panelBottom} must be ≥ 12px above ${m.ih}`);
   assert.ok(m.scrollH <= m.ih, `${where}: no page scroll (scrollHeight ${m.scrollH} > innerHeight ${m.ih})`);
   assert.ok(m.cardBottom <= m.ih, `${where}: status card inside the viewport`);
+  assert.ok(m.leftBottom <= m.ih - 12, `${where}: left column (card + float button) bottom ${m.leftBottom} ≥ 12px above ${m.ih}`);
+  assert.ok(m.leftBottom <= m.panelBottom + 0.5, `${where}: left column ${m.leftBottom} does not reach below the panel ${m.panelBottom}`);
 }
 function assertCalendarFits(m, where) {
   assertFits(m, where);
@@ -285,43 +303,71 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     assert.equal(await page.getByRole('button', { name: '下月 ›', exact: true }).getAttribute('title'), '下月（PgDn）');
   }));
 
-test('legend lists only the kinds present this month on one line; 手动标记 / 重置本月标记 only with manual marks', () =>
+// R36：图例永远列出全部 7 种，排成一行（有 / 没有假日的月份都一样）；「重置本月标记」仅本月有手动标记时出现，在摘要行最右
+const ALL_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid', 'today', 'manual'];
+const legendLine = (page) => page.evaluate(() => {
+  const l = document.querySelector('.cal-legend');
+  const items = [...l.querySelectorAll('.legend-title, .legend-item')];
+  const tops = new Set(items.map((e) => Math.round(e.getBoundingClientRect().top)));
+  const hint = l.querySelector('.legend-hint');
+  const lr = l.getBoundingClientRect();
+  const hr = hint.getBoundingClientRect();
+  return {
+    h: Math.round(lr.height * 10) / 10, rows: tops.size,
+    allInside: items.every((e) => e.getBoundingClientRect().right <= lr.right + 0.5 && e.getBoundingClientRect().bottom <= lr.bottom + 0.5),
+    hintShown: hr.top >= lr.top - 0.5 && hr.bottom <= lr.bottom + 0.5, hintCut: hint.scrollWidth > hint.clientWidth + 0.5,
+  };
+});
+test('legend always lists all 7 kinds on ONE line (months with and without holidays); 重置本月标记 only with manual marks', () =>
   withPage(T1412, async (page) => {
     const kinds = () => page.locator('.cal-legend .legend-item').evaluateAll((els) => els.map((e) => e.dataset.kind));
-    assert.deepEqual(await kinds(), ['weekend', 'today'], '2026-11: 周末 / 今天 only');
+    const labels = () => page.locator('.cal-legend .legend-item').allTextContents();
+    for (const [w, ht] of VIEWPORTS) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [month, move] of [['2026-11', null], ['2026-10', /上月/], ['2026-11', /下月/]]) {
+        if (move) await page.getByRole('button', { name: move }).click();
+        assert.deepEqual(await kinds(), ALL_KINDS, `${month} @${w}`);
+        const lg = await legendLine(page);
+        console.log(`MEASURE ${JSON.stringify({ case: 'legend', month, w, ...lg })}`);
+        assert.equal(lg.rows, 1, `${month} @${w}: one row`);
+        assert.ok(lg.h <= 24, `${month} @${w}: legend single line (${lg.h}px)`);
+        assert.equal(lg.allInside, true, `${month} @${w}: no legend item clipped`);
+        assert.equal(lg.hintCut, false, 'the hint is either fully shown or not shown (never cut mid-sentence)');
+        if (w >= 1280) assert.equal(lg.hintShown, true, `${month} @${w}: the right-hand hint fits and shows`);
+      }
+    }
+    assert.deepEqual(await labels(), ['周末', '法定假日', '调休上班', '带薪假', '无薪假', '今天', '手动标记']);
     assert.equal(await text(page, '.legend-hint'), '点日期可标记：调休 · 带薪假 · 无薪假');
+    assert.equal(await page.locator('.cal-legend [data-kind=holiday] svg.icon-holiday').count(), 1, 'same icon as the 假 tag');
+    assert.equal(await page.locator('.cal-legend [data-kind=makeup] svg.icon-makeup').count(), 1);
+    assert.equal(await page.locator('.cal-legend [data-kind=paid] svg.icon-paid').count(), 1);
+    assert.equal(await page.locator('.cal-legend [data-kind=unpaid] svg.icon-unpaid').count(), 1);
+    assert.equal(await page.locator('.cal-legend [data-kind=manual] .day-dot').count(), 1);
+    // 重置本月标记
+    await page.setViewportSize({ width: 1280, height: 585 });
     assert.equal(await page.getByRole('button', { name: '重置本月标记' }).isVisible(), false);
     await cell(page, '11月4日').click();
     await page.getByRole('menuitemradio', { name: /改为休息/ }).click();
-    assert.deepEqual(await kinds(), ['weekend', 'rest', 'today', 'manual']);
-    assert.match(await text(page, '.cal-legend'), /手动标记/);
+    assert.deepEqual(await kinds(), ALL_KINDS, 'unchanged by a manual mark');
     const reset = page.locator('.cal-summary').getByRole('button', { name: '重置本月标记' });
     assert.equal(await reset.isVisible(), true, 'reset lives in the summary row');
     const [rb, sb] = await Promise.all([reset.boundingBox(), page.locator('.cal-summary').boundingBox()]);
     assert.ok(Math.abs(rb.x + rb.width - (sb.x + sb.width)) <= 1, 'reset at the far right of the summary row');
+    const sh = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(sh <= 30, `summary row (text + pill + reset) stays one line (${sh})`);
     await reset.click();
-    assert.deepEqual(await kinds(), ['weekend', 'today']);
-
+    assert.equal(await reset.isVisible(), false);
+    // 极端月份：所有类型都出现时仍是一行
     await page.getByRole('button', { name: /上月/ }).click();
-    const oct = await kinds();
-    assert.deepEqual(oct, ['weekend', 'holiday', 'makeup'], '2026-10: 周末 / 法定假日 / 调休上班, no 今天');
-    assert.equal(await text(page, '.cal-legend [data-kind=holiday]'), '法定假日', '假');
-    assert.equal(await text(page, '.cal-legend [data-kind=makeup]'), '调休上班', '班');
-    assert.equal(await page.locator('.cal-legend [data-kind=holiday] svg.icon-holiday').count(), 1, 'same icon as the 假 tag');
-    // 极端月份：所有类型都出现时仍是一行，右侧提示不被截断（1280 宽）
-    await page.setViewportSize({ width: 1280, height: 585 });
     for (const [label, re] of [['10月12日', /^带薪假/], ['10月13日', /^无薪假/], ['10月14日', /改为休息/]]) {
       await cell(page, label).click();
       await page.getByRole('menuitemradio', { name: re }).click();
     }
-    assert.deepEqual(await kinds(), ['weekend', 'holiday', 'makeup', 'rest', 'paid', 'unpaid', 'manual']);
-    const lg = await page.evaluate(() => {
-      const l = document.querySelector('.cal-legend');
-      const hint = document.querySelector('.legend-hint');
-      return { h: l.getBoundingClientRect().height, hintCut: hint.scrollWidth > hint.clientWidth };
-    });
-    assert.ok(lg.h <= 24, `legend single line (${lg.h}px)`);
-    assert.equal(lg.hintCut, false, 'hint not truncated at 1280');
+    const lg = await legendLine(page);
+    assert.equal(lg.rows, 1);
+    assert.equal(lg.hintShown, true, 'hint still fits at 1280');
+    const sh2 = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(sh2 <= 30, `Oct: summary row with pill + reset stays one line (${sh2})`);
   }));
 
 test('「回到今天」 is emphasised with the target month when viewing another month', () =>
@@ -390,7 +436,7 @@ test('2027-02 (no table): 春节 2/5-2/8 marked, summary 18 days, tag text, fits
     assert.equal(m.weeks, 4);
     assert.equal(m.lastRowInside, true);
     assert.equal(m.clippedCells, 0);
-    await page.screenshot({ path: new URL('../.superpowers/sdd/plan/task-16-feb2027.png', import.meta.url).pathname });
+    await shot(page, 'task-16-feb2027.png');
   }));
 
 // WCAG 对比度：由浏览器实际算出的颜色计算（rgb）
@@ -491,7 +537,8 @@ test('mainland Simplified copy on both tabs (incl. 选单 / 自订 / 未套用),
     await scan('calendar tab');
     await tab(page, '基本设置').click();
     await page.getByRole('button', { name: /高级设置/ }).click();
-    assert.match(await text(page, '.adv-summary'), /^自定义网址：未设置$/);
+    assert.match(await text(page, '.adv-summary'), /^自定义数据网址：未设置$/);
+    await page.locator('#btn-example').click(); // Task 14 / R47：格式示例与说明也扫
     await scan('settings tab');
   }));
 
@@ -608,3 +655,471 @@ test('M2: focus stays on the error-bar button when the bar re-renders (save atte
       return orig.call(this, k, v);
     };
   } }));
+
+// ---- Task 14（redesign-v3 落地）----
+
+const OCT1 = '2026-10-01'; // 2026-10：5 周月份
+const FLOAT_STUB = { content: `(${pipStub})(${JSON.stringify({})})` };
+const NO_PIP = { content: 'delete Window.prototype.documentPictureInPicture; delete window.documentPictureInPicture;' };
+
+test('header holds only the title (≈28px); no buttons in the header; the float button sits under the status card', () =>
+  withPage(T1412, async (page) => {
+    const hd = await page.evaluate(() => {
+      const h = document.querySelector('header.app-header');
+      return { kids: [...h.children].map((c) => c.tagName), text: h.textContent, buttons: h.querySelectorAll('button, a, input').length, height: h.getBoundingClientRect().height };
+    });
+    assert.deepEqual(hd.kids, ['H1']);
+    assert.equal(hd.text, '上班鼓励器');
+    assert.equal(hd.buttons, 0);
+    assert.ok(Math.abs(hd.height - 28) <= 1, `header ≈ 28px (${hd.height})`);
+    const g = await page.evaluate(() => {
+      const c = document.querySelector('#card-slot').getBoundingClientRect();
+      const b = document.querySelector('#btn-float').getBoundingClientRect();
+      return { c: [c.left, c.right, c.bottom], b: [b.left, b.right, b.top], inCol: document.querySelector('.card-col').contains(document.querySelector('#btn-float')), bg: getComputedStyle(document.querySelector('#btn-float')).backgroundColor };
+    });
+    assert.equal(g.inCol, true, 'button in the left column');
+    assert.ok(Math.abs(g.b[0] - g.c[0]) <= 0.5 && Math.abs(g.b[1] - g.c[1]) <= 0.5, `full column width (${g.b} vs ${g.c})`);
+    assert.ok(g.b[2] >= g.c[2] && g.b[2] - g.c[2] <= 12, 'directly under the card');
+    assert.equal(g.bg, 'rgb(21, 128, 61)', 'primary green (#15803D)');
+  }, { init: FLOAT_STUB }));
+
+// 三种悬浮状态 × 四种视窗 × 两个分页：左栏（状态卡 / 占位卡 + 按钮 + 说明）都放得下、页面不滚动
+const floatStates = [
+  ['default', FLOAT_STUB, async () => {}],
+  ['floating', FLOAT_STUB, async (page) => {
+    await page.locator('#btn-float').click();
+    await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
+    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; }); // stub 视窗盖在页面左下：截图 / 量测时藏起来（不影响版面）
+  }],
+  ['unsupported', NO_PIP, async () => {}],
+];
+for (const [state, init, act] of floatStates) {
+  test(`left column fits in the ${state} float state at four viewports (both tabs, first-run banner)`, () =>
+    withPage(T1412, async (page) => {
+      await act(page);
+      const notes = await page.evaluate(() => [...document.querySelectorAll('.float-control .float-note')].filter((n) => !n.hidden).map((n) => n.textContent));
+      const btn = await page.locator('#btn-float').evaluate((b) => ({ text: b.textContent, disabled: b.disabled, desc: b.getAttribute('aria-describedby') }));
+      if (state === 'default') {
+        assert.deepEqual(notes, []);
+        assert.deepEqual(btn, { text: '悬浮成小窗', disabled: false, desc: null });
+      } else if (state === 'floating') {
+        assert.deepEqual(notes, ['请保持本页开启：关闭本页，小窗也会一起关闭']);
+        assert.deepEqual(btn, { text: '收回小窗', disabled: false, desc: 'float-keep' });
+        assert.equal(await page.locator('.pip-placeholder').isVisible(), true, 'dashed placeholder in place of the card');
+        assert.equal(await page.locator('.pip-placeholder').evaluate((e) => getComputedStyle(e).borderTopStyle), 'dashed');
+        assert.equal(await text(page, '.pip-placeholder-note'), '状态卡正显示在悬浮小窗里');
+      } else {
+        assert.deepEqual(notes, ['当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）']);
+        assert.deepEqual(btn, { text: '悬浮成小窗', disabled: true, desc: 'float-note' });
+      }
+      for (const [w, ht] of VIEWPORTS) {
+        await page.setViewportSize({ width: w, height: ht });
+        for (const tb of ['月历', '基本设置']) {
+          await tab(page, tb).click();
+          const m = await measure(page);
+          console.log(`MEASURE ${JSON.stringify({ case: `float ${state}`, tab: tb, vw: w, ih: ht, leftBottom: m.leftBottom, floatBottom: m.floatBottom, panelBottom: m.panelBottom, slack: m.slack, scrollH: m.scrollH, inner: m.settingsInnerOverflow })}`);
+          assertFits(m, `${state} ${w}x${ht} ${tb}`);
+          if (tb === '基本设置') assert.equal(m.settingsInnerOverflow, 0, `${state} ${w}x${ht}: settings fit without internal scroll`);
+        }
+        if (w === 1280) await shot(page, `task-14-float-${state}-1280x585.png`);
+      }
+    }, { init }));
+}
+
+// 决定 2：提示盖在格子本身（±2px），5 周月份 4 行、6 周月份 3 行（不显示「来源」），不盖到下面的格子；键盘聚焦一样
+async function tipCheck(page, label, lines, how) {
+  const c = cell(page, label);
+  if (how === 'hover') {
+    await c.hover();
+    await page.clock.runFor(450);
+  } else {
+    await c.focus(); // 程序聚焦不弹提示；用方向键走一格再走回来（键盘聚焦）
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+  }
+  const r = await c.evaluate((b) => {
+    const tip = document.querySelector('.day-tooltip');
+    const tr = tip.getBoundingClientRect();
+    const cr = b.parentElement.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    const row = b.closest('.cal-row');
+    const below = row.nextElementSibling?.children[[...row.children].indexOf(b.parentElement)]?.getBoundingClientRect() ?? null;
+    const shown = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
+    return {
+      hidden: tip.hidden, inCell: tip.parentElement === b.parentElement,
+      tip: [tr.left, tr.top, tr.right, tr.bottom].map((v) => Math.round(v * 10) / 10),
+      cell: [br.left, br.top, br.right, br.bottom].map((v) => Math.round(v * 10) / 10),
+      gridcell: [cr.left, cr.top, cr.right, cr.bottom].map((v) => Math.round(v * 10) / 10),
+      belowTop: below ? Math.round(below.top * 10) / 10 : null,
+      lines: shown.map((x) => x.textContent),
+      clipped: tip.scrollHeight > tip.clientHeight + 0.5,
+      lineBottoms: shown.map((x) => x.getBoundingClientRect().bottom),
+    };
+  });
+  return { ...r, expect: lines };
+}
+for (const how of ['hover', 'keyboard']) {
+  test(`tooltip on the ${how === 'hover' ? 'hovered' : 'keyboard-focused'} cell: inside the cell (±2px), 4 lines in a 5-week month, 3 lines in a 6-week month, never over the cell below — four viewports`, () =>
+    withPage(T1412, async (page) => {
+      for (const [w, ht] of VIEWPORTS) {
+        await page.setViewportSize({ width: w, height: ht });
+        for (const [month, label, lines] of [
+          ['2026-11', '11月18日', ['11月18日 周三', '工作日', '计薪 ¥323.81']],
+          ['2026-10', '10月1日', ['10月1日 周四', '法定假日（国庆）', '内置·官方通知', '计薪 ¥0.00']],
+        ]) {
+          await page.locator('.cal-today').click();
+          if (month === '2026-10') await page.getByRole('button', { name: /上月/ }).click();
+          const r = await tipCheck(page, label, lines, how);
+          console.log(`MEASURE ${JSON.stringify({ case: `tooltip ${how}`, month, w, ht, tip: r.tip, cell: r.cell, lines: r.lines.length, clipped: r.clipped, belowTop: r.belowTop })}`);
+          assert.equal(r.hidden, false, `${month} @${w}: shown`);
+          assert.equal(r.inCell, true, 'rendered inside the cell');
+          for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2, `${month} @${w}: tooltip edge ${i} ${r.tip[i]} within ±2px of the cell ${r.cell[i]}`);
+          assert.deepEqual(r.lines, lines, `${month} @${w}: ${lines.length} lines`);
+          assert.equal(r.clipped, false, `${month} @${w}: no line clipped`);
+          assert.ok(r.lineBottoms.every((b) => b <= r.tip[3] + 0.5), 'every line inside the tooltip');
+          if (r.belowTop !== null) assert.ok(r.tip[3] <= r.belowTop, `${month} @${w}: does not cover the cell below (${r.tip[3]} > ${r.belowTop})`);
+          if (how === 'hover' && (w === 1280 || w === 1920) && month === '2026-10') await shot(page, `task-14-tooltip-oct-${w}x${ht}.png`);
+          await page.mouse.move(0, 0);
+          await page.locator('.cal-summary-text').click();
+        }
+      }
+    }));
+}
+
+test('tooltip with error + info banners at 1280×585: the 5-week cell is shorter — falls back to 3 lines, nothing clipped', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await tab(page, '基本设置').click();
+    await page.getByLabel('月薪').fill('7000');
+    await page.getByLabel('月薪').fill('6800');
+    assert.equal(await page.locator(errorBar).isVisible(), true);
+    await tab(page, '月历').click();
+    await page.getByRole('button', { name: /上月/ }).click();
+    const r = await tipCheck(page, '10月1日', null, 'hover');
+    console.log(`MEASURE ${JSON.stringify({ case: 'tooltip error+info', tip: r.tip, cell: r.cell, lines: r.lines, clipped: r.clipped })}`);
+    assert.equal(r.clipped, false);
+    assert.ok(r.lines.length === 3 || r.lines.length === 4, `${r.lines.length} lines`);
+    assert.equal(r.lines.at(-1), '计薪 ¥0.00', 'the pay line is never dropped');
+    for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2);
+  }, corruptThenQuota));
+
+// 决定 4：摘要行情境胶囊——依据如实写；无表年份不声称官方来源
+const pill = (page) => page.locator('.cal-summary .cal-note').evaluate((e) => ({
+  text: e.textContent, tone: e.dataset.tone, title: e.title,
+  check: Boolean(e.querySelector('.icon-check')), flag: Boolean(e.querySelector('.icon-holiday')),
+  border: getComputedStyle(e).borderTopStyle, cut: [...e.children].some((c) => c.scrollWidth > c.clientWidth + 0.5),
+}));
+const tagText = (page) => page.locator('.cal-summary .cal-year-tag').evaluate((e) => (e.hidden ? null : e.textContent));
+const summaryOneLine = (page) => page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
+
+test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up day), past no-table year 2025 (no tag, no claim)', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    const nov = await pill(page);
+    assert.equal(nov.text, '本月没有法定假日· 依据 2026 年国务院放假通知');
+    assert.deepEqual([nov.tone, nov.check, nov.border, nov.cut], ['none', true, 'dashed', false]);
+    assert.equal(await tagText(page), null);
+    await shot(page, 'task-14-calendar-nov-1280x585.png');
+    await page.getByRole('button', { name: /上月/ }).click();
+    const oct = await pill(page);
+    assert.equal(oct.text, '国庆 10/1–10/7 放假，10/10 调休上班');
+    assert.deepEqual([oct.tone, oct.flag, oct.border, oct.cut], ['holiday', true, 'solid', false]);
+    assert.equal(oct.title, '国庆 10/1–10/7 放假，10/10 调休上班 · 依据 2026 年国务院放假通知');
+    await shot(page, 'task-14-calendar-oct-1280x585.png');
+    assert.ok(await summaryOneLine(page) <= 30);
+    // 2025（无表、已过去）：不显示缺表标签，胶囊只说「按《放假办法》标出法定假日本身；未含补假、调休」
+    for (let i = 0; i < 12; i++) await page.getByRole('button', { name: /上月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2025 年 10 月');
+    const past = await pill(page);
+    assert.equal(past.text, '国庆 10/1–10/3 放假· 按《放假办法》标出法定假日本身；未含补假、调休');
+    assert.equal(past.cut, false, 'fits at 1280');
+    assert.doesNotMatch(past.text + past.title, /国务院|待公布|依据/);
+    assert.equal(await tagText(page), null, 'R41: no tag for a past year');
+    assert.ok(await summaryOneLine(page) <= 30);
+    await page.getByRole('button', { name: /上月/ }).click();
+    assert.equal((await pill(page)).text, '本月没有已标出的法定假日· 按《放假办法》标出法定假日本身；未含补假、调休');
+    assert.equal((await pill(page)).check, false, 'no ✓ without a table');
+  }));
+
+test('summary pill + tag: 2027-01 (fixed day) and 2027-02 (lunar days) with the clock in 2026; 2036-01 (other no-table year)', async () => {
+  await withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await page.getByRole('button', { name: /下月/ }).click();
+    await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
+    const jan = await pill(page);
+    assert.equal(jan.text, '元旦 1/1 放假');
+    assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休待公布');
+    assert.equal(jan.check, false);
+    assert.equal(await tagText(page), '2027 年仅标法定假日');
+    assert.ok(await summaryOneLine(page) <= 30);
+    await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal((await pill(page)).text, '春节 2/5–2/8 放假');
+    assert.equal(await tagText(page), '2027 年仅标法定假日');
+    await page.getByRole('button', { name: /下月/ }).click();
+    const mar = await pill(page);
+    assert.deepEqual([mar.text, mar.tone, mar.check, mar.border], ['本月没有已标出的法定假日', 'unknown', false, 'dashed']);
+    assert.doesNotMatch(mar.text + mar.title, /国务院|依据/);
+  });
+  await withPage('2036-01-07T10:00:00+08:00', async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    assert.equal((await pill(page)).text, '元旦 1/1 放假');
+    assert.equal(await tagText(page), '2036 年仅标固定日期的法定假日');
+    assert.match(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), /只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）/);
+    assert.equal(await text(page, '#status-card .card-year'), '2036 年仅标固定日期的法定假日', 'status card uses the same wording');
+    assert.ok(await summaryOneLine(page) <= 30);
+    await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal((await pill(page)).text, '本月没有已标出的法定假日', 'no lunar data for 2036: nothing claimed');
+  });
+});
+
+// 联网 / 导入的年份：依据写数据的真实来源（自己开页面：联网成功时开页只会请求第一个来源，与 withPage 的「全部被中止」前提不同）
+const FILE2027 = JSON.stringify({
+  year: 2027, papers: ['https://www.gov.cn/zhengce/test-2027.htm'],
+  days: [{ name: '元旦', date: '2027-01-01', isOffDay: true }, { name: '元旦', date: '2027-01-02', isOffDay: true }, { name: '元旦', date: '2027-01-03', isOffDay: true }],
+}); // 虚构的测试数据，只为满足校验规则
+test('summary pill for an online-table year and for an imported-file year: 「依据联网取得的…」 / 「依据导入的…」', async () => {
+  for (const mode of ['online', 'file']) {
+    const o = await openAt(browser, server.url, '2026-11-04T09:00:00+08:00', {
+      viewport: { width: 1280, height: 585 },
+      beforeGoto: (page) => (mode === 'online'
+        ? page.route(/cdn\.jsdelivr\.net\/.*\/2027\.json/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FILE2027, headers: { 'access-control-allow-origin': '*' } }))
+        : Promise.resolve()),
+    });
+    try {
+      const p = o.page;
+      if (mode === 'file') {
+        await tab(p, '基本设置').click();
+        await p.locator('#holiday-file').setInputFiles({ name: '2027.json', mimeType: 'application/json', buffer: Buffer.from(FILE2027) });
+        await p.locator('#holiday-result[data-tone="success"]').waitFor();
+        await tab(p, '月历').click();
+      }
+      await p.getByRole('button', { name: /下月/ }).click();
+      await p.getByRole('button', { name: /下月/ }).click();
+      assert.equal((await pill(p)).text, '元旦 1/1–1/3 放假');
+      assert.equal(await tagText(p), null, 'table present: no tag');
+      await p.getByRole('button', { name: /下月/ }).click();
+      const feb = await pill(p);
+      assert.equal(feb.text, mode === 'online' ? '本月没有法定假日· 依据联网取得的 2027 年放假数据' : '本月没有法定假日· 依据导入的 2027 年假期表');
+      assert.equal(feb.check, true);
+      assert.doesNotMatch(feb.text, /国务院/);
+      assert.deepEqual(o.errors.map(String), []);
+      assert.deepEqual(o.consoleErrors, []);
+    } finally {
+      await o.context.close();
+    }
+  }
+});
+
+// 决定 1：默认状态两栏都不需要内部滚动；展开「格式示例」或「高级设置」后只有右栏内部滚动，展开的内容被带进视野，页面与分页标签不动
+test('基本设置: no internal scroll by default; expanding 格式示例 / 高级设置 scrolls only the right column, content brought into view', () =>
+  withPage(T1412, async (page) => {
+    const cols = () => page.evaluate(() => {
+      const sp = document.getElementById('panel-settings').getBoundingClientRect();
+      const tl = document.querySelector('[role=tablist]').getBoundingClientRect();
+      return {
+        cols: [...document.querySelectorAll('.set-col')].map((c) => ({ over: c.scrollHeight - c.clientHeight, top: c.scrollTop })),
+        pageScroll: document.documentElement.scrollHeight > innerHeight, tabs: tl.top >= 0 && tl.bottom <= innerHeight, sp: [sp.top, sp.bottom],
+      };
+    });
+    const inView = (sel) => page.evaluate((s) => {
+      const col = document.querySelectorAll('.set-col')[1].getBoundingClientRect();
+      const e = document.querySelector(s).getBoundingClientRect();
+      // 顶端在右栏视野内；放得下就整个在视野内（比右栏还高的示例：只要求从顶端开始看得到）
+      const fits = e.height <= col.height;
+      return e.height > 0 && e.top >= col.top - 0.5 && (fits ? e.bottom <= col.bottom + 0.5 : e.top < col.bottom);
+    }, sel);
+    for (const [w, ht] of VIEWPORTS) {
+      await page.setViewportSize({ width: w, height: ht });
+      await tab(page, '基本设置').click();
+      const d = await cols();
+      assert.deepEqual(d.cols.map((c) => c.over), [0, 0], `${w}x${ht}: both columns fit by default`);
+      if (w === 1280) await shot(page, 'task-14-settings-1280x585.png');
+      if (w === 1920) await shot(page, 'task-14-settings-1920x950.png');
+      for (const [what, btn, body] of [['example', '#btn-example', '#holiday-example'], ['advanced', '#adv-toggle', '#f-custom-url']]) {
+        await page.locator(btn).click();
+        assert.equal(await page.locator(btn).getAttribute('aria-expanded'), 'true');
+        const e = await cols();
+        console.log(`MEASURE ${JSON.stringify({ case: `settings ${what} expanded`, w, ht, cols: e.cols, pageScroll: e.pageScroll })}`);
+        assert.equal(e.pageScroll, false, `${what} @${w}: no page scroll`);
+        assert.equal(e.tabs, true, 'tab labels stay visible');
+        assert.equal(e.cols[0].over, 0, 'left column unaffected');
+        assert.equal(e.cols[0].top, 0);
+        assert.equal(await inView(body), true, `${what} @${w}: expanded content in view`);
+        if (w === 1280) await shot(page, `task-14-settings-${what}-1280x585.png`);
+        await page.locator(btn).click();
+        assert.equal(await page.locator(btn).getAttribute('aria-expanded'), 'false');
+      }
+      const back = await cols();
+      assert.deepEqual(back.cols.map((c) => c.over), [0, 0], 'collapsed again: no internal scroll');
+      await tab(page, '月历').click();
+      if (w === 1920) await shot(page, 'task-14-calendar-nov-1920x950.png');
+    }
+    // 键盘：两个展开钮都可用 Enter / Space 操作
+    await tab(page, '基本设置').click();
+    await page.locator('#btn-example').focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#holiday-example').isVisible(), true);
+    await page.keyboard.press(' ');
+    assert.equal(await page.locator('#holiday-example').isVisible(), false);
+    await page.locator('#adv-toggle').focus();
+    await page.keyboard.press(' ');
+    assert.equal(await page.locator('#f-custom-url').isVisible(), true);
+  }));
+
+test('基本设置 structure: two columns of <section aria-labelledby> cards with headings; labels on one vertical line; ids / aria kept', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await tab(page, '基本设置').click();
+    const st = await page.evaluate(() => {
+      const cols = [...document.querySelectorAll('.set-col')];
+      return cols.map((c) => [...c.querySelectorAll(':scope > section')].map((s) => {
+        const h = document.getElementById(s.getAttribute('aria-labelledby'));
+        return { heading: h?.closest('h2') ? h.closest('h2').tagName : h?.tagName, name: h?.textContent };
+      }));
+    });
+    assert.deepEqual(st, [
+      [{ heading: 'H2', name: '工资与上班时间' }],
+      [{ heading: 'H2', name: '假期数据' }, { heading: 'H2', name: '数据与备份' }, { heading: 'H2', name: '高级设置' }],
+    ]);
+    // 标签对齐同一条竖线；控件从同一条竖线开始
+    const lines = await page.evaluate(() => [...document.querySelectorAll('.section-pay .row')].filter((r) => !r.hidden).map((r) => [Math.round(r.querySelector('.row-label').getBoundingClientRect().left), Math.round(r.querySelector('.row-ctrl').getBoundingClientRect().left)]));
+    assert.equal(new Set(lines.map((x) => x[0])).size, 1, `labels aligned: ${JSON.stringify(lines)}`);
+    assert.equal(new Set(lines.map((x) => x[1])).size, 1, `controls aligned: ${JSON.stringify(lines)}`);
+    assert.deepEqual(await page.locator('.section-pay .row-label').allTextContents(), ['月薪', '发薪日', '上下班时间', '午休', '午休时间', '周末上班', '鼓励语']);
+    // 名称与描述
+    assert.equal(await page.getByRole('textbox', { name: '月薪' }).count(), 1);
+    assert.equal(await page.getByRole('combobox', { name: '发薪日' }).count(), 1);
+    assert.equal(await page.getByRole('group', { name: '上下班时间' }).count(), 1);
+    assert.equal(await page.getByRole('switch', { name: '周末上班' }).getAttribute('aria-describedby'), 'hint-weekends err-weekends');
+    assert.equal(await page.locator('#f-payday').getAttribute('aria-describedby'), 'hint-payday err-payday');
+    assert.equal(await text(page, '#hint-payday'), '设置后，状态卡会显示「距离发薪日 N 天」');
+    assert.equal(await text(page, '#hint-cheer'), '会显示在左侧状态卡上');
+    assert.equal(await page.locator('#f-cheer').getAttribute('aria-describedby'), 'hint-cheer err-cheer');
+    assert.equal(await page.locator('#btn-holiday-check').getAttribute('aria-describedby'), 'hint-holiday-check');
+    assert.equal(await text(page, '#hint-holiday-check'), '联网获取新公布的放假安排');
+    assert.equal(await text(page, '#hint-holiday-import'), '打不开网络时，用文件导入');
+    assert.equal(await text(page, '.section-backup .scard-desc'), '设置只保存在这个浏览器里，不会上传。');
+    assert.deepEqual(await page.locator('.section-backup .para').allTextContents(), ['导出备份：把月薪、上下班时间、月历标记保存成文件。换电脑或清除浏览数据前，请先导出。', '导入备份：用之前导出的文件恢复这些设置。']);
+    assert.equal(await text(page, '.section-backup .warn-note'), '备份文件含月薪，请妥善保管');
+    assert.equal(await text(page, '.adv-sub'), '一般不用改');
+    assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
+    assert.deepEqual(await page.locator('#holiday-status .chip').allTextContents(), ['2026 年 · 内置', '2027 年 · 未内置']);
+    // 格式示例：真实 2026 节选、GitHub 地址是文字不是链接
+    await page.locator('#btn-example').click();
+    assert.equal(await text(page, '#btn-example'), '▾收起导入文件的格式示例');
+    assert.match(await page.locator('#holiday-example-code').textContent(), /"date":"2026-01-04",\s*"isOffDay":false/);
+    assert.equal(await page.locator('#holiday-example a').count(), 0, 'no link');
+    assert.equal(await text(page, '#holiday-example .mono'), 'github.com/NateScarlet/holiday-cn');
+    // 高级设置展开：白话说明 + 输入框 + 格式提示
+    await page.locator('#adv-toggle').click();
+    assert.equal(await page.getByRole('textbox', { name: '自定义数据网址' }).getAttribute('aria-describedby'), 'explain-custom-url hint-custom-url err-custom-url');
+    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。');
+    assert.match(await text(page, '#explain-custom-url'), /^默认先从 jsDelivr、再从 GitHub 获取假期数据/);
+  }));
+
+// R47「复制示例」：clipboard.writeText 成功 → 「已复制」（剪贴板里就是示例全文）；被拒绝（CDP 把 clipboard-write 设为 denied）
+// 或不可用 → 选中整段示例并提示「已选中示例，请按 Ctrl+C 复制」
+test('复制示例 (R47): granted → 「已复制」 and the clipboard holds the full example; denied / unavailable → selection + Ctrl+C note', async () => {
+  for (const mode of ['granted', 'denied', 'unavailable']) {
+    await withPage(T1412, async (page) => {
+      const origin = new URL(server.url).origin;
+      if (mode === 'granted') await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+      let cdp = null;
+      if (mode === 'denied') {
+        // 覆盖只在这个 CDP 会话存续期间有效：测试结束才 detach
+        cdp = await browser.newBrowserCDPSession();
+        const { browserContextIds } = await cdp.send('Target.getBrowserContexts');
+        for (const id of browserContextIds) await cdp.send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'denied', origin, browserContextId: id });
+      }
+      await tab(page, '基本设置').click();
+      await page.locator('#btn-example').click();
+      const code = await page.locator('#holiday-example-code').textContent();
+      await page.locator('#btn-example-copy').click();
+      for (let i = 0; i < 40 && !(await text(page, '.example-copy-state')); i++) await new Promise((r) => setTimeout(r, 25));
+      const state = page.locator('.example-copy-state');
+      assert.equal(await state.getAttribute('role'), 'status', 'one polite live message');
+      if (mode === 'granted') {
+        assert.equal(await text(page, '.example-copy-state'), '已复制');
+        assert.equal(await page.evaluate(() => navigator.clipboard.readText()), code, 'clipboard = the example shown');
+      } else {
+        assert.equal(await text(page, '.example-copy-state'), '已选中示例，请按 Ctrl+C 复制');
+        assert.equal(await page.evaluate(() => String(getSelection())), code, 'the whole example is selected');
+      }
+      assert.doesNotMatch(await text(page, '.example-copy-state'), /Cmd|⌘/);
+      await cdp?.detach();
+    }, mode === 'unavailable' ? { init: 'Object.defineProperty(Navigator.prototype, "clipboard", { get: () => undefined, configurable: true });' } : undefined);
+  }
+});
+
+// R47：示例下方的白话说明（五行 + GitHub 地址 + 官方来源），地址与来源是可选取的文字、不是链接
+test('R47: the format help under the example lists year / papers / days / off-day rule, the GitHub address and the official source as text', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await tab(page, '基本设置').click();
+    await page.locator('#btn-example').click();
+    assert.deepEqual(await page.locator('#holiday-example .ex-line').allTextContents(), [
+      '文件为 holiday-cn 格式的年度 JSON（例如 2027.json）。',
+      'year：年份，必须和你要导入的年份一致。',
+      'papers：官方放假通知的网址，必须以 https://www.gov.cn/ 开头，否则整份文件会被拒绝。',
+      'days：每一天一条；isOffDay 为 true 表示放假，false 表示调休上班（调休上班日必须是周六或周日）。',
+      '文件里至少要有一个放假日，否则会被拒绝。',
+      '可从 github.com/NateScarlet/holiday-cn 下载（在大陆可能打不开，可请朋友下载后发给你）',
+      '官方来源：中国政府网（gov.cn）每年发布的《关于 20XX 年部分节假日安排的通知》',
+    ]);
+    assert.equal(await page.locator('#holiday-example a, #holiday-example [href]').count(), 0, 'no links');
+    assert.notEqual(await page.locator('#holiday-example .ex-official').evaluate((e) => getComputedStyle(e).userSelect), 'none', 'selectable');
+    const m = await measure(page);
+    assert.ok(m.scrollH <= m.ih, 'no page scroll with the example expanded');
+    assert.equal(m.tablistVisible, true);
+    assert.equal(m.settingsColOverflow[0], 0, 'left column unaffected');
+  }));
+
+// 新元素的对比度（浏览器实际算出的颜色）：文字 ≥ 4.5:1
+test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip lines, float notes, disabled float button, disclosure)', async () => {
+  const bgOf = (el) => {
+    for (let e = el; e; e = e.parentElement) {
+      const c = getComputedStyle(e).backgroundColor;
+      if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+    }
+    return 'rgb(255, 255, 255)';
+  };
+  const grab = (page, sels) => page.evaluate(({ sels, bgSrc }) => {
+    const bgOf = new Function(`return (${bgSrc})`)();
+    return sels.map((s) => {
+      const e = document.querySelector(s);
+      return e ? [s, getComputedStyle(e).color, bgOf(e)] : [s, null, null];
+    });
+  }, { sels, bgSrc: bgOf.toString() });
+  const check = (rows) => {
+    for (const [s, fg, bg] of rows) {
+      assert.ok(fg, `${s} exists`);
+      const r = ratio(fg, bg);
+      console.log(`MEASURE ${JSON.stringify({ case: 'contrast', what: s, fg, bg, ratio: +r.toFixed(2) })}`);
+      assert.ok(r >= 4.5, `${s}: ${fg} on ${bg} = ${r.toFixed(2)}`);
+    }
+  };
+  await withPage(T1412, async (page) => {
+    check(await grab(page, ['.cal-note-text', '.cal-note-sub', '.legend-hint', '.legend-item']));
+    await page.getByRole('button', { name: /上月/ }).click();
+    check(await grab(page, ['.cal-note[data-tone="holiday"] .cal-note-text']));
+    await cell(page, '10月1日').hover();
+    await page.clock.runFor(450);
+    check(await grab(page, ['.day-tooltip .tip-title', '.day-tooltip .tip-status', '.day-tooltip .tip-source', '.day-tooltip .tip-pay']));
+    await page.locator('.cal-today').click();
+    await page.getByRole('button', { name: /下月/ }).click();
+    await page.getByRole('button', { name: /下月/ }).click();
+    check(await grab(page, ['.cal-summary .cal-year-tag', '.cal-note[data-tone="holiday"] .cal-note-text']));
+    await tab(page, '基本设置').click();
+    check(await grab(page, ['.chip-ok', '.chip-miss', '.chip-note', '.act-hint', '.scard-desc', '.scard-title', '.row-label', '.row-hint', '.para', '.para b', '.warn-note', '.disclosure', '.adv-sub', '.adv-summary', '.unit', '.switch-state']));
+    await page.locator('#btn-example').click();
+    await page.locator('#adv-toggle').click();
+    check(await grab(page, ['.example-head span', '.code', '.ex-line', '.mono', '#hint-custom-url', '#explain-custom-url']));
+    await page.locator('#btn-float').click();
+    await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
+    check(await grab(page, ['#float-keep', '.pip-placeholder-title', '.pip-placeholder-note', '#btn-float']));
+  }, { init: FLOAT_STUB });
+  await withPage(T1412, async (page) => {
+    check(await grab(page, ['#float-note', '#btn-float']));
+  }, { init: NO_PIP });
+});

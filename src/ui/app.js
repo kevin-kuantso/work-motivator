@@ -87,7 +87,7 @@ export function mountApp(doc, storage, clock) {
   let hintShown = false;
   const reportPanel = h(doc, 'section', { class: 'import-report', hidden: true, 'aria-live': 'off' });
 
-  // ---- 顶栏（只留「悬浮成小窗」；不支持时旁边显示原因）----
+  // ---- 顶栏只留标题；「悬浮成小窗」在左栏状态卡下方（R38）----
   const cardRoot = h(doc, 'div', { id: 'status-card', 'data-size': 'lg' });
   const float = createFloatControl(doc, t, {
     cardRoot,
@@ -96,9 +96,7 @@ export function mountApp(doc, storage, clock) {
     onFail: () => toast(t.float.failed),
   });
   const fileInput = h(doc, 'input', { type: 'file', accept: '.json,application/json', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true', onchange: onFile });
-  const header = h(doc, 'header', { class: 'app-header' },
-    h(doc, 'h1', { text: t.appTitle }),
-    h(doc, 'div', { class: 'header-actions' }, float.note, float.button));
+  const header = h(doc, 'header', { class: 'app-header' }, h(doc, 'h1', { text: t.appTitle }));
 
   // ---- 主区：左 状态卡｜右 分页「月历」「基本设置」----
   let holiday = null; // 下方建立；面板的回调在用户操作时才会用到
@@ -114,6 +112,7 @@ export function mountApp(doc, storage, clock) {
     onExport: () => doExport(),
     onImport: () => fileInput.click(),
     report: reportPanel,
+    builtinYears: Object.keys(HOLIDAYS_CN).filter((y) => HOLIDAYS_CN[y].source === 'builtin'),
   });
   const calendar = createCalendar(doc, t, {
     getState: () => state,
@@ -147,7 +146,7 @@ export function mountApp(doc, storage, clock) {
     header,
     banners.root,
     h(doc, 'main', { class: 'shell' },
-      h(doc, 'div', { class: 'card-col' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot, float.placeholder)),
+      h(doc, 'div', { class: 'card-col' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot, float.placeholder), float.el),
       h(doc, 'div', { class: 'main-panel' }, tabs.root, calendarPanel, settingsPanel)),
     fileInput,
     toastEl,
@@ -264,7 +263,7 @@ export function mountApp(doc, storage, clock) {
 
   // 导入报告放在「基本设置 › 数据与备份」组内：先切到该分页再聚焦标题
   function showReport(titleText, body, actions) {
-    const title = h(doc, 'h4', { tabindex: '-1', text: titleText });
+    const title = h(doc, 'h3', { tabindex: '-1', text: titleText });
     reportPanel.replaceChildren(title, ...body, h(doc, 'div', { class: 'report-actions' }, actions));
     show(reportPanel, true);
     tabs.select('settings');
