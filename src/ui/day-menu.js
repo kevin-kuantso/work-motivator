@@ -1,6 +1,6 @@
-// 月历日期小选单（spec §12.1）：role=menu + menuitemradio；方向键 / Home / End 移动，
-// Enter / Space 套用（按钮原生行为），Esc / Tab 关闭并把焦点还给日期格，点选单外关闭。
-// 全页只有一个选单节点；只在打开期间挂 document / window 监听，关闭即移除。
+// 月历日期小菜单（spec §12.1）：role=menu + menuitemradio；方向键 / Home / End 移动，
+// Enter / Space 套用（按钮原生行为），Esc / Tab 关闭并把焦点还给日期格，点菜单外关闭。
+// 全页只有一个菜单节点；只在打开期间挂 document / window 监听，关闭即移除。
 import { h, setText } from './dom.js';
 import { icon } from './icons.js';
 

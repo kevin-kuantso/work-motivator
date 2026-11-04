@@ -1,4 +1,4 @@
-// 月历：切换月份、图例常驻、点日期弹出小选单（修改即存）、悬停 / 聚焦提示、无内置假期表的年份显示提示条。
+// 月历：切换月份、图例常驻、点日期弹出小菜单（修改即存）、悬停 / 聚焦提示、无内置假期表的年份显示提示条。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
 import { monthGrid } from './calendar-model.js';
@@ -182,7 +182,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     const menuHadFocus = menu.hasFocus();
     grid.replaceChildren(head, ...rows);
     if (toFocus) toFocus.focus();
-    // 选单打开时重绘（跨日、其他分页改了设置）：日期仍在画面上就原地更新，否则关闭且不丢焦点
+    // 菜单打开时重绘（跨日、其他分页改了设置）：日期仍在画面上就原地更新，否则关闭且不丢焦点
     if (menu.isOpen()) {
       const key = menu.key();
       const anchor = grid.querySelector(`button[data-key="${key}"]`);

@@ -171,14 +171,14 @@ export const STRINGS = {
     manualTitle: '已手动标记',
     tags: { holiday: '假', makeup: '班', paid: '带薪', unpaid: '无薪' },
     cellAria: ({ month, day, weekday, kind, holidayName, manual, today }) =>
-      `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车打开选单`,
+      `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车打开菜单`,
     marked: (md, label) => `${md} 已标记为${label}`,
     cleared: (md) => `${md} 已恢复默认`,
     resetDone: '已重置本月标记',
     undo: '撤销',
     dayTitle: (month, day, weekday) => `${month}月${day}日 ${weekday}`,
     todaySuffix: '（今天）',
-    // 日期的状态文字（选单标题与提示共用）
+    // 日期的状态文字（菜单标题与提示共用）
     status: {
       workday: '工作日',
       rest: '休息日',
@@ -187,7 +187,7 @@ export const STRINGS = {
       paid: '带薪假',
       unpaid: '无薪假',
     },
-    // 点日期弹出的小选单
+    // 点日期弹出的小菜单
     menu: {
       header: (title, status) => `${title} · ${status}`,
       options: { default: '恢复默认', work: '改为上班', rest: '改为休息', paidLeave: '带薪假', unpaidLeave: '无薪假' },
