@@ -293,10 +293,10 @@ async function main() {
 
     // ===== 9 假期数据：开页自动检查 2027 → 上游空文件 → 「暂未发布」信息状态（不是错误、不套用）=====
     const idle9 = await waitFor(A, '!!document.getElementById("btn-holiday-check") && !document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && !document.getElementById("holiday-result").hidden', 10000);
-    const h9 = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, text: r.querySelector('.holiday-result-text').textContent, line: document.getElementById('holiday-status').textContent, tag2027: [...document.querySelectorAll('.cal-year-tag')].map((e) => e.hidden), rec: localStorage.getItem('work-motivator-v1-holidays'), errBar: !document.querySelector('.notices .banner-error').hidden, toast: !document.querySelector('.toast').hidden }; })()`);
+    const h9 = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, text: r.querySelector('.holiday-result-text').textContent, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), tag2027: [...document.querySelectorAll('.cal-year-tag')].map((e) => e.hidden), rec: localStorage.getItem('work-motivator-v1-holidays'), errBar: !document.querySelector('.notices .banner-error').hidden, toast: !document.querySelector('.toast').hidden }; })()`);
     check('9', idle9 !== null && fulfilled.length === 3 && refused.length === 0, '开页自动检查只请求三个来源的 2027.json（经 CDP Fetch 以空文件 fixture 回应），无其他外部请求', `fulfilled=${JSON.stringify(fulfilled)} refused=${JSON.stringify(refused)} idle after ~${idle9}ms`);
     check('9', h9.tone === 'info' && h9.text === '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。' && !h9.errBar && !h9.toast, '空文件 -> 「数据来源暂未发布」信息状态（info，不是错误，无 toast）', JSON.stringify({ tone: h9.tone, text: h9.text, errBar: h9.errBar, toast: h9.toast }));
-    check('9', h9.line === '2026 内置 · 2027 未内置（可联网更新） · 上次检查 11/03' && JSON.parse(h9.rec).years && Object.keys(JSON.parse(h9.rec).years).length === 0, '状态行显示 2027 未内置且未套用任何数据', `line="${h9.line}" record=${h9.rec}`);
+    check('9', h9.line === '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03' && JSON.parse(h9.rec).years && Object.keys(JSON.parse(h9.rec).years).length === 0, '状态行显示 2027 未内置且未套用任何数据', `line="${h9.line}" record=${h9.rec}`);
     info('0', 'opener 视窗', `innerWidth x innerHeight = ${await ev(A, 'innerWidth + "x" + innerHeight')}; outer = ${await ev(A, 'outerWidth + "x" + outerHeight')}`);
     info('0', 'page', `${await ev(A, 'location.href')} ; app Date = ${await ev(A, 'new Date().toString()')} ; reduced-motion=${await ev(A, 'matchMedia("(prefers-reduced-motion: reduce)").matches')}`);
     await shot(A, 'main-before');
@@ -461,7 +461,7 @@ async function main() {
     // 本脚本共载入 3 次（开页、步骤 6 reload、步骤 7 reload），每次之前都清掉假期数据键 → 预期 3 × 3 = 9 个请求，
     // 全部是三个 fixture 网址，且最后一次 reload 后仍是「暂未发布」信息状态。
     await waitFor(A, '!document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && !document.getElementById("holiday-result").hidden', 5000);
-    const h9bAll = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, hidden: r.hidden, line: document.getElementById('holiday-status').textContent, busy: document.getElementById('btn-holiday-check').getAttribute('aria-disabled'), rec: localStorage.getItem('work-motivator-v1-holidays'), now: Date.now() }; })()`);
+    const h9bAll = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, hidden: r.hidden, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), busy: document.getElementById('btn-holiday-check').getAttribute('aria-disabled'), rec: localStorage.getItem('work-motivator-v1-holidays'), now: Date.now() }; })()`);
     const h9b = h9bAll.tone;
     info('9', 'reload 后假期数据区', JSON.stringify(h9bAll));
     check('9', fulfilled.length === 9 && fulfilled.every((u) => HOLIDAY_HOSTS.test(u)) && refused.length === 0 && h9b === 'info', '每次载入（含 2 次 reload，之前清掉假期数据键）都只请求三个 fixture 网址，reload 后仍是「暂未发布」信息状态', `fulfilled=${fulfilled.length} refused=${refused.length} tone=${h9b}`);
