@@ -328,6 +328,8 @@ button, input, select { font: inherit; color: inherit; }
 .cal-today.is-away { background: var(--color-brand-100); border-color: var(--color-brand-600); color: var(--color-brand-700); font-weight: 600; }
 .cal-today.is-away:hover { background: var(--color-brand-50); }
 .cal-summary { display: flex; align-items: center; gap: 10px; min-height: 28px; margin-bottom: 2px; flex: none; white-space: nowrap; font-size: 13px; min-width: 0; }
+/* 较窄的视窗（< 1280px）：摘要行放不下时换行，不截断胶囊或缺表标签（round 3） */
+@media (max-width: 1279px) { .cal-summary { flex-wrap: wrap; row-gap: 2px; } .cal-note { flex: none; } }
 .cal-summary-text { font-weight: 500; font-variant-numeric: tabular-nums; flex: none; }
 /* 情境胶囊（R36 / 决定 4）：有放假 = 实线灰底 + 旗子；有表且本月真的没有 = 虚线 + ✓；无表且没标出 = 虚线、不打 ✓。放不下时省略号，全文在 title */
 .cal-note {
@@ -438,9 +440,11 @@ button, input, select { font: inherit; color: inherit; }
 .day-tooltip.is-compact .tip-source { display: none; }
 /* 窄格子（< 112px，约 1000–1240px 宽的视窗）：小一号字、允许换行，任何一行都不截断（round 2）；≥ 1280 保持原样 */
 @container (max-width: 112px) {
-  .day-tooltip { padding: 1px 4px; font-size: 11px; line-height: 13px; }
+  .day-tooltip { padding: 1px 3px; font-size: 11px; line-height: 13px; }
+  .day-tooltip .tip-pay { font-size: 10.5px; letter-spacing: -0.2px; } /* 「计薪 ¥xxx.xx」不拆行也放得下 78px 宽的格子 */
   .day-tooltip .tip-title { font-size: 11px; }
   .day-tooltip > span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  .day-tooltip .u, .day-tooltip .tip-pay { white-space: nowrap; overflow-wrap: normal; }
 }
 
 /* Import report */
