@@ -236,7 +236,7 @@ button, input, select { font: inherit; color: inherit; }
 .day.is-today { border: 2px solid var(--color-brand-600); }
 .day.is-today .day-num { background: var(--color-brand-600); color: #fff; }
 
-/* Day menu（选单）与提示：浮在月历之上；状态以文字 + 图示表达，不只靠颜色 */
+/* Day menu（菜单）与提示：浮在月历之上；状态以文字 + 图示表达，不只靠颜色 */
 .day-menu {
   position: absolute; z-index: 20; width: 300px; max-width: calc(100% - 8px);
   background: var(--color-surface); border: 1px solid var(--color-border-subtle);

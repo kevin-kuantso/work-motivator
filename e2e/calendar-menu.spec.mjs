@@ -1,11 +1,11 @@
-// 月历小选单与悬停提示（spec §12.1 / §12.2 / §12.5）。
+// 月历小菜单与悬停提示（spec §12.1 / §12.2 / §12.5）。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
-const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选项单', '菜單'];
+const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选'];
 
 let server;
 let browser;
@@ -56,7 +56,7 @@ test('click opens a menu with header, options and footer; keyboard moves; Esc re
   withPage(T1412, async (page) => {
     const sat = cell(page, '11月7日');
     assert.equal(await sat.getAttribute('aria-haspopup'), 'menu');
-    assert.match(await sat.getAttribute('aria-label'), /按回车打开选单$/);
+    assert.match(await sat.getAttribute('aria-label'), /按回车打开菜单$/);
     assert.equal(await menu(page).isVisible(), false, 'no menu before click');
     await openMenu(page, '11月7日');
     assert.equal(await sat.getAttribute('aria-expanded'), 'true');
@@ -115,7 +115,7 @@ test('click outside closes; clicking the same cell toggles; only one menu at a t
     assert.equal(await page.locator('.day-menu:visible').count(), 1);
     assert.equal(await text(page, '.day-menu-header'), '11月4日 周三 · 工作日');
     assert.equal(await cell(page, '11月7日').getAttribute('aria-expanded'), 'false');
-    // 切换月份时选单关闭
+    // 切换月份时菜单关闭
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await menu(page).isVisible(), false);
   }));
@@ -249,7 +249,7 @@ test('menu is never clipped at the right or bottom edge (last column and last ro
       assert.ok(r.m.b <= Math.min(r.c.b, r.vh) + 0.5, `${label}: bottom ${r.m.b} within ${Math.min(r.c.b, r.vh)}`);
       assert.ok(r.m.l >= Math.max(r.c.l, 0) - 0.5, `${label}: left inside`);
       assert.ok(r.m.t >= Math.max(r.c.t, 0) - 0.5, `${label}: top inside`);
-      // 选单不盖住被点的格子
+      // 菜单不盖住被点的格子
       const cb = await cell(page, label).boundingBox();
       const overlapX = Math.min(r.m.r, cb.x + cb.width) - Math.max(r.m.l, cb.x);
       assert.ok(overlapX <= 0.5, `${label}: menu sits beside the cell`);

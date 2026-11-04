@@ -1,4 +1,4 @@
-// 纯函数：月历小选单的选项、日薪预览与悬停提示内容（spec §12.1 / §12.2）。
+// 纯函数：月历小菜单的选项、日薪预览与悬停提示内容（spec §12.1 / §12.2）。
 import { dayInfo, workdaysInMonth } from '../calendar.js';
 import { STRINGS } from '../strings.zh-CN.js';
 import { money, ymd } from './format.js';
