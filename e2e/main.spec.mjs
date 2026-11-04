@@ -264,7 +264,7 @@ test('2027 (no built-in holiday table): the status card says so', () =>
   withPage('2027-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await visible(page, `${card} .card-year`), true);
     assert.equal(await text(page, `${card} .card-year`), '2027 年仅标法定假日');
-    assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2027 年放假安排未公布：已按《放假办法》标出法定假日本身；补假、调休和延长的假日待公布');
+    assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     // R39：1/1 是固定法定假日 → 1 月 20 个工作日、日薪 340.00；10:00 已赚 340 × 5400/25200 = 72.8571
     assert.equal(await text(page, `${card} .card-amount`), '¥ 72.8571');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥340.00');

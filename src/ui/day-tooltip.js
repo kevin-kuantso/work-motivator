@@ -19,8 +19,8 @@ export function createDayTooltip(doc) {
     const cell = btn.parentElement;
     if (!btn.isConnected || !cell) return;
     el.replaceChildren(
-      h(doc, 'span', { class: 'tip-title', text: m.title }),
-      h(doc, 'span', { class: 'tip-status', text: m.status }),
+      h(doc, 'span', { class: 'tip-title', text: m.titleShort }),
+      h(doc, 'span', { class: 'tip-status', text: m.statusShort }),
       h(doc, 'span', { class: 'tip-source', text: m.sourceLabel }),
       h(doc, 'span', { class: 'tip-pay', text: m.payShort }));
     el.classList.toggle('is-compact', compact);

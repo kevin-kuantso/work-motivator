@@ -95,7 +95,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   const wd = tip(at(11, 4));
   assert.deepEqual(wd, {
     title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改',
-    sourceLabel: '按默认规则', payShort: '计薪 ¥323.81',
+    sourceLabel: '按默认规则', payShort: '计薪 ¥323.81', titleShort: '11月4日 周三', statusShort: '工作日',
   });
   assert.equal(tip(at(11, 3)).title, '11月3日 周二（今天）');
   const sat = tip(at(11, 7));
@@ -125,7 +125,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(tip(at(11, 4), { '2026-11-05': 'rest' }).pay, '当日计薪 ¥340.00', 'other days see the new denominator');
   // 联网表：source 'online'
   const online = { 2027: { off: { '2027-01-01': '元旦' }, makeup: { '2027-01-09': '元旦' }, source: 'online' } };
-  assert.equal(tip(at(1, 1, 2027), {}, online).source, '来源：联网更新·官方通知');
+  assert.equal(tip(at(1, 1, 2027), {}, online).source, '来源：联网更新', 'C minor: same claim as the pill (联网取得的数据), no 「官方通知」');
   // R30：导入的文件只写「导入文件」，不声称官方来源
   const file = { 2027: { ...online[2027], source: 'file' } };
   assert.equal(tip(at(1, 1, 2027), {}, file).source, '来源：导入文件');
@@ -133,7 +133,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(tip(at(1, 1, 2027), {}, file).sourceLabel, '导入文件');
   assert.equal(hol.sourceLabel, '内置·官方通知');
   assert.equal(mk.payShort, '计薪 ¥377.78');
-  assert.equal(tip(at(1, 1, 2027), {}, {}).sourceLabel, '法定日期（《放假办法》）');
+  assert.equal(tip(at(1, 1, 2027), {}, {}).sourceLabel, '《放假办法》');
   assert.equal(tip(at(1, 1, 2027), {}, online).status, '法定假日（元旦）');
   assert.equal(tip(at(1, 9, 2027), {}, online).status, '调休上班（元旦）');
   assert.equal(tip(at(1, 4, 2027)).source, '来源：按默认规则', 'no table, weekday → default rule');
@@ -151,4 +151,19 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
 test('tooltipText joins the same lines used by the visual tooltip', () => {
   const m = dayTooltipModel(at(11, 7), cfg, {}, HOLIDAYS_CN, at(11, 3));
   assert.equal(tooltipText(m), '11月7日 周六，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
+});
+
+// R50（fix round 1 · C2）：盖在格子上的提示用不带括号的短状态，「今天」放在状态行里而不是日期行
+test('R50: tooltip short status (法定假日·劳动节 / 调休上班·劳动节), 今天 in the status line, no （今天） on the date line', () => {
+  const tip = (date, marks = {}, tables = HOLIDAYS_CN, now = at(11, 3)) => dayTooltipModel(date, cfg, marks, tables, now);
+  assert.equal(tip(at(5, 1)).statusShort, '法定假日·劳动节');
+  assert.equal(tip(at(5, 9)).statusShort, '调休上班·劳动节');
+  assert.equal(tip(at(11, 3)).titleShort, '11月3日 周二');
+  assert.equal(tip(at(11, 3)).statusShort, '工作日·今天');
+  assert.equal(tip(at(11, 3)).title, '11月3日 周二（今天）', 'aria text keeps the long form');
+  assert.equal(tip(at(5, 1), {}, HOLIDAYS_CN, at(5, 1)).statusShort, '法定假日·劳动节·今天');
+  assert.equal(tip(at(11, 5), { '2026-11-05': 'paidLeave' }).statusShort, '带薪假');
+  assert.equal(tip(at(11, 7), { '2026-11-07': 'work' }).statusShort, '调休上班');
+  assert.equal(tip(at(1, 1, 2027), {}, {}).sourceLabel, '《放假办法》', 'short source label for statutory days');
+  assert.equal(tip(at(1, 1, 2027), {}, {}).source, '来源：法定日期（《放假办法》）', 'aria keeps the full label');
 });

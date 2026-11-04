@@ -359,6 +359,8 @@ button, input, select { font: inherit; color: inherit; }
   border: 1px solid var(--color-border-subtle); background: var(--color-surface);
 }
 .legend-swatch.is-today { border: 2px solid var(--color-brand-600); }
+/* 周末格的底色（#F8FAFB）在白底上几乎看不出：图例色块加一道看得见的边框（#9CA3AF，对白底 2.54:1） */
+.legend-swatch.kind-weekend { border-color: #9CA3AF; }
 .legend-swatch .day-dot { position: static; }
 .legend-swatch .icon { width: 12px; height: 12px; }
 .cal-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto; grid-auto-rows: minmax(40px, 1fr); gap: var(--space-1); }

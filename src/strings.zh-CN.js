@@ -192,11 +192,12 @@ export const STRINGS = {
     // 缺假期表的标签（R41）：只在当年与之后的年份显示；措辞按该年实际标出的日子
     // lunar：2027–2035（含春节 / 清明 / 端午 / 中秋）；fixed：其他 ≥ 2025 的年份（只有六个固定日期）；none：< 2025（什么都没标）
     yearMissing: (year) => `${year} 年仅标法定假日`,
-    yearMissingLong: (year) => `${year} 年放假安排未公布：已按《放假办法》标出法定假日本身；补假、调休和延长的假日待公布`,
+    // R49：只说 app 知道什么（未内置 / 未标出），不断言放假安排是否已公布
+    yearMissingLong: (year) => `${year} 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出`,
     yearMissingFixed: (year) => `${year} 年仅标固定日期的法定假日`,
-    yearMissingFixedLong: (year) => `没有 ${year} 年的假期表：只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）；春节、清明、端午、中秋和补假、调休未标出`,
+    yearMissingFixedLong: (year) => `${year} 年假期表未内置：只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）；其余假日和补假、调休未标出`,
     yearMissingNone: (year) => `${year} 年未标法定假日`,
-    yearMissingNoneLong: (year) => `没有 ${year} 年的假期表，没有标出任何法定假日`,
+    yearMissingNoneLong: (year) => `${year} 年假期表未内置，没有标出任何法定假日`,
     gear: '收回小窗并打开基本设置',
     srSummary: (badge, yuan) => `${badge}，今天已赚 ${yuan} 元`,
   },
@@ -273,16 +274,19 @@ export const STRINGS = {
       noData: (y) => `没有 ${y} 年的假期数据，未标出假日`,
       range: (a, b) => (a === b ? a : `${a}–${b}`),
       md: (m, d) => `${m}/${d}`,
-      off: (name, ranges) => `${name} ${ranges.join('、')} 放假`,
-      makeup: (name, days) => `${name ? `${name} ` : ''}${days.join('、')} 调休上班`,
-      join: (parts) => parts.join('，'),
+      // 按节日分组、按各组最早的日期排序；组内先放假后调休：「国庆 9/20 调休上班；中秋 9/25–9/27 放假」
+      off: (ranges) => `${ranges.join('、')} 放假`,
+      makeup: (days) => `${days.join('、')} 调休上班`,
+      group: (name, parts) => `${name} ${parts.join('，')}`,
+      join: (groups) => groups.join('；'),
       sub: (basis) => `· ${basis}`,
       basis: {
         builtin: (y) => `依据 ${y} 年国务院放假通知`,
         online: (y) => `依据联网取得的 ${y} 年放假数据`,
         file: (y) => `依据导入的 ${y} 年假期表`,
-        statutory: '按《放假办法》标出法定假日本身；补假、调休待公布',
-        statutoryPast: '按《放假办法》标出法定假日本身；未含补假、调休',
+        // R49：无表年份按实际标出的日子分开写（2027–2035 含农历 / 节气日；其他年份只有固定日期）
+        lunar: '按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
+        fixed: '按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出',
       },
     },
     reset: '重置本月标记',
@@ -330,9 +334,13 @@ export const STRINGS = {
     // 悬停 / 聚焦提示
     tip: {
       source: (label) => `来源：${label}`,
-      sources: { builtin: '内置·官方通知', online: '联网更新·官方通知', file: '导入文件', manual: '手动标记', rule: '按周末规则', statutory: '法定日期（《放假办法》）', default: '按默认规则' },
+      sources: { builtin: '内置·官方通知', online: '联网更新', file: '导入文件', manual: '手动标记', rule: '按周末规则', statutory: '法定日期（《放假办法》）', default: '按默认规则' },
       pay: (yuan) => `当日计薪 ${yuan}`,
       payShort: (yuan) => `计薪 ${yuan}`,
+      // 盖在格子上的提示（R50）：状态不用括号、「今天」放进状态行；来源用短写（完整说法仍在 aria-describedby）
+      statusShort: { holiday: (name) => (name ? `法定假日·${name}` : '法定假日'), makeup: (name) => (name ? `调休上班·${name}` : '调休上班') },
+      todayTag: (status) => `${status}·今天`,
+      sourcesShort: { statutory: '《放假办法》' },
       hint: '点击修改',
       join: (parts) => parts.join('，'),
     },
