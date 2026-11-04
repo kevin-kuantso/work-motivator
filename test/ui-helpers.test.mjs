@@ -5,7 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STRINGS as t } from '../src/strings.zh-CN.js';
 import { money, heroParts, duration, hours, minutesCeil, dateLine, ymd } from '../src/ui/format.js';
-import { cardModel } from '../src/ui/card-model.js';
+import { cardModel, monthPercent } from '../src/ui/card-model.js';
 import { cellKind, monthGrid } from '../src/ui/calendar-model.js';
 import { importReport } from '../src/ui/import-model.js';
 import { snapshot } from '../src/calc.js';
@@ -67,7 +67,7 @@ test('card model per status', () => {
   assert.equal(before.label, '今天还没开始');
   assert.equal(before.secondary, '距上班 1小时30分0秒');
   const after = cardModel(snapshot(at(11, 3, 18), cfg, {}), cfg, t);
-  assert.equal(after.label, '今天一共赚了');
+  assert.equal(after.label, '今天辛苦了，收工！'); // Task 17：已下班换成收工文案（带薪假仍是「今天一共赚了」，见下方 Task 17 测试）
   assert.equal(after.settled, true);
   const rest = cardModel(snapshot(at(11, 7, 10), cfg, {}), cfg, t);
   assert.equal(rest.badge, '休息日');
@@ -164,4 +164,61 @@ test('strings.zh-CN.js: no Taiwan-only terms or Traditional characters', () => {
   }
   const trad = [...'設開時賺鐘勵週與請計錢進導電連線標題預覽'].filter((c) => code.includes(c));
   assert.deepEqual(trad, []);
+});
+
+test('Task 17: 已下班 gets the wrap-up label and 本月进度; every other status keeps the old copy', () => {
+  const d = (m, day, h, mi = 0) => {
+    const now = at(m, day, h, mi);
+    return cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
+  };
+  const done = d(11, 4, 18); // 2026-11-04 周三 18:00：今天 323.8095、本月累计 971.43
+  assert.equal(done.status, 'afterWork');
+  assert.equal(done.label, '今天辛苦了，收工！');
+  assert.equal(done.rateLabel, '本月进度');
+  assert.equal(done.rate, '14%');
+  assert.equal(done.month, '¥971.43');
+  assert.equal(done.amount.toFixed(4), '323.8095');
+  const old = { rateLabel: '当前赚钱速度' };
+  const working = d(11, 4, 10);
+  assert.equal(working.label, '今天已经赚了');
+  assert.equal(working.rateLabel, old.rateLabel);
+  assert.match(working.rate, /^¥\d+\.\d{4} \/秒$/);
+  const lunch = d(11, 4, 12, 15);
+  assert.equal(lunch.label, '今天已经赚了');
+  assert.equal(lunch.rate, '¥0.0000 /秒');
+  const before = d(11, 4, 7);
+  assert.equal(before.label, '今天还没开始');
+  assert.equal(before.rateLabel, old.rateLabel);
+  assert.equal(before.rate, '¥0.0000 /秒');
+  const rest = d(11, 7, 18);
+  assert.equal(rest.label, '今天休息');
+  assert.equal(rest.rateLabel, old.rateLabel);
+  const holiday = d(10, 1, 18);
+  assert.equal(holiday.label, '今天休息 · 国庆');
+  assert.equal(holiday.rateLabel, old.rateLabel);
+  const now = at(11, 4, 18);
+  const paid = cardModel({ ...snapshot(now, cfg, { '2026-11-04': 'paidLeave' }), now }, cfg, t);
+  assert.equal(paid.label, '今天一共赚了');
+  assert.equal(paid.rateLabel, old.rateLabel);
+  const unpaid = cardModel({ ...snapshot(now, cfg, { '2026-11-04': 'unpaidLeave' }), now }, cfg, t);
+  assert.equal(unpaid.rateLabel, old.rateLabel);
+  assert.equal(unpaid.rate, '¥0.0000 /秒');
+  // 调休上班日（排定的工作日）收工后同样适用
+  const makeup = d(9, 20, 18);
+  assert.equal(makeup.status, 'afterWork');
+  assert.equal(makeup.label, '今天辛苦了，收工！');
+});
+
+test('Task 17: monthPercent rounds, clamps to 0–100 and guards salary 0', () => {
+  assert.equal(monthPercent(0, 6800), 0);
+  assert.equal(monthPercent(971.43, 6800), 14);
+  assert.equal(monthPercent(34, 6800), 1); // 0.5% 四舍五入进位
+  assert.equal(monthPercent(33.99, 6800), 0); // 刚好低于 0.5%
+  assert.equal(monthPercent(6800, 6800), 100);
+  assert.equal(monthPercent(9999, 6800), 100);
+  assert.equal(monthPercent(-5, 6800), 0);
+  assert.equal(monthPercent(500, 0), 0);
+  assert.equal(monthPercent(500, NaN), 0);
+  assert.equal(monthPercent(NaN, 6800), 0);
+  assert.equal(monthPercent(500, undefined), 0);
 });

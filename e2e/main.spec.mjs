@@ -289,7 +289,7 @@ test('lunch, before-work and after-work states', async () => {
   });
   await withPage('2026-11-03T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '已下班');
-    assert.equal(await text(page, `${card} .card-label`), '今天一共赚了');
+    assert.equal(await text(page, `${card} .card-label`), '今天辛苦了，收工！'); // Task 17
     assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
   });
   await withPage('2026-09-20T10:00:00+08:00', async (page) => {

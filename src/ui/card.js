@@ -9,6 +9,8 @@ import { heroParts, dateLine, money } from './format.js';
 import { renderDigits } from './digits.js';
 
 const built = new WeakMap();
+const CELEBRATE_MS = 1200; // 与 style.css 的 .is-celebrating 动画时长一致
+const CELEBRATE_GAP_MS = 5000; // 距上次绘制超过这么久（睡眠 / 后台暂停）就不算「当场收工」
 
 function build(root, t) {
   const doc = root.ownerDocument;
@@ -17,7 +19,7 @@ function build(root, t) {
   const sr = () => h(doc, 'span', { class: 'visually-hidden sr-text' });
   const metric = (cls, label, extra = '', cells = false) =>
     h(doc, 'div', { class: `metric ${cls}${extra}` },
-      h(doc, 'div', { class: 'metric-label', text: label }),
+      (r[`${cls}-label`] = h(doc, 'div', { class: 'metric-label', text: label })),
       (r[cls] = h(doc, 'div', { class: `metric-value amount${cells ? ' digits' : ''}`, 'aria-hidden': cells ? 'true' : null })),
       cells ? (r[`${cls}-sr`] = sr()) : null);
 
@@ -61,6 +63,26 @@ function build(root, t) {
   return r;
 }
 
+// 收工当下（直播状态由上班中 / 午休转入已下班）金额淡绿高亮一次：不是载入时就已下班，也不是睡眠醒来；
+// 减少动态时完全不加类。用每次绘制时的时钟判断何时移除（不依赖计时器，主窗 / PiP 都适用）。
+function celebrate(root, r, snap, m) {
+  const nowMs = snap.now instanceof Date ? snap.now.getTime() : NaN;
+  const prev = r.prevStatus ?? null;
+  const gap = nowMs - (r.prevMs ?? NaN);
+  r.prevStatus = m.status;
+  r.prevMs = nowMs;
+  const win = root.ownerDocument.defaultView;
+  const reduced = Boolean(win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  const live = Number.isFinite(gap) && gap >= 0 && gap <= CELEBRATE_GAP_MS;
+  if (m.status === 'afterWork' && (prev === 'working' || prev === 'lunch') && live && !reduced) {
+    r.celebrateUntil = nowMs + CELEBRATE_MS;
+    r.amount.classList.add('is-celebrating');
+  } else if (r.amount.classList.contains('is-celebrating')
+    && (m.status !== 'afterWork' || reduced || !(nowMs < r.celebrateUntil))) {
+    r.amount.classList.remove('is-celebrating');
+  }
+}
+
 export function renderCard(root, snap, cfg, t) {
   const r = built.get(root) ?? build(root, t);
   const m = cardModel(snap, cfg, t);
@@ -102,6 +124,7 @@ export function renderCard(root, snap, cfg, t) {
   renderDigits(r.countdown, m.secondary);
   setText(r.countdownSr, m.secondary);
 
+  setText(r['metric-rate-label'], m.rateLabel);
   setText(r['metric-rate'], m.rate);
   renderDigits(r['metric-month'], m.month);
   setText(r['metric-month-sr'], m.month);
@@ -113,5 +136,6 @@ export function renderCard(root, snap, cfg, t) {
   show(r.year, m.yearNote !== null);
   setText(r.year, m.yearNote ?? '');
   r.year.title = m.yearTitle;
+  celebrate(root, r, snap, m);
   return m;
 }
