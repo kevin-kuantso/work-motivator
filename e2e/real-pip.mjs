@@ -1,6 +1,10 @@
 // 真实环境验证（Mac Chrome，有头）：以 file:// 开启成品，经 CDP 送出「受信任」的滑鼠事件
 // （Input.dispatchMouseEvent => 真实 user activation），驱动 Document Picture-in-Picture。
 // 不属于 npm test / npm run e2e；用 `npm run e2e:real` 执行。
+// !! 不得与其他驱动 Chrome 的测试（npm run e2e、Playwright、另一个 e2e:real）同时执行：
+//    并发时曾出现整段卡住约 25 分钟、以及 documentPictureInPicture.window 为 null 的崩溃（受信任点击 / 视窗焦点被抢走）。
+// 防护：整体硬性逾时（HARD_TIMEOUT_MS，默认 5 分钟）→ 杀掉 Chrome、删除临时 profile、以非 0 结束；
+//       每个 CDP 调用 / HTTP 请求都有单步逾时；PiP 视窗可能为 null 的地方一律判空并记为 FAIL，而不是抛 TypeError。
 // 只量测、只回报：任何数字都是本次实际量到的，没有量到的不会被声称。
 //
 // 测试用的措施（仅在 harness 内，不进成品）：
@@ -18,7 +22,18 @@ const SHOT_DIR = join(root, '.superpowers', 'sdd', 'plan');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 9300 + Math.floor(Math.random() * 600);
 const HIDDEN_MS = Number(process.env.HIDDEN_MS ?? 60000);
+const HARD_TIMEOUT_MS = Number(process.env.HARD_TIMEOUT_MS ?? 5 * 60 * 1000);
+const STEP_MS = 20000; // 单个 CDP 调用 / HTTP 请求的上限
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const withTimeout = (p, ms, what) => {
+  let timer;
+  return Promise.race([
+    p,
+    new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`step timeout after ${ms}ms: ${what}`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+};
+// PiP 文件的安全取法：视窗已关闭时得到 null（而不是抛错）
+const PIPDOC = '(documentPictureInPicture.window ? documentPictureInPicture.window.document : null)';
 
 // ---------- 结果表 ----------
 const rows = [];
@@ -33,12 +48,12 @@ const check = (item, ok, name, detail) => (ok ? pass : fail)(item, name, detail)
 
 // ---------- CDP ----------
 async function http(path, method = 'GET') {
-  const res = await fetch(`http://127.0.0.1:${PORT}${path}`, { method });
+  const res = await fetch(`http://127.0.0.1:${PORT}${path}`, { method, signal: AbortSignal.timeout(5000) });
   return res.json();
 }
 async function connect(wsUrl) {
   const ws = new WebSocket(wsUrl);
-  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('ws error')); });
+  await withTimeout(new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('ws error')); }), 5000, 'websocket open');
   let id = 0;
   const pending = new Map();
   const handlers = [];
@@ -49,11 +64,11 @@ async function connect(wsUrl) {
   return {
     ws,
     on: (h) => handlers.push(h),
-    send: (method, params = {}) => new Promise((res, rej) => {
+    send: (method, params = {}) => withTimeout(new Promise((res, rej) => {
       const i = ++id;
       pending.set(i, (m) => (m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result)));
       ws.send(JSON.stringify({ id: i, method, params }));
-    }),
+    }), STEP_MS, method),
   };
 }
 async function ev(c, expr) {
@@ -159,12 +174,15 @@ const PIP_INFO = `(() => {
 const MAIN_INFO = `(() => {
   const card = document.getElementById('status-card');
   const s = document.getElementById('settings');
+  const st = document.getElementById('tab-settings');
   return {
+    settingsSelected: st.getAttribute('aria-selected') === 'true', settingsPanelShown: !document.getElementById('panel-settings').hidden,
+    focusId: document.activeElement ? document.activeElement.id : null,
     cardInMain: !!card, size: card && card.dataset.size, pipWin: !!documentPictureInPicture.window,
     placeholderHidden: document.querySelector('.pip-placeholder').hidden,
     btn: document.getElementById('btn-float').textContent, btnDisabled: document.getElementById('btn-float').disabled,
     iv100: window.__ivCount(window, 100), scrollY: Math.round(window.scrollY),
-    settingsTop: Math.round(s.getBoundingClientRect().top),
+    settingsTop: Math.round(s.getBoundingClientRect().top), pageScrolls: document.documentElement.scrollHeight > innerHeight,
     maxScroll: Math.round(document.scrollingElement.scrollHeight - window.innerHeight),
     vis: document.visibilityState, amount: card && card.querySelector('.card-amount').textContent,
   };
@@ -172,7 +190,7 @@ const MAIN_INFO = `(() => {
 
 async function openPip(A) {
   await trustedClick(A, '#btn-float');
-  return waitFor(A, '!!documentPictureInPicture.window && !!documentPictureInPicture.window.document.getElementById("status-card")', 5000);
+  return waitFor(A, `!!(${PIPDOC} && ${PIPDOC}.getElementById("status-card"))`, 5000);
 }
 
 async function shot(c, name) {
@@ -188,29 +206,37 @@ async function closeAndMeasure(A, how) {
   // how: 'placeholder' | 'gear' | 'x'
   await ev(A, `__armBack(${how === 'placeholder'})`);
   if (how === 'placeholder') await trustedClick(A, '.pip-placeholder');
-  else if (how === 'gear') await ev(A, `(() => { __t.start = performance.now(); documentPictureInPicture.window.document.querySelector('.card-gear').click(); })()`);
-  else await ev(A, `(() => { __t.start = performance.now(); documentPictureInPicture.window.close(); })()`);
+  else if (how === 'gear') {
+    const ok = await ev(A, `(() => { const d = ${PIPDOC}; if (!d) return false; __t.start = performance.now(); d.querySelector('.card-gear').click(); return true; })()`);
+    if (!ok) return { ok: false, delay: null, why: 'PiP window was null before the gear click' };
+  } else {
+    const ok = await ev(A, `(() => { if (!documentPictureInPicture.window) return false; __t.start = performance.now(); documentPictureInPicture.window.close(); return true; })()`);
+    if (!ok) return { ok: false, delay: null, why: 'PiP window was null before close()' };
+  }
   const ok = await waitFor(A, '__t.back !== undefined', 5000, 10);
   const t = await ev(A, '__t');
   return { ok: ok !== null, delay: t.back !== undefined ? +(t.back - t.start).toFixed(1) : null };
 }
 
 // ---------- 主流程 ----------
+let chrome = null;
+let profile = null;
+let exited = false;
+async function cleanup() {
+  if (chrome && !exited) chrome.kill('SIGTERM');
+  for (let i = 0; i < 10 && chrome && !exited; i++) await sleep(100);
+  if (chrome && !exited) chrome.kill('SIGKILL');
+  if (profile) await rm(profile, { recursive: true, force: true }).catch(() => {});
+}
+
 async function main() {
-  const profile = await mkdtemp(join(tmpdir(), 'wm-real-pip-'));
+  profile = await mkdtemp(join(tmpdir(), 'wm-real-pip-'));
   await mkdir(SHOT_DIR, { recursive: true });
-  const chrome = spawn(CHROME, [
+  chrome = spawn(CHROME, [
     `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
     'about:blank',
   ], { stdio: 'ignore' });
-  let exited = false;
   chrome.on('exit', () => { exited = true; });
-  const cleanup = async () => {
-    if (!exited) chrome.kill('SIGTERM');
-    await sleep(800);
-    if (!exited) chrome.kill('SIGKILL');
-    await rm(profile, { recursive: true, force: true });
-  };
 
   const consoleMsgs = [];
   try {
@@ -250,9 +276,10 @@ async function main() {
     if (openMs === null) throw new Error('PiP did not open; cannot continue');
     await sleep(300);
     const p1 = await ev(A, PIP_INFO);
+    if (!p1) { fail('1', 'PiP 视窗在开启后变成 null', 'documentPictureInPicture.window === null right after opening'); throw new Error('PiP window vanished'); }
     check('1', p1.placeholderText === '已悬浮 · 点此收回' && !p1.placeholderHidden && !p1.mainHasCard, '主页面显示占位卡「已悬浮 · 点此收回」，卡片不在主文件', `placeholder="${p1.placeholderText}" hidden=${p1.placeholderHidden} mainHasCard=${p1.mainHasCard}`);
     check('1', p1.cardSize === 'sm', 'PiP 内 #status-card data-size="sm"', `data-size=${p1.cardSize}`);
-    check('1', /今天已经赚了/.test(p1.text) && /¥\s*[\d,]+\.\d+/.test(p1.text), 'PiP 含今日已赚金额', `text has label+amount; amount="${await ev(A, 'documentPictureInPicture.window.document.querySelector(".card-amount").textContent')}"`);
+    check('1', /今天已经赚了/.test(p1.text) && /¥\s*[\d,]+\.\d+/.test(p1.text), 'PiP 含今日已赚金额', `text has label+amount; amount="${await ev(A, `(${PIPDOC} || { querySelector: () => ({ textContent: 'PiP null' }) }).querySelector(".card-amount").textContent`)}"`);
     check('1', /当前赚钱速度/.test(p1.text), 'PiP 含「当前赚钱速度」', 'present');
     check('1', !/时薪/.test(p1.text) && !/今日满勤可得/.test(p1.text), 'PiP 不含「时薪」「今日满勤可得」(innerText)', `lg-only computed display=${p1.lgOnlyDisplay}`);
     check('1', p1.openerIv100 === 0 && p1.iv100 === 1, '计时器已移到 PiP（开启者 0 个、PiP 1 个 100ms interval）', `opener=${p1.openerIv100} pip=${p1.iv100}`);
@@ -288,7 +315,7 @@ async function main() {
     info('8', 'PiP 窗口截图 (经 /json 目标)', pipTarget ? `target ${pipTarget.type} url=${pipTarget.url.slice(0, 40)} -> ${pipShot}` : '未找到 PiP 的 CDP page 目标，无法截图');
 
     // ===== 3 跳动 =====
-    await ev(A, '__watchAmount(documentPictureInPicture.window.document)');
+    if (!(await ev(A, `(() => { const d = ${PIPDOC}; if (!d) return false; __watchAmount(d); return true; })()`))) throw new Error('PiP window null before the foreground tick check');
     await sleep(5000);
     const s5 = statsOf(await ev(A, '__chg'), 5000);
     check('3', s5.distinct >= 20, 'PiP 金额 5s 内变化 (前景)', `changes=${s5.n} distinct=${s5.distinct} avgGap=${s5.avgGap}ms maxGap=${s5.maxGap}ms (~${s5.perSec}/s)`);
@@ -299,7 +326,7 @@ async function main() {
     const hiddenAfter = await waitFor(A, 'document.visibilityState === "hidden"', 5000, 50);
     const visStart = await ev(A, 'document.visibilityState');
     check('3', visStart === 'hidden', '开启者进入后台 (visibilityState==="hidden")', `visibilityState=${visStart} after ~${hiddenAfter}ms`);
-    await ev(A, '__watchAmount(documentPictureInPicture.window.document)');
+    if (!(await ev(A, `(() => { const d = ${PIPDOC}; if (!d) return false; __watchAmount(d); return true; })()`))) throw new Error('PiP window null before the background tick check');
     const t0 = Date.now();
     await sleep(HIDDEN_MS);
     const winMs = Date.now() - t0;
@@ -308,7 +335,7 @@ async function main() {
     const sh = statsOf(chg, winMs);
     const expected = winMs / 100;
     check('3', sh.n >= expected * 0.8 && sh.maxGap !== null && sh.maxGap <= 500, `后台 ${Math.round(winMs / 1000)}s PiP 金额持续约 100ms 跳动`, `changes=${sh.n} (expected ~${Math.round(expected)}) distinct=${sh.distinct} avgGap=${sh.avgGap}ms maxGap=${sh.maxGap}ms; opener visibility start=${visStart} end=${visEnd}`);
-    info('3', 'PiP 内部 visibilityState (后台期间)', await ev(A, 'documentPictureInPicture.window.document.visibilityState'));
+    info('3', 'PiP 内部 visibilityState (后台期间)', await ev(A, `(${PIPDOC} || { visibilityState: 'PiP null' }).visibilityState`));
     await A.send('Page.bringToFront');
     await fetch(`http://127.0.0.1:${PORT}/json/close/${Tinfo.id}`).catch(() => {});
     T.ws.close();
@@ -338,10 +365,11 @@ async function main() {
     const c5 = await closeAndMeasure(A, 'gear');
     await sleep(900);
     const after = await ev(A, MAIN_INFO);
-    check('5', c5.ok && after.cardInMain && after.size === 'lg' && after.placeholderHidden, 'PiP 内齿轮(页内 click) -> 卡片回主文件', `delay=${c5.delay}ms; inMain=${after.cardInMain} size=${after.size} placeholderHidden=${after.placeholderHidden} (gear click was dispatched via element.click() inside the PiP document, no Chrome block observed)`);
-    const nearTop = Math.abs(after.settingsTop) <= 5;
-    const atMax = after.scrollY > 0 && after.maxScroll - after.scrollY <= 2;
-    check('5', after.scrollY > before.scrollY && (nearTop || atMax), '齿轮后页面捲到设置区', `scrollY ${before.scrollY} -> ${after.scrollY}; settings top ${before.settingsTop} -> ${after.settingsTop}px; maxScroll=${after.maxScroll}`);
+    check('5', c5.ok && after.cardInMain && after.size === 'lg' && after.placeholderHidden, 'PiP 内齿轮(页内 click) -> 卡片回主文件', `delay=${c5.delay}ms; inMain=${after.cardInMain} size=${after.size} placeholderHidden=${after.placeholderHidden}${c5.why ? ` (${c5.why})` : ''} (gear click was dispatched via element.click() inside the PiP document, no Chrome block observed)`);
+    // 新版面（spec §13.1）：齿轮 = 切到「基本设置」分页并把焦点放在分页标签（取代旧的「捲到设置区」）
+    check('5', !before.settingsSelected && after.settingsSelected && after.settingsPanelShown && after.focusId === 'tab-settings' && after.settingsTop >= 0 && !after.pageScrolls, '齿轮后切到「基本设置」分页、焦点在分页标签、设置区在视窗内',
+      `selected ${before.settingsSelected} -> ${after.settingsSelected}; panel shown=${after.settingsPanelShown}; focus=${after.focusId}; settings top=${after.settingsTop}px; page scrolls=${after.pageScrolls}`);
+    await ev(A, `document.getElementById('tab-calendar').click()`);
     await ev(A, 'window.scrollTo(0, 0)');
     const o5b = await openPip(A);
     await sleep(300);
@@ -364,6 +392,7 @@ async function main() {
     check('6', o6 !== null, '设置后重开 PiP', `~${o6}ms`);
     await sleep(400);
     const p6 = await ev(A, PIP_INFO);
+    if (!p6) { fail('6', 'PiP 视窗在重开后变成 null', 'documentPictureInPicture.window === null'); throw new Error('PiP window vanished (step 6)'); }
     info('6', '要求尺寸 vs 实际', `req ${JSON.stringify(p6.req)} ; inner ${p6.inner.join('x')} ; outer ${p6.outer.join('x')} ; card ${p6.cardW}x${p6.cardH}`);
     check('6', p6.req && p6.req.height > reqH, '要求高度比无鼓励语/发薪日时增加', `before ${reqH} -> after ${p6.req && p6.req.height}; inner height ${h1} -> ${p6.inner[1]}`);
     check('6', p6.scrollH <= p6.clientH, '未被裁切', `scrollH=${p6.scrollH} clientH=${p6.clientH} (compat=${p6.compat})`);
@@ -397,7 +426,7 @@ async function main() {
     const o7 = await openPip(A);
     await sleep(300);
     const c7 = await closeAndMeasure(A, 'x');
-    check('7', o7 !== null && c7.ok, 'reload 后可再次开启并关闭 PiP', `open ~${o7}ms; close delay=${c7.delay}ms`);
+    check('7', o7 !== null && c7.ok, 'reload 后可再次开启并关闭 PiP', `open ~${o7}ms; close delay=${c7.delay}ms${c7.why ? ` (${c7.why})` : ''}`);
     info('8', '收回后主页面截图', await shot(A, 'main-after'));
 
     // ===== console =====
@@ -409,8 +438,17 @@ async function main() {
   }
 }
 
+console.log(`e2e:real — do NOT run concurrently with other Chrome-driven tests (npm run e2e, Playwright, another e2e:real). Hard timeout ${Math.round(HARD_TIMEOUT_MS / 1000)}s.`);
+// 硬性逾时：不论卡在哪一步，都杀掉 Chrome、删 profile，并以非 0 结束（不会再卡 25 分钟）
+const hard = setTimeout(async () => {
+  console.error(`\n[FAIL] X harness hard timeout: no completion after ${Math.round(HARD_TIMEOUT_MS / 1000)}s — killing Chrome (was another Chrome-driven test running concurrently?)`);
+  await cleanup();
+  process.exit(2);
+}, HARD_TIMEOUT_MS);
+process.on('SIGINT', async () => { await cleanup(); process.exit(130); });
+
 let crashed = null;
-try { await main(); } catch (e) { crashed = e; fail('X', 'harness 中途失败', e.stack ?? String(e)); }
+try { await main(); } catch (e) { crashed = e; fail('X', 'harness 中途失败', e.stack ?? String(e)); } finally { await cleanup(); clearTimeout(hard); }
 
 console.log('\n===== SUMMARY =====');
 const count = (s) => rows.filter((r) => r.status === s).length;
