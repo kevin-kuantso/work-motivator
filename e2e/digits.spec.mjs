@@ -197,6 +197,26 @@ test('copy gives the plain number; screen readers get the full text once (visual
       assert.equal(aria.split(s).length - 1, 1, `accessible text "${s}" exactly once:\n${aria}`);
     }
     assert.ok(!/\b1 9 4\b/.test(aria), 'no digit-by-digit reading');
-    // 开启者的 polite 摘要照旧
-    assert.match(await page.locator('body > #app > div.visually-hidden[role=status][aria-live=polite]').textContent(), /194/);
+    // sr-only 副本不在任何 live region 里（否则读屏每 100 毫秒念一次）
+    const live = await page.evaluate(() => [...document.querySelectorAll('#status-card .sr-text')].map((el) => {
+      const hits = [];
+      for (let n = el; n; n = n.parentElement) {
+        if (n.hasAttribute('aria-live') || /^(status|alert|log|marquee|timer)$/.test(n.getAttribute('role') ?? '')) hits.push(n.className || n.tagName);
+      }
+      return hits;
+    }));
+    assert.deepEqual(live, [[], [], [], []], 'no sr-only copy has a live ancestor or a live role');
+    // 开启者的 polite 摘要（不变）：状态不变时最多每 60 秒更新一次，而数字格每 100 毫秒在变
+    const summary = page.locator('body > #app > div.visually-hidden[role=status][aria-live=polite]');
+    assert.equal(await summary.textContent(), '上班中，今天已赚 194 元');
+    await summary.evaluate((el) => {
+      window.__ann = [];
+      new MutationObserver(() => window.__ann.push([performance.now(), el.textContent])).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    await page.clock.runFor(130000);
+    const ann = await page.evaluate(() => window.__ann);
+    console.log(`MEASURE ${JSON.stringify({ case: 'polite-summary', ann })}`);
+    assert.ok(ann.length >= 1 && ann.length <= 3, `1–3 updates in 130 s (1300 ticks), not per tick (${ann.length})`);
+    for (let i = 1; i < ann.length; i += 1) assert.ok(ann[i][0] - ann[i - 1][0] >= 59999, 'at least 60 s apart');
+    assert.match(ann.at(-1)[1], /^上班中，今天已赚 19\d 元$/);
   }));
