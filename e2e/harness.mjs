@@ -106,3 +106,45 @@ export async function openAt(browser, url, iso, { init, reducedMotion, viewport,
   if (!idle) throw new Error('holiday auto-check did not finish after page load');
   return { context, page, errors, external, consoleErrors, blockedLogs, autoUrls: external.slice() };
 }
+
+// 悬浮小窗 stub（pip.spec / digits.spec 共用）：requestWindow 回传一个 iframe 的 window（独立 document），
+// 其 setInterval / clearInterval 转给已被 page.clock 接管的主视窗计时器，并记录存活的 id。
+// 以 addInitScript 的 content 注入：`(${pipStub})(${JSON.stringify(opts)})`。
+export function pipStub(opts) {
+  const reg = { calls: [], wins: [] };
+  window.__pip = reg;
+  const dp = {
+    window: null,
+    async requestWindow(o) {
+      reg.calls.push(o);
+      if (opts.reject) throw new DOMException('denied', 'NotAllowedError');
+      const f = document.createElement('iframe');
+      f.className = 'pip-stub';
+      f.style.cssText = `position:fixed;left:0;bottom:0;width:${o.width}px;height:${o.height}px;border:0;z-index:9`; // 尺寸 = 请求的视口
+      document.documentElement.append(f);
+      const w = f.contentWindow;
+      const entry = { active: new Set(), closed: false };
+      w.setInterval = (fn, ms) => {
+        const id = window.setInterval(fn, ms);
+        entry.active.add(id);
+        return id;
+      };
+      w.clearInterval = (id) => {
+        entry.active.delete(id);
+        window.clearInterval(id);
+      };
+      // 真实浏览器：close()（程序或按 X）都会触发 pagehide
+      w.close = () => {
+        if (entry.closed) return;
+        entry.closed = true;
+        w.dispatchEvent(new Event('pagehide'));
+        dp.window = null;
+        f.remove();
+      };
+      reg.wins.push(entry);
+      dp.window = w;
+      return w;
+    },
+  };
+  Object.defineProperty(window, 'documentPictureInPicture', { value: dp, configurable: true });
+}

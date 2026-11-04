@@ -4,49 +4,11 @@
 // 用来检查「计时器跑在 PiP 视窗」与「关闭后没有残留计时器」。真实 PiP 留给 Task 7 实机验证。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer, launch, openAt, expectedAutoUrls } from './harness.mjs';
+import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 const T1830 = '2026-11-03T18:30:00+08:00';
 
-function pipStub(opts) {
-  const reg = { calls: [], wins: [] };
-  window.__pip = reg;
-  const dp = {
-    window: null,
-    async requestWindow(o) {
-      reg.calls.push(o);
-      if (opts.reject) throw new DOMException('denied', 'NotAllowedError');
-      const f = document.createElement('iframe');
-      f.className = 'pip-stub';
-      f.style.cssText = `position:fixed;left:0;bottom:0;width:${o.width}px;height:${o.height}px;border:0;z-index:9`; // 尺寸 = 请求的视口
-      document.documentElement.append(f);
-      const w = f.contentWindow;
-      const entry = { active: new Set(), closed: false };
-      w.setInterval = (fn, ms) => {
-        const id = window.setInterval(fn, ms);
-        entry.active.add(id);
-        return id;
-      };
-      w.clearInterval = (id) => {
-        entry.active.delete(id);
-        window.clearInterval(id);
-      };
-      // 真实浏览器：close()（程序或按 X）都会触发 pagehide
-      w.close = () => {
-        if (entry.closed) return;
-        entry.closed = true;
-        w.dispatchEvent(new Event('pagehide'));
-        dp.window = null;
-        f.remove();
-      };
-      reg.wins.push(entry);
-      dp.window = w;
-      return w;
-    },
-  };
-  Object.defineProperty(window, 'documentPictureInPicture', { value: dp, configurable: true });
-}
 const stub = (opts = {}) => ({ content: `(${pipStub})(${JSON.stringify(opts)})` });
 const unsupported = {
   content: 'delete Window.prototype.documentPictureInPicture; delete window.documentPictureInPicture;',
