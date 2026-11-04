@@ -1375,3 +1375,97 @@ test('weekend legend swatch is distinguishable on white (visible border)', () =>
     assert.ok(r >= 2.5, `weekend swatch border ${c.border} on ${c.panel} = ${r.toFixed(2)}`);
     assert.equal(c.width, '1px');
   }));
+
+// ---- Task 14 fix round 1 · C3（Kevin 实机反馈）----
+
+// 提示的内容块在卡片里垂直居中（上下留白差 ≤ 1px），日期行比其他行更醒目；四种视窗 + 一个很高的格子，5 周与 6 周月份
+async function tipBalance(page, key) {
+  const c = page.locator(`.cal-grid button[data-key="${key}"]`);
+  await c.hover();
+  await page.clock.runFor(450);
+  const r = await page.evaluate(() => {
+    const tip = document.querySelector('.day-tooltip');
+    const tr = tip.getBoundingClientRect();
+    const lines = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
+    const first = lines[0].getBoundingClientRect();
+    const last = lines.at(-1).getBoundingClientRect();
+    const fs = lines.map((x) => parseFloat(getComputedStyle(x).fontSize));
+    const fw = lines.map((x) => getComputedStyle(x).fontWeight);
+    return {
+      top: Math.round((first.top - tr.top) * 10) / 10, bottom: Math.round((tr.bottom - last.bottom) * 10) / 10, h: Math.round(tr.height * 10) / 10,
+      n: lines.length, fs, fw, cut: lines.some((x) => x.scrollWidth > x.clientWidth), payColor: getComputedStyle(lines.at(-1)).color,
+    };
+  });
+  await page.mouse.move(0, 0);
+  return r;
+}
+test('C3: tooltip content is vertically centred in the card (top/bottom space differ ≤ 1px) with a clear hierarchy — 4 viewports + a tall cell, 5- and 6-week months', () =>
+  withPage(T1412, async (page) => {
+    for (const [w, ht] of [...VIEWPORTS, [1920, 1300]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [ym, key] of [['2026-11', '2026-11-03'], ['2026-11', '2026-11-18'], ['2026-10', '2026-10-01']]) {
+        await page.locator('.cal-today').click();
+        if (ym === '2026-10') await page.getByRole('button', { name: /上月/ }).click();
+        const r = await tipBalance(page, key);
+        console.log(`MEASURE ${JSON.stringify({ case: 'C3 tooltip balance', w, ht, key, ...r })}`);
+        assert.ok(Math.abs(r.top - r.bottom) <= 1, `${key} @${w}x${ht}: top ${r.top} vs bottom ${r.bottom}`);
+        assert.equal(r.cut, false, `${key} @${w}x${ht}: no truncated line`);
+        assert.ok(r.fs[0] > r.fs[1], `date line larger (${r.fs})`);
+        assert.ok(Number(r.fw[0]) >= 700 && Number(r.fw[1]) <= 500, `date bold, status normal (${r.fw})`);
+        assert.equal(r.payColor, 'rgb(187, 247, 208)', 'pay line accent');
+      }
+      if (w === 1280 || w === 1920 && ht === 950) {
+        await page.locator('.cal-today').click();
+        await page.locator('.cal-grid button[data-key="2026-11-04"]').hover();
+        await page.clock.runFor(450);
+        await shot(page, `task-14-c3-tooltip-${w}x${ht}.png`);
+        await page.mouse.move(0, 0);
+      }
+    }
+  }));
+
+// 今天的绿色圆圈：数字在圆里光学居中（字形墨迹框中心 vs 圆心 ≤ 1px），圆整个在格子里、距 2px 的今天边框 ≥ 2px；
+// 1 位数与 2 位数日期；普通格子的数字位置与今天一致（同一行看起来整齐）
+async function numGeometry(page, key) {
+  return page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => {
+    const num = b.querySelector('.day-num');
+    const nr = num.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    const bw = parseFloat(getComputedStyle(b).borderTopWidth);
+    const range = document.createRange();
+    range.selectNodeContents(num);
+    const tr = range.getBoundingClientRect();
+    const cs = getComputedStyle(num);
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const m = ctx.measureText(num.textContent);
+    const baseline = tr.top + m.fontBoundingBoxAscent;
+    const ink = { l: tr.left - m.actualBoundingBoxLeft, r: tr.left + m.actualBoundingBoxRight, t: baseline - m.actualBoundingBoxAscent, b: baseline + m.actualBoundingBoxDescent };
+    const r1 = (v) => Math.round(v * 10) / 10;
+    return {
+      text: num.textContent, today: b.classList.contains('is-today'),
+      dx: r1((ink.l + ink.r) / 2 - (nr.left + nr.right) / 2), dy: r1((ink.t + ink.b) / 2 - (nr.top + nr.bottom) / 2),
+      clearTop: r1(nr.top - (br.top + bw)), clearLeft: r1(nr.left - (br.left + bw)),
+      offTop: r1(nr.top - br.top), offLeft: r1(nr.left - br.left), circle: [r1(nr.width), r1(nr.height)],
+    };
+  });
+}
+test('C3: today circle — digit optically centred (≤ 1px), circle inside the cell with ≥ 2px clearance from the 2px border; 1- and 2-digit dates; consistent with other cells; four viewports', async () => {
+  for (const [iso, todayKey, otherKey] of [['2026-11-04T10:00:00+08:00', '2026-11-04', '2026-11-05'], ['2026-11-18T10:00:00+08:00', '2026-11-18', '2026-11-19']]) {
+    await withPage(iso, async (page) => {
+      for (const [w, ht] of VIEWPORTS) {
+        await page.setViewportSize({ width: w, height: ht });
+        const t = await numGeometry(page, todayKey);
+        const o = await numGeometry(page, otherKey);
+        console.log(`MEASURE ${JSON.stringify({ case: 'C3 today circle', w, ht, today: t, other: o })}`);
+        assert.equal(t.today, true);
+        assert.ok(Math.abs(t.dx) <= 1 && Math.abs(t.dy) <= 1, `${t.text} @${w}: digit centred in the circle (dx ${t.dx}, dy ${t.dy})`);
+        assert.ok(t.clearTop >= 2 && t.clearLeft >= 2, `${t.text} @${w}: ≥ 2px from the today border (top ${t.clearTop}, left ${t.clearLeft})`);
+        assert.ok(t.circle[0] >= t.circle[1] - 0.5, 'round circle wide enough for 2 digits');
+        assert.ok(Math.abs(t.offTop - o.offTop) <= 0.5 && Math.abs(t.offLeft - o.offLeft) <= 0.5, `today number at the same place as other cells (${t.offTop},${t.offLeft} vs ${o.offTop},${o.offLeft})`);
+        assert.ok(Math.abs(o.dx) <= 1 && Math.abs(o.dy) <= 1, `other number centred in its box (dx ${o.dx}, dy ${o.dy})`);
+        if ((w === 1280 || w === 1920) && todayKey === '2026-11-04') await shot(page, `task-14-c3-today-${w}x${ht}.png`);
+      }
+    });
+  }
+});
