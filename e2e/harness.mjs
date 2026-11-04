@@ -108,7 +108,7 @@ export async function openAt(browser, url, iso, { init, reducedMotion, viewport,
 }
 
 // 悬浮小窗 stub（pip.spec / digits.spec 共用）：requestWindow 回传一个 iframe 的 window（独立 document），
-// 其 setInterval / clearInterval 转给已被 page.clock 接管的主视窗计时器，并记录存活的 id。
+// 其 setInterval / clearInterval（与 setTimeout / clearTimeout）转给已被 page.clock 接管的主视窗计时器，并记录存活的 id。
 // 以 addInitScript 的 content 注入：`(${pipStub})(${JSON.stringify(opts)})`。
 export function pipStub(opts) {
   const reg = { calls: [], wins: [] };
@@ -132,6 +132,17 @@ export function pipStub(opts) {
       w.clearInterval = (id) => {
         entry.active.delete(id);
         window.clearInterval(id);
+      };
+      // 减少动态模式的对齐计时（R46）用 setTimeout：同样转给主视窗，记录在 timeouts（触发或清除后移除）
+      entry.timeouts = new Set();
+      w.setTimeout = (fn, ms) => {
+        const id = window.setTimeout(() => { entry.timeouts.delete(id); fn(); }, ms);
+        entry.timeouts.add(id);
+        return id;
+      };
+      w.clearTimeout = (id) => {
+        entry.timeouts.delete(id);
+        window.clearTimeout(id);
       };
       // 真实浏览器：close()（程序或按 X）都会触发 pagehide
       w.close = () => {

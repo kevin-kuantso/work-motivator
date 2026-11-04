@@ -20,6 +20,7 @@ import { readTicks, isStall } from './pause-model.js';
 const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、备份提示已显示），与设置分开存放
 const TICK_MS = 100;
 const TICK_MS_REDUCED = 1000;
+const TICK_MIN_DELAY_MS = 20;
 const ANNOUNCE_MS = 60000;
 // R34 / R42 / R43：只有真的停过才提示——两次 tick 之间超过 5 秒（单调时钟与墙上时钟取较大者，见 pause-model.js），
 // 或 Page Lifecycle resume。单纯切走分页再回来（tick 照常）不提示。数字会一下子跳到当前时间：不打扰地提示一次，10 分钟内最多一次。
@@ -364,17 +365,37 @@ export function mountApp(doc, storage, clock) {
   }
 
   // 计时器跑在状态卡所在的视窗：悬浮时改由 PiP 视窗的 setInterval 驱动（spec §3），收回后回到主视窗。
+  // 减少动态（1 秒一跳，R46）：用自我校正的 setTimeout 对齐墙上时钟的整秒（下一次 = 1000 − Date.now() % 1000，至少 20 ms），
+  // 倒数的秒数不会跳号或重复；一般模式（100 ms）仍用 setInterval，不变。Date.now 用全域时钟（与暂停侦测相同，不是可注入的 clock）。
   const mq = win.matchMedia ? win.matchMedia('(prefers-reduced-motion: reduce)') : null;
   let timerHost = win;
-  let timer = null;
-  function start() {
+  let timer = null; // setInterval（一般模式）
+  let aligned = null; // setTimeout（减少动态模式）
+  function stop() {
     timerHost.clearInterval(timer);
-    timer = timerHost.setInterval(tick, mq && mq.matches ? TICK_MS_REDUCED : TICK_MS);
+    timerHost.clearTimeout(aligned);
+    timer = null;
+    aligned = null;
+  }
+  function alignedDelay() {
+    return Math.max(TICK_MIN_DELAY_MS, TICK_MS_REDUCED - (Date.now() % TICK_MS_REDUCED));
+  }
+  function scheduleAligned() {
+    const host = timerHost;
+    aligned = host.setTimeout(() => {
+      aligned = null;
+      tick();
+      if (host === timerHost && aligned === null && timer === null && mq && mq.matches) scheduleAligned();
+    }, alignedDelay());
+  }
+  function start() {
+    stop();
+    if (mq && mq.matches) scheduleAligned();
+    else timer = timerHost.setInterval(tick, TICK_MS);
   }
   function moveTimer(host) {
     skipGap = true;
-    timerHost.clearInterval(timer);
-    timer = null;
+    stop();
     timerHost = host;
     start();
     tick();

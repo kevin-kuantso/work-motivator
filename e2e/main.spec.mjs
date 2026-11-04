@@ -119,6 +119,31 @@ test('reduced motion: display updates at 1 Hz', () =>
     assert.notEqual(await text(page, `${card} .card-amount`), a);
   }, { reducedMotion: true }));
 
+// R46：减少动态模式（1 秒一跳）对齐墙上时钟的整秒：每次倒数变化都发生在整秒（Date.now() % 1000 < 20），
+// 120 秒内秒数逐一递减，不跳号、不重复。打开时刻故意落在 .600（旧的 setInterval 版本相位 = 载入时刻，不在整秒上）。
+test('R46: reduced-motion ticks align to wall-clock seconds; the countdown never skips or repeats over 120 s', () =>
+  withPage('2026-11-03T14:12:00.600+08:00', async (page) => {
+    const secs = (s) => {
+      const m = s.match(/(?:(\d+)小时)?(\d+)分(\d+)秒/);
+      return Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+    };
+    await page.evaluate(() => {
+      window.__cd = [];
+      const el = document.querySelector('#status-card .card-countdown + .sr-text');
+      new MutationObserver(() => window.__cd.push([Date.now(), el.textContent])).observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    const start = secs(await text(page, `${card} .card-countdown + .sr-text`));
+    assert.equal(start, 2 * 3600 + 48 * 60, '14:12:00.6 → ceil(10079.4) = 2:48:00');
+    for (let i = 0; i < 24; i++) await page.clock.runFor(5000);
+    const cd = await page.evaluate(() => window.__cd);
+    const phases = cd.map(([ms]) => ms % 1000);
+    const values = cd.map(([, s]) => secs(s));
+    console.log(`MEASURE ${JSON.stringify({ case: 'R46 tick alignment', changes: cd.length, phases: [...new Set(phases)], first: values[0], last: values.at(-1) })}`);
+    assert.ok(phases.every((p) => p < 20), `every change lands on a second boundary (phases ${[...new Set(phases)]})`);
+    assert.equal(cd.length, 120, 'one change per second for 120 s');
+    values.forEach((v, i) => assert.equal(v, start - 1 - i, `step ${i}: no skip / no repeat`));
+  }, { reducedMotion: true }));
+
 test('payday row appears after setting payday and persists', () =>
   withPage(T1412, async (page) => {
     await openSettings(page);
