@@ -1,4 +1,4 @@
-// 月历（spec §13.3）：工具列（切月、回到今天、PgUp / PgDn 提示）、摘要行（应出勤天数、日薪、缺表标签、重置本月标记）、
+// 月历（spec §13.3）：工具列（切月、回到今天；PgUp / PgDn 只写在切月按钮的悬停提示里）、摘要行（应出勤天数、日薪、缺表标签、重置本月标记）、
 // 只列当月出现类型的单行图例、弹性行高的格子；点日期弹出小菜单（修改即存），悬停 / 聚焦提示。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
@@ -43,13 +43,10 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
 
   const el = h(doc, 'section', { class: 'calendar', 'aria-label': c.title },
     h(doc, 'div', { class: 'cal-toolbar' },
-      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, onclick: () => move(-1) }),
+      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, title: c.prevTitle, onclick: () => move(-1) }),
       title,
-      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, onclick: () => move(1) }),
-      todayBtn,
-      h(doc, 'span', { class: 'cal-keys' },
-        h(doc, 'kbd', { text: c.pageKeys.up }), c.pageKeys.sep, h(doc, 'kbd', { text: c.pageKeys.down }),
-        h(doc, 'span', { class: 'cal-keys-label', text: c.pageKeys.label }))),
+      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, title: c.nextTitle, onclick: () => move(1) }),
+      todayBtn),
     h(doc, 'div', { class: 'cal-summary' }, summaryText, yearTag, reset),
     h(doc, 'div', { class: 'cal-legend' },
       h(doc, 'span', { class: 'legend-title', text: c.legend }),

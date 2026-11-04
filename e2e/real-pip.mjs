@@ -37,6 +37,10 @@ const withTimeout = (p, ms, what) => {
 };
 // PiP 文件的安全取法：视窗已关闭时得到 null（而不是抛错）
 const HOLIDAY_HOSTS = /^https:\/\/(raw\.githubusercontent\.com\/NateScarlet\/holiday-cn\/master|cdn\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master|fastly\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master)\/2027\.json$/;
+// 每次 reload 前只清掉假期数据键（含 lastCheck）：INIT 每次载入都把页面时钟回拨到 14:12:00，
+// 旧的 lastCheck 会时而落在「未来」时而不会，是否重查就取决于载入快慢（实测 6 或 9 个请求，不确定）。
+// 清掉后每次载入都确定地重查一次。「每天最多一次」由 npm test / npm run e2e 覆盖。设置键不受影响。
+const CLEAR_HOLIDAYS = `localStorage.removeItem('work-motivator-v1-holidays')`;
 const PIPDOC = '(documentPictureInPicture.window ? documentPictureInPicture.window.document : null)';
 
 // ---------- 结果表 ----------
@@ -409,6 +413,7 @@ async function main() {
 
     // ===== 6 鼓励语 + 发薪日 =====
     await ev(A, `localStorage.setItem('work-motivator-v1', JSON.stringify({ version: 1, cheer: '今天也要加油，下班就能吃好吃的！', payday: 15 }))`);
+    await ev(A, CLEAR_HOLIDAYS);
     await A.send('Page.reload');
     await waitFor(A, 'document.readyState === "complete" && !!document.getElementById("btn-float")', 10000);
     await A.send('Page.bringToFront');
@@ -440,6 +445,7 @@ async function main() {
 
     // ===== 7 PiP 开着时 reload =====
     const tgtBefore = (await http('/json/list')).filter((t) => t.id !== tab.id && t.type === 'page').map((t) => `${t.type}:${t.url.slice(0, 40)}`);
+    await ev(A, CLEAR_HOLIDAYS);
     await A.send('Page.reload');
     await waitFor(A, 'document.readyState === "complete" && !!document.getElementById("btn-float")', 10000);
     await sleep(800);
@@ -452,15 +458,13 @@ async function main() {
     await sleep(2000);
     const s7 = statsOf(await ev(A, '__chg'), 2000);
     check('7', s7.perSec >= 8, 'reload 后金额照常跳动', `changes/s=${s7.perSec}`);
-    // 注意：INIT 每次载入都把页面时钟重新对到 14:12:00，于是之前存下的 lastCheck 落在「未来」，
-    // 按 Task 9 的规则（未来的 lastCheck 不算最近）每次载入都会再检查一次——这是本 harness 回拨时钟造成的，不是「每天一次」失效
-    // （「每天一次」由 npm test / npm run e2e 覆盖）。本脚本共载入 3 次（开页、步骤 6 reload、步骤 7 reload）→ 预期 3 × 3 = 9 个请求，
-    // 全部是三个 fixture 网址，且 reload 后仍是「暂未发布」信息状态。
+    // 本脚本共载入 3 次（开页、步骤 6 reload、步骤 7 reload），每次之前都清掉假期数据键 → 预期 3 × 3 = 9 个请求，
+    // 全部是三个 fixture 网址，且最后一次 reload 后仍是「暂未发布」信息状态。
     await waitFor(A, '!document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && !document.getElementById("holiday-result").hidden', 5000);
     const h9bAll = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, hidden: r.hidden, line: document.getElementById('holiday-status').textContent, busy: document.getElementById('btn-holiday-check').getAttribute('aria-disabled'), rec: localStorage.getItem('work-motivator-v1-holidays'), now: Date.now() }; })()`);
     const h9b = h9bAll.tone;
     info('9', 'reload 后假期数据区', JSON.stringify(h9bAll));
-    check('9', fulfilled.length === 9 && fulfilled.every((u) => HOLIDAY_HOSTS.test(u)) && refused.length === 0 && h9b === 'info', 'reload 后（harness 回拨时钟 → 重查）仍只请求三个 fixture 网址并回到「暂未发布」信息状态', `fulfilled=${fulfilled.length} refused=${refused.length} tone=${h9b}`);
+    check('9', fulfilled.length === 9 && fulfilled.every((u) => HOLIDAY_HOSTS.test(u)) && refused.length === 0 && h9b === 'info', '每次载入（含 2 次 reload，之前清掉假期数据键）都只请求三个 fixture 网址，reload 后仍是「暂未发布」信息状态', `fulfilled=${fulfilled.length} refused=${refused.length} tone=${h9b}`);
     const o7 = await openPip(A);
     await sleep(300);
     const c7 = await closeAndMeasure(A, 'x');

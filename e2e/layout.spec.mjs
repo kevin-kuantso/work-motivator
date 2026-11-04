@@ -276,8 +276,13 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     await page.keyboard.press('PageDown');
     assert.equal(await title(), '2027 年 2 月');
     assert.equal((await page.evaluate(() => window.__pg)).at(-1), false);
-    assert.match(await text(page, '.cal-keys'), /PgUp \/ PgDn 切换月份/);
-    assert.equal(await page.locator('.cal-keys kbd').count(), 2);
+    // R29：工具列不放可见的键盘提示；按键只写在「上月」「下月」的悬停提示里（无障碍名称仍是按钮文字）
+    assert.equal(await page.locator('.cal-toolbar kbd, .cal-keys').count(), 0, 'no visible key hint in the toolbar');
+    assert.doesNotMatch(await page.locator('.cal-toolbar').innerText(), /PgUp|PgDn|切换月份/);
+    assert.equal(await page.locator('.cal-prev').getAttribute('title'), '上月（PgUp）');
+    assert.equal(await page.locator('.cal-next').getAttribute('title'), '下月（PgDn）');
+    assert.equal(await page.getByRole('button', { name: '‹ 上月', exact: true }).getAttribute('title'), '上月（PgUp）', 'accessible name = visible text; key in the description');
+    assert.equal(await page.getByRole('button', { name: '下月 ›', exact: true }).getAttribute('title'), '下月（PgDn）');
   }));
 
 test('legend lists only the kinds present this month on one line; 手动标记 / 重置本月标记 only with manual marks', () =>
@@ -532,27 +537,24 @@ test('M6: 「回到今天」 quiet state looks clickable, not disabled: border �
     assert.equal(c.aria, null);
   }));
 
-test('M3: at 1000px the PgUp / PgDn hint is never clipped (this month and while viewing another month)', () =>
+test('M3 / R29: the calendar toolbar has no horizontal overflow at 1000px (this month and while viewing another month)', () =>
   withPage(T1412, async (page) => {
-    await page.setViewportSize({ width: 1000, height: 700 });
-    const probe = () => page.evaluate(() => {
-      const k = document.querySelector('.cal-keys');
-      const tb = document.querySelector('.cal-toolbar');
-      const kr = k.getBoundingClientRect();
-      const tr = tb.getBoundingClientRect();
-      return { sw: k.scrollWidth, cw: k.clientWidth, right: kr.right, tbRight: tr.right, kbd: [...k.querySelectorAll('kbd')].map((x) => x.textContent), tbOverflow: tb.scrollWidth - tb.clientWidth };
-    });
-    for (const away of [false, true]) {
-      if (away) await page.getByRole('button', { name: /下月/ }).click();
-      const m = await probe();
-      console.log(`MEASURE ${JSON.stringify({ case: 'pgkeys@1000', away, ...m })}`);
-      assert.ok(m.sw <= m.cw, `hint not clipped (${m.sw} > ${m.cw})`);
-      assert.ok(m.right <= m.tbRight + 0.5, 'hint inside the toolbar');
-      assert.equal(m.tbOverflow, 0, 'toolbar does not overflow');
-      assert.deepEqual(m.kbd, ['PgUp', 'PgDn'], 'keys still shown');
+    for (const [w, ht] of [[1000, 700], [1280, 585]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      await page.locator('.cal-today').click();
+      for (const away of [false, true]) {
+        if (away) await page.getByRole('button', { name: /下月/ }).click();
+        const m = await page.evaluate(() => {
+          const tb = document.querySelector('.cal-toolbar');
+          const tr = tb.getBoundingClientRect();
+          return { overflow: tb.scrollWidth - tb.clientWidth, lastRight: Math.round(tb.lastElementChild.getBoundingClientRect().right), tbRight: Math.round(tr.right), h: Math.round(tr.height) };
+        });
+        console.log(`MEASURE ${JSON.stringify({ case: 'toolbar', w, away, ...m })}`);
+        assert.equal(m.overflow, 0, `${w}px away=${away}: toolbar does not overflow`);
+        assert.ok(m.lastRight <= m.tbRight, 'last toolbar item inside the toolbar');
+        assert.ok(m.h <= 32, `single line (${m.h}px)`);
+      }
     }
-    await page.setViewportSize({ width: 1280, height: 585 });
-    assert.match(await page.locator('.cal-keys').innerText(), /切换月份/, 'full hint at 1280');
   }));
 
 test('M2: focus stays on the error-bar button when the bar re-renders (save attempt while storage fails)', () =>
