@@ -55,7 +55,7 @@ test('card shows a year note when the holiday table is missing (R15)', () => {
   const now = at(1, 4, 10, 0, 0, 2027);
   const m = cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
   assert.equal(m.yearNote, '2027 年仅标法定假日');
-  assert.equal(m.yearTitle, '2027 年放假安排未公布：已按《放假办法》标出法定假日本身；补假、调休和延长的假日待公布');
+  assert.equal(m.yearTitle, '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
   assert.ok([...m.yearNote.replace(/[\d\s]/g, '')].length <= 14, 'short tag stays short');
 });
 

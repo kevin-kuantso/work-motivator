@@ -510,7 +510,7 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     await page.locator('.cal-grid button[data-key="2027-01-01"]').hover();
     await page.clock.runFor(500); // 悬停 0.4 秒后出现提示
     // 盖在格子上的提示用短写（2027-01 是 5 周月份，4 行）：第 3 行是来源
-    assert.deepEqual((await page.locator('.day-tooltip').innerText()).split('\n'), ['1月1日 周五', '法定假日（元旦）', '导入文件', '计薪 ¥0.00']);
+    assert.deepEqual((await page.locator('.day-tooltip').innerText()).split('\n'), ['1月1日 周五', '法定假日·元旦', '导入文件', '计薪 ¥0.00']);
     // 联网有不同的 2027：不覆盖导入的文件，页面级提示
     const changed = JSON.parse(synth2027());
     changed.days = changed.days.filter((d) => d.date !== '2027-01-03');

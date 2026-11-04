@@ -50,6 +50,19 @@ function statusText(info, plain) {
   return C.status.rest;
 }
 
+// 盖在格子上的提示用的短状态（R50）：不带括号
+function statusShortText(info, plain) {
+  const S = C.tip.statusShort;
+  if (info.leave) return statusText(info, plain);
+  if (info.base === 'work') {
+    if (info.reason === 'makeup') return S.makeup(info.holidayName);
+    return plain.base === 'rest' ? S.makeup(null) : C.status.workday;
+  }
+  if (info.reason === 'holiday') return S.holiday(info.holidayName);
+  if (info.reason === 'override' && plain.reason === 'holiday') return S.holiday(plain.holidayName);
+  return C.status.rest;
+}
+
 const dayTitle = (date) => C.dayTitle(date.getMonth() + 1, date.getDate(), STRINGS.weekdays[date.getDay()]);
 const cents = (v) => Math.round(v * 100);
 
@@ -74,7 +87,9 @@ export function dayTooltipModel(date, cfg, marks, tables, now) {
   const paid = info.base === 'work' && info.leave !== 'unpaid';
   const isToday = now && ymd(now) === ymd(date);
   // 'rule'：周末按周末规则；其他日子（含「周末计入」时的周末、无内置表年份的平日）按默认规则
-  const sourceLabel = C.tip.sources[info.source === 'rule' && info.reason !== 'weekend' ? 'default' : info.source];
+  const sourceKey = info.source === 'rule' && info.reason !== 'weekend' ? 'default' : info.source;
+  const sourceLabel = C.tip.sources[sourceKey];
+  const statusShort = statusShortText(info, plain);
   const pay = yuan(paid ? monthDailyWage(date, cfg, marks, tables) : 0);
   return {
     title: `${dayTitle(date)}${isToday ? C.todaySuffix : ''}`,
@@ -83,8 +98,10 @@ export function dayTooltipModel(date, cfg, marks, tables, now) {
     pay: C.tip.pay(pay),
     hint: C.tip.hint,
     // 盖在格子上的提示用短写（设计稿）：来源只写类别、「计薪 ¥x」；完整句子仍在 aria-describedby
-    sourceLabel,
+    sourceLabel: C.tip.sourcesShort[sourceKey] ?? sourceLabel,
     payShort: C.tip.payShort(pay),
+    titleShort: dayTitle(date),
+    statusShort: isToday ? C.tip.todayTag(statusShort) : statusShort,
   };
 }
 

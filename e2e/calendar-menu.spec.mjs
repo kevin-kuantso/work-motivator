@@ -333,7 +333,7 @@ test('R39: 2027 fixed-date holidays carry the 「法定日期（《放假办法�
     await cell(page, '1月1日').hover();
     await page.clock.runFor(450);
     // 2027-01 是 5 周月份：4 行，第 3 行是来源（短写，不带「来源：」）
-    assert.deepEqual((await tooltip(page).innerText()).split('\n'), ['1月1日 周五', '法定假日（元旦）', '法定日期（《放假办法》）', '计薪 ¥0.00']);
+    assert.deepEqual((await tooltip(page).innerText()).split('\n'), ['1月1日 周五', '法定假日·元旦', '《放假办法》', '计薪 ¥0.00']);
     // R40：2027-02-06（周六）是春节初一：法定假日，来源「法定日期」；补假不猜，2 月 9 日仍是普通工作日
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await desc('2月6日'), '2月6日 周六，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');

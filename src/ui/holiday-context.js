@@ -38,15 +38,6 @@ function groupRuns(days) {
   return runs;
 }
 
-function byName(runs) {
-  const out = new Map();
-  for (const r of runs) {
-    if (!out.has(r.name)) out.set(r.name, []);
-    out.get(r.name).push(r);
-  }
-  return out;
-}
-
 // 月份内的法定假日与调休上班日（不含手动标记）：{ off:[{name,day}], makeup:[{name,day}] }，按日期排序
 export function monthHolidays(year, monthIndex, tables) {
   const n = new Date(year, monthIndex + 1, 0).getDate();
@@ -70,20 +61,30 @@ export function monthContext(year, monthIndex, tables, today, t) {
   const table = has(tables, year) ? tables[year] : null;
   const { off, makeup } = monthHolidays(year, monthIndex, tables);
 
-  const offRuns = byName(groupRuns(off));
-  const parts = [];
-  for (const [name, runs] of offRuns) parts.push(C.off(name, runs.map((r) => C.range(md(r.from), md(r.to)))));
-  for (const [name, runs] of byName(groupRuns(makeup))) {
-    const days = runs.flatMap((r) => Array.from({ length: r.to - r.from + 1 }, (_, i) => md(r.from + i)));
-    // 本月只有一个放假节日且就是它：不重复节日名（「国庆 10/1–10/7 放假，10/10 调休上班」）；否则写出是哪个节日的调休
-    parts.push(C.makeup(offRuns.size === 1 && offRuns.has(name) ? null : name, days));
+  // 按节日分组；组内「放假」在前、「调休上班」在后；各组按自己最早的日期排序
+  const groups = new Map();
+  const groupOf = (name) => {
+    if (!groups.has(name)) groups.set(name, { name, first: Infinity, off: [], makeup: [] });
+    return groups.get(name);
+  };
+  for (const r of groupRuns(off)) {
+    const g = groupOf(r.name);
+    g.off.push(C.range(md(r.from), md(r.to)));
+    g.first = Math.min(g.first, r.from);
   }
+  for (const r of groupRuns(makeup)) {
+    const g = groupOf(r.name);
+    for (let d = r.from; d <= r.to; d++) g.makeup.push(md(d));
+    g.first = Math.min(g.first, r.from);
+  }
+  const parts = [...groups.values()].sort((a, b) => a.first - b.first)
+    .map((g) => C.group(g.name, [g.off.length ? C.off(g.off) : null, g.makeup.length ? C.makeup(g.makeup) : null].filter(Boolean)));
   const marked = parts.length > 0;
 
   let basis;
   if (table) basis = typeof C.basis[table.source] === 'function' ? C.basis[table.source](year) : null; // 来源不明：不写依据
   else if (noTableKind(year) === 'none') basis = null;
-  else basis = today instanceof Date && year < today.getFullYear() ? C.basis.statutoryPast : C.basis.statutory;
+  else basis = noTableKind(year) === 'lunar' ? C.basis.lunar : C.basis.fixed; // R49：说 app 标了什么，过去 / 将来同一句
   const tag = missingTableTag(year, today, tables, t);
 
   if (!table && noTableKind(year) === 'none') {

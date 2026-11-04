@@ -426,7 +426,7 @@ test('2027-02 (no table): 春节 2/5-2/8 marked, summary 18 days, tag text, fits
     assert.match(await cell(page, '2月9日').getAttribute('aria-label'), /^2月9日 周二，工作日/, 'no invented compensation day');
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
     assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标法定假日');
-    assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2027 年放假安排未公布：已按《放假办法》标出法定假日本身；补假、调休和延长的假日待公布');
+    assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     assert.ok((await text(page, '.cal-summary .cal-year-tag')).length <= 14, 'tag <= 14 chars');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
@@ -765,7 +765,7 @@ for (const how of ['hover', 'keyboard']) {
         await page.setViewportSize({ width: w, height: ht });
         for (const [month, label, lines] of [
           ['2026-11', '11月18日', ['11月18日 周三', '工作日', '计薪 ¥323.81']],
-          ['2026-10', '10月1日', ['10月1日 周四', '法定假日（国庆）', '内置·官方通知', '计薪 ¥0.00']],
+          ['2026-10', '10月1日', ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00']],
         ]) {
           await page.locator('.cal-today').click();
           if (month === '2026-10') await page.getByRole('button', { name: /上月/ }).click();
@@ -827,17 +827,17 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
     assert.equal(oct.title, '国庆 10/1–10/7 放假，10/10 调休上班 · 依据 2026 年国务院放假通知');
     await shot(page, 'task-14-calendar-oct-1280x585.png');
     assert.ok(await summaryOneLine(page) <= 30);
-    // 2025（无表、已过去）：不显示缺表标签，胶囊只说「按《放假办法》标出法定假日本身；未含补假、调休」
+    // 2025（无表、已过去，fixed 年份）：不显示缺表标签，胶囊说 app 只标了固定日期的法定假日（R49）
     for (let i = 0; i < 12; i++) await page.getByRole('button', { name: /上月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2025 年 10 月');
     const past = await pill(page);
-    assert.equal(past.text, '国庆 10/1–10/3 放假· 按《放假办法》标出法定假日本身；未含补假、调休');
+    assert.equal(past.text, '国庆 10/1–10/3 放假· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
     assert.equal(past.cut, false, 'fits at 1280');
     assert.doesNotMatch(past.text + past.title, /国务院|待公布|依据/);
     assert.equal(await tagText(page), null, 'R41: no tag for a past year');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /上月/ }).click();
-    assert.equal((await pill(page)).text, '本月没有已标出的法定假日· 按《放假办法》标出法定假日本身；未含补假、调休');
+    assert.equal((await pill(page)).text, '本月没有已标出的法定假日· 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
     assert.equal((await pill(page)).check, false, 'no ✓ without a table');
   }));
 
@@ -849,7 +849,7 @@ test('summary pill + tag: 2027-01 (fixed day) and 2027-02 (lunar days) with the 
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
     const jan = await pill(page);
     assert.equal(jan.text, '元旦 1/1 放假');
-    assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休待公布');
+    assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     assert.equal(jan.check, false);
     assert.equal(await tagText(page), '2027 年仅标法定假日');
     assert.ok(await summaryOneLine(page) <= 30);
@@ -1285,4 +1285,93 @@ test('B minors: chip group has a readable text node; backup card documents what 
     assert.ok(seq.includes(''), 'cleared between announcements');
     const m = await measure(page);
     assert.equal(m.scrollH <= m.ih, true);
+  }));
+
+// ---- Task 14 fix round 1 · Block C（R49 / R50）----
+
+// R50：提示的每一行都不被省略号截断（scrollWidth ≤ clientWidth）：2026 年全部 7 个节日的放假 / 调休、今天、带薪 / 无薪 / 手动标记，
+// 四种视窗；5 周月份用内置 2026 表，6 周月份（2027-05）用导入的测试表（7 个节日名都放进去，虚构数据只为测宽度）
+const WIDTH2027 = JSON.stringify({
+  year: 2027, papers: ['https://www.gov.cn/zhengce/test-width-2027.htm'],
+  days: [
+    ...['元旦', '春节', '清明', '劳动节', '端午', '中秋', '国庆'].map((n, i) => ({ name: n, date: `2027-05-${String(3 + i).padStart(2, '0')}`, isOffDay: true })),
+    ...[['元旦', '01'], ['春节', '02'], ['清明', '15'], ['劳动节', '16'], ['端午', '22'], ['中秋', '23'], ['国庆', '29']].map(([n, d]) => ({ name: n, date: `2027-05-${d}`, isOffDay: false })),
+  ],
+}); // 2027-05-01 是周六；所有调休日都在周六 / 周日
+async function tipLines(page, key) {
+  const c = page.locator(`.cal-grid button[data-key="${key}"]`);
+  await c.hover();
+  await page.clock.runFor(450);
+  const r = await c.evaluate((b) => {
+    const tip = document.querySelector('.day-tooltip');
+    const desc = document.getElementById(b.getAttribute('aria-describedby')).textContent;
+    return { hidden: tip.hidden, desc, lines: [...tip.children].filter((x) => getComputedStyle(x).display !== 'none').map((x) => ({ text: x.textContent, cut: x.scrollWidth > x.clientWidth })) };
+  });
+  await page.mouse.move(0, 0);
+  return r;
+}
+test('R50: no tooltip line is truncated — every 2026 festival (off + make-up), today, leave / manual states; 5-week and 6-week months; four viewports', () =>
+  withPage(T1412, async (page) => {
+    await tab(page, '基本设置').click();
+    await page.locator('#holiday-file').setInputFiles({ name: '2027.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2027) });
+    await page.locator('#holiday-result[data-tone="success"]').waitFor();
+    await tab(page, '月历').click();
+    // 手动标记：11/5 带薪假、11/6 无薪假、11/7（周六）改为上班、11/9 改为休息
+    for (const [label, re] of [['11月5日', /^带薪假/], ['11月6日', /^无薪假/], ['11月7日', /改为上班/], ['11月9日', /改为休息/]]) {
+      await cell(page, label).click();
+      await page.getByRole('menuitemradio', { name: re }).click();
+    }
+    const builtin = [
+      ['2026-01', ['2026-01-01', '2026-01-04']], ['2026-02', ['2026-02-15', '2026-02-14']], ['2026-04', ['2026-04-04']],
+      ['2026-05', ['2026-05-01', '2026-05-09']], ['2026-06', ['2026-06-19']], ['2026-09', ['2026-09-25', '2026-09-20']], ['2026-10', ['2026-10-01', '2026-10-10']],
+    ];
+    const months = [
+      ...builtin,
+      ['2026-11', ['2026-11-03', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-09', '2026-11-18']], // 6 周：今天 / 带薪 / 无薪 / 手动上班 / 手动休息 / 工作日
+      ['2027-05', ['2027-05-03', '2027-05-04', '2027-05-05', '2027-05-06', '2027-05-07', '2027-05-08', '2027-05-09', '2027-05-01', '2027-05-02', '2027-05-15', '2027-05-16', '2027-05-22', '2027-05-23', '2027-05-29']], // 6 周：7 个节日名的放假与调休
+    ];
+    const go = async (ym) => {
+      const [y, m] = ym.split('-').map(Number);
+      await page.locator('.cal-today').click();
+      const diff = (y - 2026) * 12 + (m - 11);
+      for (let i = 0; i < Math.abs(diff); i++) await page.getByRole('button', { name: diff < 0 ? /上月/ : /下月/ }).click();
+    };
+    const cuts = [];
+    let checked = 0;
+    for (const [w, ht] of VIEWPORTS) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [ym, keys] of months) {
+        await go(ym);
+        for (const key of keys) {
+          const r = await tipLines(page, key);
+          assert.equal(r.hidden, false, `${key} @${w}: shown`);
+          checked++;
+          for (const l of r.lines) if (l.cut) cuts.push(`${w}x${ht} ${key}: 「${l.text}」`);
+          // 完整文字（含来源与「点击修改」）在 aria-describedby
+          assert.match(r.desc, /来源：.+，当日计薪 .+，点击修改$/, `${key}: full text in aria-describedby`);
+        }
+      }
+    }
+    console.log(`MEASURE ${JSON.stringify({ case: 'R50 tooltip widths', checked, cuts })}`);
+    assert.deepEqual(cuts, [], 'no truncated tooltip line');
+    // 状态行的短写
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await go('2026-05');
+    assert.deepEqual((await tipLines(page, '2026-05-01')).lines.map((l) => l.text), ['5月1日 周五', '法定假日·劳动节', '内置·官方通知', '计薪 ¥0.00']);
+    assert.equal((await tipLines(page, '2026-05-09')).lines[1].text, '调休上班·劳动节');
+    await go('2026-11');
+    assert.deepEqual((await tipLines(page, '2026-11-03')).lines.map((l) => l.text).slice(0, 2), ['11月3日 周二', '工作日·今天']);
+  }));
+
+// C minor：周末图例色块在白底上看得出来（边框 ≥ 2.5:1，与其他色块的浅边框不同）
+test('weekend legend swatch is distinguishable on white (visible border)', () =>
+  withPage(T1412, async (page) => {
+    const c = await page.locator('.cal-legend [data-kind=weekend] .legend-swatch').evaluate((e) => {
+      const cs = getComputedStyle(e);
+      return { border: cs.borderTopColor, width: cs.borderTopWidth, bg: cs.backgroundColor, panel: getComputedStyle(document.querySelector('.main-panel')).backgroundColor };
+    });
+    const r = ratio(c.border, c.panel);
+    console.log(`MEASURE ${JSON.stringify({ case: 'weekend swatch', ...c, ratio: +r.toFixed(2) })}`);
+    assert.ok(r >= 2.5, `weekend swatch border ${c.border} on ${c.panel} = ${r.toFixed(2)}`);
+    assert.equal(c.width, '1px');
   }));
