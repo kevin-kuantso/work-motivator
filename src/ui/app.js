@@ -414,8 +414,16 @@ export function mountApp(doc, storage, clock) {
   // 只有当年 / （11 月起的）下一年缺可信假期表、且今天还没检查过时才会联网（spec §12.3）
   holiday.autoCheckIfNeeded();
 
-  // 齿轮只在小窗显示：收回小窗（同按 X）并切到「基本设置」分页，不依赖聚焦开启者视窗的 API（spec §13.1）
+  // 齿轮只在小窗显示：先把开启者视窗带到前面（R45），再收回小窗（同按 X），再切到「基本设置」分页。
+  // window.focus() 在小窗内的点击手势里调用时，Chrome 123+ 会把开启者分页 / 视窗带到前面
+  // （https://developer.chrome.com/docs/web-platform/document-picture-in-picture 「Focus the opener window」）；
+  // 必须同步、在任何 await 之前调用。不支持或抛例外时照常收回并切分页。
   cardRoot.querySelector('.card-gear').addEventListener('click', () => {
+    try {
+      win.focus();
+    } catch {
+      // 无法聚焦开启者：不影响后续
+    }
     float.close();
     openSettings();
   });
