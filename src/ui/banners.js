@@ -1,10 +1,11 @@
 // 页面顶部的提示条（spec §13.2）：两条通道。
 // 错误通道（储存失败、已保存设置损坏 / 部分无效）：永远显示、不被信息条压掉；同时发生就合并成一条，用「·」分隔。
-// 信息通道（首次提示、备份建议）：同一时间只显示一条，首次提示优先；其余排队，前一条关闭后才显示，不丢弃。
+// 信息通道（首次提示、联网数据与内置表不同、备份建议）：同一时间只显示一条，首次提示优先；其余排队，前一条关闭后才显示，不丢弃。
 import { h, show, setText } from './dom.js';
 
 const ERROR_ORDER = ['storageFail', 'loadIssue'];
-const INFO_ORDER = ['firstRun', 'backupNudge'];
+// 联网数据与内置表不同的提示是用户按「检查更新」的直接结果，排在备份建议之前
+const INFO_ORDER = ['firstRun', 'holidayDiff', 'backupNudge'];
 
 // 纯函数：errors = Map<id, { content, dismissible, actions:[{key,label,...}] }> → 合并后的一条（或 null）
 export function mergeErrors(errors, sep) {

@@ -222,7 +222,8 @@ button, input, select { font: inherit; color: inherit; }
 .input-with-extra { display: flex; align-items: center; gap: var(--space-2); }
 .input-with-extra > input { flex: 1 1 auto; }
 .cheer-count { flex: none; min-width: 3.5em; text-align: right; font-size: var(--fs-caption); color: var(--color-text-600); font-variant-numeric: tabular-nums; }
-.backup-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.backup-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.backup-note { flex: 1 1 10em; }
 .section-adv { display: grid; gap: var(--space-2); }
 .adv-toggle {
   display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); width: 100%;
@@ -233,6 +234,22 @@ button, input, select { font: inherit; color: inherit; }
 .adv-toggle[aria-expanded="true"] .adv-title::before { content: "▾ "; }
 .adv-summary { font-size: var(--fs-caption); color: var(--color-text-600); }
 .adv-body { display: grid; gap: var(--space-3); }
+
+/* 基本设置 › 假期数据：状态行、按钮、单一结果区（tone：success 绿 / muted 灰 / info 蓝，不是错误 / warn 黄） */
+.holiday-body { display: grid; gap: 6px; }
+.holiday-status { margin: 0; font-size: 13px; line-height: 1.4; color: var(--color-text-600); font-variant-numeric: tabular-nums; }
+.holiday-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+#btn-holiday-check[aria-disabled="true"] { background: var(--state-rest-bg); color: var(--color-text-600); cursor: progress; }
+.holiday-result {
+  margin: 0; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-size: 13px; line-height: 1.4;
+  display: grid; gap: 2px; background: var(--state-rest-bg); color: var(--state-rest-fg); overflow-wrap: anywhere;
+}
+.holiday-result[data-tone="success"] { background: var(--state-working-bg); color: var(--state-working-fg); }
+.holiday-result[data-tone="info"] { background: var(--state-before-bg); color: var(--state-before-fg); }
+.holiday-result[data-tone="warn"] { background: var(--state-lunch-bg); color: var(--state-lunch-fg); }
+.holiday-result-detail { font-size: var(--fs-caption); }
+.holiday-result-detail:empty { display: none; }
+.adv-body .field input { font-family: var(--font-num); }
 
 /* Calendar（spec §13.3）：工具列 / 摘要行 / 图例各占一行且不换行，其余高度给格子（行高 minmax(40px, 1fr)） */
 .calendar { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }

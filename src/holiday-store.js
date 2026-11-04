@@ -1,4 +1,4 @@
-import { validateHolidayYear } from './holiday-data.js';
+import { validateHolidayYear, validateCustomUrl } from './holiday-data.js';
 
 export const HOLIDAYS_STORAGE_KEY = 'work-motivator-v1-holidays';
 
@@ -60,6 +60,8 @@ function update(storage, mutate) {
       years: record && isPlainObject(record.years) ? { ...record.years } : {},
       lastCheck: record && typeof record.lastCheck === 'number' ? record.lastCheck : null,
     };
+    // 新增字段（自定义网址）在其他写入时保留；读取时另行校验
+    if (record && typeof record.customUrl === 'string') next.customUrl = record.customUrl;
     mutate(next);
     storage.setItem(HOLIDAYS_STORAGE_KEY, JSON.stringify(next));
     return { ok: true };
@@ -87,4 +89,18 @@ export function loadLastCheck(storage) {
 
 export function saveLastCheck(storage, ms) {
   return update(storage, (next) => { next.lastCheck = ms; });
+}
+
+// 「自定义网址」存在假期数据记录里（不进设置备份文件）；读取时重新校验，不合格视为未设置。
+export function loadCustomUrl(storage) {
+  const { record } = readRecord(storage);
+  const v = record && record.customUrl;
+  return typeof v === 'string' && validateCustomUrl(v).ok ? v : null;
+}
+
+export function saveCustomUrl(storage, url) {
+  return update(storage, (next) => {
+    if (url === null) delete next.customUrl;
+    else next.customUrl = url;
+  });
 }

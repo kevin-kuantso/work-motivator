@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { startServer, launch, openAt, root } from './harness.mjs';
+import { startServer, launch, openAt, root, expectedAutoUrls } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 // 常见繁体字（简体中不存在的字形）+ 台湾用语；成品中一个都不得出现。
@@ -47,10 +47,14 @@ function assertNoTraditional(s, where) {
 }
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
   try {
+    // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
+    assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
     assert.deepEqual(errors.map(String), [], 'no uncaught page errors');
+    assert.deepEqual(consoleErrors, [], 'no console errors (blocked external requests are counted separately)');
+    assert.deepEqual(external, autoUrls, 'no external request besides the load-time auto-check');
   } finally {
     await context.close();
   }
@@ -268,7 +272,7 @@ test('import with bad fields lists dropped items with reasons and unknown fields
       version: 1, salary: -5, start: '9am', cheer: '加油', foo: 1,
       marks: { '2026-11-05': 'paidLeave', '2026-02-30': 'work' },
     });
-    await page.locator('input[type=file]').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(file) });
+    await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(file) });
     const report = page.locator('.import-report');
     await report.waitFor({ state: 'visible' });
     assert.equal(await page.getByRole('tab', { name: '基本设置' }).getAttribute('aria-selected'), 'true', 'report shown in 基本设置 › 数据与备份');
@@ -288,20 +292,20 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     await report.getByRole('button', { name: '知道了' }).click();
     assert.equal(await report.isVisible(), false);
     // 「去设置里修改」：在同一分页里聚焦对应字段
-    await page.locator('input[type=file]').setInputFiles({ name: 'c.json', mimeType: 'application/json', buffer: Buffer.from('{"salary":-1}') });
+    await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'c.json', mimeType: 'application/json', buffer: Buffer.from('{"salary":-1}') });
     await report.waitFor({ state: 'visible' });
     await report.getByRole('button', { name: '去设置里修改' }).click();
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'f-salary');
     assert.equal(await visible(page, '.import-report'), false);
 
-    await page.locator('input[type=file]').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
+    await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
     await report.waitFor({ state: 'visible' });
     assert.match(await text(page, '.import-report'), /导入失败：无法识别这个文件。当前设置没有被修改。/);
     assert.match(await text(page, '.import-report'), /原因：不是有效的 JSON 文本/);
     assertNoTraditional(await bodyText(page), 'import failure panel (non-JSON)');
-    await page.locator('input[type=file]').setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('[1]') });
+    await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('[1]') });
     await page.getByText('原因：文件内容的结构不正确').waitFor();
-    await page.locator('input[type=file]').setInputFiles({ name: 'z.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ cheer: 5, lunchOn: 'yes', payday: 0, marks: { '2026-11-09': 'holiday' } })) });
+    await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'z.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ cheer: 5, lunchOn: 'yes', payday: 0, marks: { '2026-11-09': 'holiday' } })) });
     await page.getByText('已导入 0 项，4 项未导入').waitFor();
     const partial = await text(page, '.import-report');
     assert.match(partial, /鼓励语格式不正确/);
@@ -312,7 +316,7 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     assertNoTraditional(await bodyText(page), 'partial import report');
     assert.equal(await text(page, `${card} .card-cheer`), '加油', 'failed import changes nothing');
 
-    await page.locator('input[type=file]').setInputFiles({ name: 'ok.json', mimeType: 'application/json', buffer: Buffer.from('{"version":1,"salary":7000}') });
+    await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'ok.json', mimeType: 'application/json', buffer: Buffer.from('{"version":1,"salary":7000}') });
     await page.getByText('导入成功').waitFor();
     assert.equal(await visible(page, '.import-report'), false);
     assert.equal(await text(page, '.toast-text'), '导入成功');

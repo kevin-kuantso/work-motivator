@@ -1,7 +1,7 @@
 // 月历小菜单与悬停提示（spec §12.1 / §12.2 / §12.5）。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer, launch, openAt } from './harness.mjs';
+import { startServer, launch, openAt, expectedAutoUrls } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
@@ -19,10 +19,14 @@ after(async () => {
 });
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
   try {
+    // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
+    assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
     assert.deepEqual(errors.map(String), [], 'no uncaught page errors');
+    assert.deepEqual(consoleErrors, [], 'no console errors (blocked external requests are counted separately)');
+    assert.deepEqual(external, autoUrls, 'no external request besides the load-time auto-check');
   } finally {
     await context.close();
   }
