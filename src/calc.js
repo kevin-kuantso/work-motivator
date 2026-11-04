@@ -53,8 +53,8 @@ function paydayIn(now, payday) {
   return dayDiff(now, t);
 }
 
-export function snapshot(now, cfg, marks) {
-  const info = dayInfo(now, cfg, marks);
+export function snapshot(now, cfg, marks, tables) {
+  const info = dayInfo(now, cfg, marks, tables);
   const year = now.getFullYear();
   const month = now.getMonth();
 
@@ -70,7 +70,7 @@ export function snapshot(now, cfg, marks) {
   const lunchSec = lunchOk ? overlap(ls, le, s, e) : 0;
   const totalSec = scheduleOk ? e - s - lunchSec : 0;
 
-  const denom = workdaysInMonth(year, month, cfg, marks);
+  const denom = workdaysInMonth(year, month, cfg, marks, tables);
   const dailyWage = validSalary(cfg.salary) && denom > 0 ? cfg.salary / denom : 0;
   const hourlyWage = totalSec > 0 ? dailyWage / (totalSec / 3600) : 0;
   const perSec = totalSec > 0 ? dailyWage / totalSec : 0;
@@ -87,7 +87,7 @@ export function snapshot(now, cfg, marks) {
 
   if (info.base === 'rest') {
     status = 'restDay';
-    nextDays = nextWorkdayInDays(now, cfg, marks);
+    nextDays = nextWorkdayInDays(now, cfg, marks, tables);
   } else if (info.leave === 'paid') {
     status = 'paidLeave';
     earned = dailyWage;
@@ -116,7 +116,7 @@ export function snapshot(now, cfg, marks) {
   let past = 0;
   if (dailyWage > 0) {
     for (let d = 1; d < now.getDate(); d++) {
-      const di = dayInfo(new Date(year, month, d), cfg, marks);
+      const di = dayInfo(new Date(year, month, d), cfg, marks, tables);
       if (di.base === 'work' && di.leave !== 'unpaid') past += dailyWage;
     }
   }

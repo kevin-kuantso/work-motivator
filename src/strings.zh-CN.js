@@ -46,6 +46,29 @@ export const STRINGS = {
     },
   },
 
+  // 联网获取的假期数据校验原因 / 抓取结果
+  holidayData: {
+    notObject: '假期数据的结构不正确',
+    yearMismatch: (year) => `假期数据不是 ${year} 年的`,
+    papersMissing: '假期数据缺少国务院放假通知的出处',
+    papersBad: '假期数据的出处不是国务院官网（www.gov.cn）的链接',
+    daysEmpty: '该年度的假期数据还没有发布',
+    dayShape: '假期数据中有格式不正确的日期条目',
+    dayName: '假期数据中有节日名称为空或过长',
+    dayDate: '假期数据中有日期格式不正确',
+    dayNotReal: '假期数据中有不是真实存在的日期',
+    dayOutOfYear: (year) => `假期数据中有日期不在 ${year} 年内`,
+    dayOffFlag: '假期数据中有放假标记不正确的条目',
+    makeupNotWeekend: '假期数据中有调休上班日不在周六或周日',
+    dayDuplicate: '假期数据中有重复的日期',
+    notJson: '下载到的内容不是有效的 JSON 文本',
+    httpFail: (status) => `服务器返回了错误（${status}）`,
+    timeout: '连接超时',
+    network: '网络连接失败',
+    noSource: '没有可用的数据源',
+    allFailed: (last) => `所有数据源都获取失败：${last}`,
+  },
+
   banner: {
     firstRun: '这是默认值，可在设置里修改',
     dismiss: '关闭提示',

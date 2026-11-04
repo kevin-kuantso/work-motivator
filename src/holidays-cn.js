@@ -16,7 +16,7 @@ function build(year, offRanges, makeupDays) {
   const makeup = {};
   for (const [name, from, to] of offRanges) expand(year, name, from, to, off);
   for (const [name, m, d] of makeupDays) makeup[`${year}-${pad(m)}-${pad(d)}`] = name;
-  return { off, makeup };
+  return { off, makeup, source: 'builtin' };
 }
 
 export const HOLIDAYS_CN = {
