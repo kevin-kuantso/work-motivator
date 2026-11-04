@@ -471,6 +471,56 @@ async function main() {
     check('7', o7 !== null && c7.ok, 'reload 后可再次开启并关闭 PiP', `open ~${o7}ms; close delay=${c7.delay}ms${c7.why ? ` (${c7.why})` : ''}`);
     info('8', '收回后主页面截图', await shot(A, 'main-after'));
 
+    // ===== 10 R45：开启者在后台时按 PiP 齿轮 → window.focus() 把开启者带回前面并切到「基本设置」=====
+    await ev(A, `document.getElementById('tab-calendar').click()`);
+    const o10 = await openPip(A);
+    check('10', o10 !== null, '重开 PiP（受信任点击）', `~${o10}ms`);
+    if (o10 !== null) {
+      await sleep(300);
+      const T2info = await withTimeout(http('/json/new?about:blank', 'PUT'), STEP_MS, '/json/new');
+      const T2 = await connect(T2info.webSocketDebuggerUrl);
+      let P10 = null;
+      try {
+        await T2.send('Page.bringToFront');
+        const hid10 = await waitFor(A, 'document.visibilityState === "hidden"', 5000, 50);
+        const pre = await ev(A, '({ vis: document.visibilityState, focus: document.hasFocus(), pip: !!documentPictureInPicture.window, selected: document.getElementById("tab-settings").getAttribute("aria-selected") })');
+        check('10', pre.vis === 'hidden' && pre.pip && pre.selected === 'false', '前提：另一个分页在前面，开启者 visibilityState==="hidden"，PiP 开着，「基本设置」未选中', `${JSON.stringify(pre)} after ~${hid10}ms`);
+        const pipT = (await withTimeout(http('/json/list'), STEP_MS, '/json/list')).find((t) => t.id !== tab.id && t.id !== T2info.id && t.type === 'page');
+        let how = null;
+        if (!pipT) info('10', 'PiP CDP 目标', '在 /json/list 中找不到 PiP 的 page 目标');
+        else {
+          try {
+            P10 = await connect(pipT.webSocketDebuggerUrl);
+            const g = await ev(P10, `(() => { const e = document.querySelector('#status-card .card-gear'); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+            if (!g) throw new Error('gear not found in the PiP target');
+            await P10.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: g.x, y: g.y });
+            await P10.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: g.x, y: g.y, button: 'left', clickCount: 1 });
+            await P10.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: g.x, y: g.y, button: 'left', clickCount: 1 });
+            if ((await waitFor(A, '!documentPictureInPicture.window', 3000, 25)) !== null) how = 'trusted';
+            else info('10', '受信任点击', `CDP Input.dispatchMouseEvent 到 PiP 目标 (${g.x.toFixed(1)}, ${g.y.toFixed(1)}) 后 3 秒内 PiP 未关闭`);
+          } catch (e) {
+            info('10', '受信任点击', `Chrome 不接受 CDP 输入到 PiP 目标：${e.message}`);
+          }
+        }
+        if (how === null) {
+          const ok = await ev(A, `(() => { const d = ${PIPDOC}; if (!d) return false; d.querySelector('.card-gear').click(); return true; })()`);
+          how = ok ? 'SYNTHETIC element.click() (no user gesture: window.focus() is expected NOT to raise the tab)' : 'none (PiP null)';
+          info('10', '点击方式', `fallback: ${how}`);
+        } else info('10', '点击方式', 'trusted CDP mouse press/release in the PiP target');
+        const back10 = await waitFor(A, 'document.getElementById("tab-settings").getAttribute("aria-selected") === "true" && !documentPictureInPicture.window && !!document.querySelector("#card-slot #status-card")', 5000, 25);
+        const front10 = await waitFor(A, 'document.visibilityState === "visible" && document.hasFocus()', 5000, 50);
+        const m10 = await ev(A, '({ selected: document.getElementById("tab-settings").getAttribute("aria-selected"), pip: !!documentPictureInPicture.window, card: !!document.querySelector("#card-slot #status-card"), vis: document.visibilityState, focus: document.hasFocus(), active: document.activeElement && document.activeElement.id })');
+        check('10', back10 !== null && m10.selected === 'true' && !m10.pip && m10.card, '齿轮后「基本设置」选中、PiP 已关、卡片回到 #status-card', `${JSON.stringify(m10)} after ~${back10}ms (click: ${how})`);
+        check('10', front10 !== null && m10.vis === 'visible' && m10.focus, '开启者分页被带到前面（visibilityState==="visible" 且 document.hasFocus()）', `vis=${m10.vis} hasFocus=${m10.focus} after ~${front10}ms (click: ${how})`);
+      } finally {
+        P10?.ws.close();
+        await fetch(`http://127.0.0.1:${PORT}/json/close/${T2info.id}`, { signal: AbortSignal.timeout(5000) }).catch(() => {});
+        T2.ws.close();
+        await A.send('Page.bringToFront').catch(() => {});
+        await sleep(300);
+      }
+    }
+
     // ===== console =====
     const uniq = [...new Set(consoleMsgs)];
     check('7', uniq.length === 0, '整个流程开启者 console error/warning/exception', uniq.length ? `${uniq.length} 条: ${uniq.join(' || ')}` : '0 条');
