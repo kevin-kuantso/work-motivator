@@ -16,11 +16,9 @@ import { HOLIDAYS_STORAGE_KEY } from '../holiday-store.js';
 import { startHolidayUpdate } from './holiday-update.js';
 import { createHolidayPanel } from './holiday-panel.js';
 import { readTicks, isStall } from './pause-model.js';
+import { createTicker } from './tick-scheduler.js';
 
 const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、备份提示已显示），与设置分开存放
-const TICK_MS = 100;
-const TICK_MS_REDUCED = 1000;
-const TICK_MIN_DELAY_MS = 20;
 const ANNOUNCE_MS = 60000;
 // R34 / R42 / R43：只有真的停过才提示——两次 tick 之间超过 5 秒（单调时钟与墙上时钟取较大者，见 pause-model.js），
 // 或 Page Lifecycle resume。单纯切走分页再回来（tick 照常）不提示。数字会一下子跳到当前时间：不打扰地提示一次，10 分钟内最多一次。
@@ -364,39 +362,14 @@ export function mountApp(doc, storage, clock) {
   }
 
   // 计时器跑在状态卡所在的视窗：悬浮时改由 PiP 视窗的 setInterval 驱动（spec §3），收回后回到主视窗。
-  // 减少动态（1 秒一跳，R46）：用自我校正的 setTimeout 对齐墙上时钟的整秒（下一次 = 1000 − Date.now() % 1000，至少 20 ms），
-  // 倒数的秒数不会跳号或重复；一般模式（100 ms）仍用 setInterval，不变。Date.now 用全域时钟（与暂停侦测相同，不是可注入的 clock）。
+  // 计时（R46，tick-scheduler.js）：一般模式 100 ms；减少动态模式对齐墙上时钟整秒；任何时刻只有一个计时器。
+  // 计时器跑在状态卡所在的视窗：悬浮时由小窗驱动（spec §3），收回后回到主视窗。
   const mq = win.matchMedia ? win.matchMedia('(prefers-reduced-motion: reduce)') : null;
-  let timerHost = win;
-  let timer = null; // setInterval（一般模式）
-  let aligned = null; // setTimeout（减少动态模式）
-  function stop() {
-    timerHost.clearInterval(timer);
-    timerHost.clearTimeout(aligned);
-    timer = null;
-    aligned = null;
-  }
-  function alignedDelay() {
-    return Math.max(TICK_MIN_DELAY_MS, TICK_MS_REDUCED - (Date.now() % TICK_MS_REDUCED));
-  }
-  function scheduleAligned() {
-    const host = timerHost;
-    aligned = host.setTimeout(() => {
-      aligned = null;
-      tick();
-      if (host === timerHost && aligned === null && timer === null && mq && mq.matches) scheduleAligned();
-    }, alignedDelay());
-  }
-  function start() {
-    stop();
-    if (mq && mq.matches) scheduleAligned();
-    else timer = timerHost.setInterval(tick, TICK_MS);
-  }
+  const ticker = createTicker({ tick, reduced: () => Boolean(mq && mq.matches), now: () => Date.now() });
+  const start = () => ticker.start();
   function moveTimer(host) {
     skipGap = true;
-    stop();
-    timerHost = host;
-    start();
+    ticker.start(host);
     tick();
   }
   // 其他分页改了设置（或清空了储存）：重新读取并套用，不回写，避免两个分页互相覆盖（spec §2 反目标）
@@ -430,7 +403,7 @@ export function mountApp(doc, storage, clock) {
   setStorageFail(!storageOk);
   calendar.render();
   tick();
-  start();
+  ticker.start(win);
   // 只有当年 / （11 月起的）下一年缺可信假期表、且今天还没检查过时才会联网（spec §12.3）
   holiday.autoCheckIfNeeded();
 
