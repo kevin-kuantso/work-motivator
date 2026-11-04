@@ -11,6 +11,8 @@ const PATHS = {
   unpaid: [['circle', { cx: 8, cy: 8, r: 5.5 }], ['path', { d: 'M4.2 11.8l7.6-7.6' }]],
   makeup: [['rect', { x: 2.5, y: 5, width: 11, height: 8, rx: 1.5 }], ['path', { d: 'M6 5V3.5h4V5M2.5 8.5h11' }]],
   holiday: [['path', { d: 'M4 14V2.5' }], ['path', { d: 'M4 3h7.5l-1.8 2.5 1.8 2.5H4' }]],
+  check: [['path', { d: 'M3.5 8.5l3 3 6-7' }]],
+  reset: [['path', { d: 'M3.2 8a4.8 4.8 0 1 0 1.4-3.4' }], ['path', { d: 'M4.2 2.2v2.6h2.6' }]],
   gear: [['circle', { cx: 8, cy: 8, r: 2.2 }], ['path', { d: 'M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4' }]],
 };
 

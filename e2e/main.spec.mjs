@@ -161,32 +161,35 @@ test('lunch toggle hides lunch fields; lunch off counts lunch as work time', () 
     assert.equal(await text(page, `${card} .card-progress-text`), '已工作 5.70 / 8.50 小时');
   }));
 
-test('calendar: two clicks on today -> unpaid leave, today earned 0', () =>
+test('calendar: day menu marks today as paid then unpaid leave; weekend → make-up work; undo', () =>
   withPage(T1412, async (page) => {
     const cell = todayCell(page, '11月3日');
     assert.match(await cell.getAttribute('aria-label'), /今天/);
-    await cell.click();
+    const choose = async (label, name) => {
+      await todayCell(page, label).click();
+      await page.getByRole('menuitemradio', { name }).click();
+    };
+    await choose('11月3日', /^带薪假/);
     assert.equal(await text(page, `${card} .card-badge`), '带薪假');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
     assert.equal(await text(page, `${card} .card-countdown`), '今天按全天计薪');
     assert.match(await text(page, '.toast-text'), /11\/3 已标记为带薪假/);
-    await todayCell(page, '11月3日').click();
+    await choose('11月3日', /^无薪假/);
     assert.equal(await text(page, `${card} .card-badge`), '无薪假');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 0.0000');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥323.81');
     assert.match(await todayCell(page, '11月3日').textContent(), /无薪/);
     await page.reload();
     assert.equal(await text(page, `${card} .card-badge`), '无薪假', 'marks persisted');
-    await todayCell(page, '11月3日').click();
-    assert.equal(await text(page, `${card} .card-badge`), '上班中', 'third click returns to default');
-    // 休息日循环：默认 → 调休上班 → 默认
-    const sat = todayCell(page, '11月7日');
-    await sat.click();
+    await choose('11月3日', /^恢复默认/);
+    assert.equal(await text(page, `${card} .card-badge`), '上班中', '恢复默认 returns to default');
+    // 休息日：默认 → 调休上班 → 默认
+    await choose('11月7日', /改为上班/);
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /调休上班/);
-    await todayCell(page, '11月7日').click();
+    await choose('11月7日', /恢复默认/);
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
     // 撤销
-    await todayCell(page, '11月7日').click();
+    await choose('11月7日', /改为上班/);
     await page.getByRole('button', { name: '撤销' }).click();
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
   }));
@@ -377,6 +380,7 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57', 'tab 2 salary not reverted');
     // 月历标记同样同步
     await p2.locator('.cal-grid button[aria-label^="11月3日 "]').click();
+    await p2.getByRole('menuitemradio', { name: /^带薪假/ }).click();
     await until(p1, `${card} .card-badge .badge-text`, '带薪假');
     // 其他分页清空储存（key === null）：回到默认值
     await p2.evaluate(() => localStorage.clear());

@@ -1,5 +1,6 @@
 // 主分页：组装顶栏 / 提示层 / 状态卡 / 设置 / 月历，负责储存、计时与导入导出。
 import { snapshot } from '../calc.js';
+import { HOLIDAYS_CN } from '../holidays-cn.js';
 import { STORAGE_KEY, loadState, saveState, exportState, importState } from '../settings.js';
 import { STRINGS } from '../strings.zh-CN.js';
 import { h, show, setText } from './dom.js';
@@ -47,6 +48,8 @@ export function mountApp(doc, storage, clock) {
   let state = loaded.state;
   let storageOk = loaded.storageOk;
   const ui = readUi(storage);
+  // 当前使用的假期表（R16）：所有计算与月历都用它；替换请走 setTables()。
+  let tables = HOLIDAYS_CN;
 
   // ---- 提示层 ----
   const storageBanner = h(doc, 'p', { class: 'banner banner-error storage-banner', role: 'alert', hidden: true, text: t.banner.storageFail });
@@ -93,6 +96,7 @@ export function mountApp(doc, storage, clock) {
   const settings = createSettingsPanel(doc, t, { getCfg: () => state.cfg, onChange: (cfg) => commit({ ...state, cfg }, true) });
   const calendar = createCalendar(doc, t, {
     getState: () => state,
+    getTables: () => tables,
     getToday: clock,
     onMarks: (marks, msg, prevMarks) => {
       commit({ ...state, marks }, false);
@@ -230,7 +234,7 @@ export function mountApp(doc, storage, clock) {
   let lastAnnounce = 0;
   function tick() {
     const now = clock();
-    const snap = { ...snapshot(now, state.cfg, state.marks), now };
+    const snap = { ...snapshot(now, state.cfg, state.marks, tables), now };
     const m = renderCard(cardRoot, snap, state.cfg, t);
     const day = ymd(now);
     if (day !== lastDay) {
@@ -292,4 +296,13 @@ export function mountApp(doc, storage, clock) {
     float.close();
     settings.el.scrollIntoView({ block: 'start' });
   });
+
+  return {
+    // 换用另一份假期表（例如合并了联网数据）：状态卡与月历立即按新表重算。
+    setTables(next) {
+      tables = next;
+      calendar.render();
+      tick();
+    },
+  };
 }
