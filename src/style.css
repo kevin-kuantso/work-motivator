@@ -384,11 +384,13 @@ button, input, select { font: inherit; color: inherit; }
 .day:hover { border-color: var(--color-border-control); }
 .day:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
 .day-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; }
-.day-label { display: flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); line-height: 14px; }
+.day-label { display: flex; align-items: center; gap: 1px; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); line-height: 14px; }
 .day.is-manual .day-label { padding-right: 8px; }
-.day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: var(--fs-caption); line-height: 14px; }
+.day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 1px; flex: none; font-size: var(--fs-caption); line-height: 14px; }
 .day-tag .icon { width: 12px; height: 12px; }
 .day-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 窄视窗（< 1240px，格子最窄约 78px）：标签字号 11px，让「班 劳动节」在 Windows 的微软雅黑下也有余量（mac 上实测 ≥ 6px） */
+@media (max-width: 1239px) { .day-label, .day-tag { font-size: 11px; } }
 .day-dot { position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-600); display: inline-block; }
 .kind-weekend { background: var(--cal-weekend-bg); }
 .kind-weekend .day-num, .kind-rest .day-num { color: var(--cal-weekend-num); font-weight: 500; }
@@ -428,27 +430,64 @@ button, input, select { font: inherit; color: inherit; }
 .day-menu-note { display: block; grid-column: 3; font-size: var(--fs-caption); color: var(--color-text-600); font-weight: 400; font-variant-numeric: tabular-nums; }
 .day-menu-note.is-current { color: var(--color-brand-700); }
 .day-menu-footer { margin: 0; padding: var(--space-2) var(--space-2) var(--space-1); border-top: 1px solid var(--color-border-subtle); font-size: var(--fs-caption); line-height: 1.4; color: var(--color-text-600); }
+/* 日期提示（Task 18 · V1「白卡盖格」）：白底卡片原样盖在被悬停 / 聚焦的格子上（inset:0，不溢出到旁边或下面的格子），内容水平置中、
+   上下留白相等；2px 边框用状态色组的 fg（今天 = brand-600；周末 / 休息 / 假日 = 中性灰）；日期粗体、状态用状态色、计薪金额是主角。
+   「来源」行只在放得下时出现（由 day-tooltip.js 实测决定）；完整文字始终在 aria-describedby。 */
 .day-tooltip {
-  /* 提示盖在被悬停 / 聚焦的格子本身（R35 / 决定 2）：同样大小，不溢出到旁边或下面的格子；
-     内容块在卡片里垂直居中、上下留白相等（C3，Kevin：大格子里贴顶很难看），左对齐；日期行 13px 粗体、状态正常、计薪绿色强调 */
   position: absolute; inset: 0; z-index: 15; pointer-events: none; overflow: hidden;
-  display: flex; flex-direction: column; justify-content: safe center; padding: 1px 7px;
-  border-radius: var(--radius-sm); background: var(--color-text-900); color: #fff;
-  font: 400 12px/14px var(--font-num); font-variant-numeric: tabular-nums;
+  display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 0;
+  padding: 0 4px; text-align: center; border-radius: var(--radius-sm);
+  border: 2px solid var(--tip-ring, var(--tip-fg));
+  background: var(--color-surface); color: var(--color-text-900); box-shadow: 0 4px 12px rgb(16 24 40 / .14);
+  font: 400 12px/15px var(--font-num); font-variant-numeric: tabular-nums;
 }
-.day-tooltip > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
-.day-tooltip .tip-title { font-size: 13px; font-weight: 700; }
-.day-tooltip .tip-status { font-weight: 400; }
-.day-tooltip .tip-source { color: #D1D5DB; }
-.day-tooltip .tip-pay { color: #BBF7D0; font-weight: 600; }
+.day-tooltip > span { flex: none; max-width: 100%; }
+.day-tooltip[data-kind="workday"] { --tip-fg: var(--state-working-fg); }
+.day-tooltip[data-kind="weekend"], .day-tooltip[data-kind="rest"], .day-tooltip[data-kind="holiday"] { --tip-fg: var(--state-rest-fg); }
+.day-tooltip[data-kind="makeup"] { --tip-fg: var(--state-makeup-fg); }
+.day-tooltip[data-kind="paid"] { --tip-fg: var(--state-paid-fg); }
+.day-tooltip[data-kind="unpaid"] { --tip-fg: var(--state-unpaid-fg); }
+.day-tooltip.is-today { --tip-fg: var(--color-brand-700); --tip-ring: var(--color-brand-600); }
+.day-tooltip .tip-title { font-weight: 600; color: var(--color-text-900); }
+.day-tooltip .tip-status { font-weight: 500; color: var(--tip-fg); }
+.day-tooltip .tip-source { font-size: 11px; line-height: 14px; color: var(--color-text-600); }
+.day-tooltip .tip-pay { line-height: 20px; white-space: nowrap; }
+.day-tooltip .pay-label { font-size: 11px; color: var(--color-text-600); }
+.day-tooltip .pay-amt { font-size: 16px; font-weight: 700; color: var(--color-brand-700); letter-spacing: -0.2px; }
+.day-tooltip .tip-pay.is-zero .pay-amt { color: var(--color-text-600); }
 .day-tooltip.is-compact .tip-source { display: none; }
-/* 窄格子（< 112px，约 1000–1240px 宽的视窗）：小一号字、允许换行，任何一行都不截断（round 2）；≥ 1280 保持原样 */
+.day-tooltip.is-tight { font-size: 11px; line-height: 13px; }
+.day-tooltip.is-tight .tip-pay { line-height: 16px; }
+.day-tooltip.is-tight .pay-amt { font-size: 14px; }
+/* 窄格子（< 112px，约 1000–1240px 宽的视窗）：只在单位之间换行（「11月18日」「周三」「计薪」各是整体）；「计薪」小字一行、金额一行 */
 @container (max-width: 112px) {
-  .day-tooltip { padding: 1px 3px; font-size: 11px; line-height: 13px; }
-  .day-tooltip .tip-pay { font-size: 10.5px; letter-spacing: -0.2px; } /* 「计薪 ¥xxx.xx」不拆行也放得下 78px 宽的格子 */
-  .day-tooltip .tip-title { font-size: 11px; }
-  .day-tooltip > span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
-  .day-tooltip .u, .day-tooltip .tip-pay { white-space: nowrap; overflow-wrap: normal; }
+  .day-tooltip { padding: 0 2px; font-size: 11px; line-height: 13px; }
+  .day-tooltip .tip-source { font-size: 10.5px; line-height: 13px; }
+  .day-tooltip .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: 12px; }
+  .day-tooltip .pay-label { font-size: 10.5px; line-height: 12px; }
+  .day-tooltip .pay-amt { font-size: 14px; line-height: 17px; letter-spacing: -0.3px; }
+  .day-tooltip.is-tight { line-height: 12px; padding: 0 1px; }
+  .day-tooltip.is-tight .tip-title { font-size: 10.5px; letter-spacing: -0.2px; } /* 78px 宽、64px 高的格子：日期 + 周X 也要挤进一行 */
+  .day-tooltip.is-tight .tip-status { line-height: 11px; } /* 「法定假日·劳动节」在 78px 宽的格子里要换两行：整张卡 59px，放进 64px 高的格子（边框 4px） */
+  .day-tooltip.is-tight .pay-label { line-height: 10px; }
+  .day-tooltip.is-tight .pay-amt { font-size: 13px; line-height: 15px; }
+  .day-tooltip .u { white-space: nowrap; }
+  .day-tooltip .tip-status, .day-tooltip .tip-source { overflow-wrap: anywhere; }
+}
+/* 大格子（≥ 140px，约 1920 宽）：字跟着放大 */
+@container (min-width: 140px) {
+  .day-tooltip { font-size: 13px; line-height: 18px; gap: 1px; }
+  .day-tooltip .tip-title { font-size: 14px; }
+  .day-tooltip .tip-source { font-size: 12px; line-height: 16px; }
+  .day-tooltip .tip-pay { line-height: 28px; }
+  .day-tooltip .pay-label { font-size: 12px; }
+  .day-tooltip .pay-amt { font-size: 22px; }
+  /* 大格子但行高不够（6 周月份）：收紧行距，金额仍明显大于日期 */
+  .day-tooltip.is-tight { font-size: 13px; line-height: 16px; gap: 0; }
+  .day-tooltip.is-tight .tip-source { font-size: 12px; line-height: 14px; }
+  .day-tooltip.is-tight .tip-pay { line-height: 22px; }
+  .day-tooltip.is-tight .pay-label { font-size: 12px; }
+  .day-tooltip.is-tight .pay-amt { font-size: 18px; }
 }
 
 /* Import report */

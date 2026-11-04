@@ -159,3 +159,9 @@ export function pipStub(opts) {
   };
   Object.defineProperty(window, 'documentPictureInPicture', { value: dp, configurable: true });
 }
+
+// 提示的可见行（V1 里计薪金额在窄格子会另起一行，innerText 会把「计薪 / 金额」拆开；这里按行元素取 textContent）。
+export const tipVisibleLines = (page) => page.evaluate(() => {
+  const tip = document.querySelector('.day-tooltip');
+  return [...tip.children].filter((x) => getComputedStyle(x).display !== 'none').map((x) => x.textContent);
+});

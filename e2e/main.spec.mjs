@@ -244,7 +244,8 @@ test('calendar shows holiday names, legend, and a summary-row tag for years with
     assert.equal(await visible(page, `${card} .card-amount`), false);
     assert.equal(await text(page, `${card} .card-countdown`), '距下个工作日 7 天');
     assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0000 /秒');
-    assert.match(await todayCell(page, '10月1日').textContent(), /假.*国庆|国庆.*假/s);
+    assert.equal(await todayCell(page, '10月1日').locator('.day-label').textContent(), '国庆', 'holiday cell: flag + name only, no 「假」 tag (Task 18)');
+    assert.equal(await todayCell(page, '10月1日').locator('.day-label svg.icon-holiday').count(), 1);
     assert.match(await todayCell(page, '10月10日').textContent(), /班/);
     assert.match(await todayCell(page, '10月10日').getAttribute('aria-label'), /调休上班/);
     assert.match(await text(page, '.cal-legend'), /图例/);

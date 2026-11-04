@@ -308,7 +308,8 @@ export const STRINGS = {
     todayLabel: '今天',
     manual: '手动标记',
     manualTitle: '已手动标记',
-    tags: { holiday: '假', makeup: '班', paid: '带薪', unpaid: '无薪' },
+    // 法定假日格不再有文字标签（只有旗子图示 + 节日名，Task 18）
+    tags: { makeup: '班', paid: '带薪', unpaid: '无薪' },
     cellAria: ({ month, day, weekday, kind, holidayName, manual, today }) =>
       `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车打开菜单`,
     marked: (md, label) => `${md} 已标记为${label}`,

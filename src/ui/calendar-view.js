@@ -1,6 +1,6 @@
 // 月历（spec §13.3）：工具列（切月、回到今天；PgUp / PgDn 只写在切月按钮的悬停提示里）、
 // 摘要行（应出勤天数、日薪、情境胶囊、缺表标签、重置本月标记）、固定列出全部 7 种的单行图例（R36）、弹性行高的格子；
-// 点日期弹出小菜单（修改即存），悬停 / 聚焦提示直接盖在该格上（R35）。
+// 点日期弹出小菜单（修改即存），悬停 / 聚焦提示直接盖在该格上（R35、Task 18）。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
 import { monthGrid } from './calendar-model.js';
@@ -27,8 +27,9 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
   let rovingKey = null; // 月历的 Tab 停靠点：跟着实际焦点走
   let quiet = false; // 程序聚焦（Esc 关菜单、重绘后还原焦点）时不弹提示
 
+  // 法定假日格只放旗子图示 + 节日名（Task 18：不再有「假」字；无节日名时只剩旗子，格子的无障碍名称仍写明「法定假日」）
   const tag = (kind) =>
-    TAG_ICON[kind] ? h(doc, 'span', { class: 'day-tag' }, icon(doc, TAG_ICON[kind]), c.tags[kind]) : null;
+    TAG_ICON[kind] ? h(doc, 'span', { class: 'day-tag' }, icon(doc, TAG_ICON[kind]), c.tags[kind] ?? null) : null;
 
   const title = h(doc, 'span', { class: 'cal-title', id: 'cal-title', 'aria-live': 'polite' });
   const todayBtn = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-today', onclick: goToday });
@@ -210,7 +211,6 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     const head = h(doc, 'div', { class: 'cal-row cal-head', role: 'row' },
       c.weekHeads.map((w, i) => h(doc, 'span', { class: `cal-colhead${i >= 5 ? ' is-weekend' : ''}`, role: 'columnheader', text: w })));
     const cells = model.weeks.flat().filter(Boolean);
-    const compact = model.weeks.length >= 6; // 6 周的月份格子较矮：提示拿掉「来源」行（决定 2）
     const inMonth = (k) => (k && cells.some((x) => x.key === k) ? k : null);
     const tabKey = inMonth(refocus) ?? inMonth(menu.key()) ?? inMonth(rovingKey) ?? cells.find((x) => x.today)?.key ?? cells[0].key;
     let toFocus = null;
@@ -235,11 +235,11 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
             'aria-expanded': 'false',
             onclick: () => toggleMenu(cell, btn),
             onkeydown: (e) => onKey(e, cell),
-            onmouseenter: () => { if (!menu.isOpen()) tooltip.later(btn, tip, HOVER_MS, compact); },
+            onmouseenter: () => { if (!menu.isOpen()) tooltip.later(btn, tip, HOVER_MS); },
             onmouseleave: () => tooltip.hide(),
             onfocus: () => {
               setRoving(btn);
-              if (!quiet && !menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip, compact);
+              if (!quiet && !menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip);
             },
             onblur: () => tooltip.hide(),
           },
