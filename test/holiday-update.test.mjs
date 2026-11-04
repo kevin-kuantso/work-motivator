@@ -108,7 +108,7 @@ test('store: customUrl roundtrip; other writes keep it; invalid stored value ign
   assert.deepEqual(saveCustomUrl(s, 'https://example.org/{year}.json'), { ok: true });
   assert.equal(loadCustomUrl(s), 'https://example.org/{year}.json');
   saveLastCheck(s, 5);
-  saveOnlineYear(s, 2027, { table: validateHolidayYear(file2027(), 2027).table, papers: file2027().papers, source: 'x', fetchedAt: 1 });
+  saveOnlineYear(s, 2027, { table: validateHolidayYear(file2027(), 2027).table, papers: file2027().papers, source: 'https://example.org/2027.json', fetchedAt: 1 });
   assert.equal(loadCustomUrl(s), 'https://example.org/{year}.json', 'kept across other writes');
   assert.equal(loadLastCheck(s), 5);
   assert.ok(loadOnlineTables(s).tables[2027]);
@@ -408,7 +408,7 @@ test('reload (other tab changed the holidays key): re-read tables, no storage wr
   const storage = memStore();
   const h = harness({ storage, fetchImpl: async () => { throw new Error('no'); } });
   const other = memStore();
-  saveOnlineYear(other, 2027, { table: validateHolidayYear(file2027(), 2027).table, papers: file2027().papers, source: 'x', fetchedAt: 1 });
+  saveOnlineYear(other, 2027, { table: validateHolidayYear(file2027(), 2027).table, papers: file2027().papers, source: 'https://example.org/2027.json', fetchedAt: 1 });
   storage.m[HOLIDAYS_STORAGE_KEY] = other.m[HOLIDAYS_STORAGE_KEY];
   let writes = 0;
   const set = storage.setItem;
@@ -457,7 +457,7 @@ test('R30: online data never overwrites an imported (file) year; differing data 
   assert.equal(cur[2027].off['2027-04-05'], '清明节');
 });
 
-test('store: source file read as file; any other non-empty source string as online; empty source dropped', () => {
+test('store: source file read as file; an https:// source as online; empty source dropped', () => {
   const s = memStore();
   const v = validateHolidayYear(file2027(), 2027);
   saveOnlineYear(s, 2027, { table: v.table, papers: v.papers, source: 'file', fetchedAt: 1 });
@@ -467,6 +467,33 @@ test('store: source file read as file; any other non-empty source string as onli
   assert.equal(l.tables[2027].source, 'file');
   assert.equal(l.tables[2028].source, 'online');
   assert.equal(l.tables[2029], undefined);
+});
+
+// Task 14 E1：已存年份的 source 只接受 'file' 或以 https:// 开头的下载网址；其他一律丢弃该年（绝不默默变成 'online'）
+test('store: a stored source must be exactly \'file\' or start with https:// — anything else drops the year', () => {
+  const s = memStore();
+  const v = validateHolidayYear(file2027(), 2027);
+  const put = (year, source) => {
+    const off = { [`${year}-01-01`]: '元旦' };
+    saveOnlineYear(s, year, { table: year === 2027 ? v.table : { off, makeup: {} }, papers: ['https://www.gov.cn/x'], source, fetchedAt: 1 });
+  };
+  put(2027, 'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/2027.json');
+  put(2028, 'weird');
+  put(2029, 'FILE');
+  put(2030, 'http://evil/x');
+  put(2031, 'file');
+  put(2032, ' https://a/b');
+  put(2033, 'https:/x');
+  put(2034, 42);
+  put(2035, 'HTTPS://A/B');
+  const l = loadOnlineTables(s);
+  assert.equal(l.tables[2027].source, 'online');
+  assert.equal(l.tables[2031].source, 'file');
+  for (const y of [2028, 2029, 2030, 2032, 2033, 2034, 2035]) {
+    assert.equal(l.tables[y], undefined, `${y} dropped`);
+    assert.equal(l.meta[y], undefined, `${y} no meta`);
+  }
+  assert.deepEqual(Object.keys(l.tables).sort(), ['2027', '2031']);
 });
 
 // ---- R32：结果区一次一个，最新的用户操作优先 ----

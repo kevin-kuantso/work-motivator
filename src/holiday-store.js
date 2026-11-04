@@ -5,6 +5,8 @@ export const HOLIDAYS_STORAGE_KEY = 'work-motivator-v1-holidays';
 export const FILE_SOURCE = 'file';
 
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+const DOWNLOAD_PREFIX = /^https:\/\/[^/\s]/;
+const isKnownSource = (s) => s === FILE_SOURCE || (typeof s === 'string' && DOWNLOAD_PREFIX.test(s));
 
 function readRecord(storage) {
   let raw;
@@ -45,7 +47,8 @@ export function loadOnlineTables(storage) {
       if (!json) continue;
       const v = validateHolidayYear(json, year);
       if (!v.ok) continue;
-      if (typeof entry.source !== 'string' || entry.source === '') continue;
+      // source 只接受导入文件标记 'file' 或以 https:// 开头的下载网址（区分大小写）；其他值丢弃该年，绝不默认为联网
+      if (!isKnownSource(entry.source)) continue;
       if (typeof entry.fetchedAt !== 'number' || !Number.isFinite(entry.fetchedAt)) continue;
       // R30：导入的文件记为 'file'（不声称来源），其余（记录的是下载网址）为 'online'
       tables[year] = { off: v.table.off, makeup: v.table.makeup, source: entry.source === FILE_SOURCE ? 'file' : 'online' };

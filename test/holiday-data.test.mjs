@@ -227,7 +227,7 @@ test('store: save/load roundtrip, lastCheck, bad data discarded', () => {
   assert.deepEqual(l.tables[2027].off, v.table.off);
   assert.deepEqual(l.meta[2027], { source: 'https://b/2027.json', papers: v.papers, fetchedAt: 123 });
   // 另存一年不丢 lastCheck 与旧年份
-  saveOnlineYear(s, 2028, { table: { off: { '2028-01-01': '元旦' }, makeup: {} }, papers: ['https://www.gov.cn/x'], source: 's', fetchedAt: 1 });
+  saveOnlineYear(s, 2028, { table: { off: { '2028-01-01': '元旦' }, makeup: {} }, papers: ['https://www.gov.cn/x'], source: 'https://b/2028.json', fetchedAt: 1 });
   assert.equal(loadLastCheck(s), 456);
   assert.ok(loadOnlineTables(s).tables[2027] && loadOnlineTables(s).tables[2028]);
   // 坏年份单独丢弃
