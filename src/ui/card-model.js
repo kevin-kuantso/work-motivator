@@ -7,7 +7,7 @@ const TONE = {
   restDay: 'rest', paidLeave: 'paid', unpaidLeave: 'unpaid',
 };
 
-// 本月进度：本月累计 ÷ 设定月薪，四舍五入取整数百分比，夹在 0–100；月薪无效（≤0 / 非数）时为 0，不除以 0
+// 已赚占月薪：本月累计 ÷ 设定月薪，四舍五入取整数百分比，夹在 0–100；月薪无效（≤0 / 非数）时为 0，不除以 0
 export function monthPercent(monthTotal, salary) {
   if (!(Number.isFinite(monthTotal) && Number.isFinite(salary) && salary > 0)) return 0;
   return Math.min(100, Math.max(0, Math.round((monthTotal / salary) * 100)));
