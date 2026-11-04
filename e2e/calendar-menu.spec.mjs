@@ -1,7 +1,7 @@
 // 月历小菜单与悬停提示（spec §12.1 / §12.2 / §12.5）。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startServer, launch, openAt, expectedAutoUrls } from './harness.mjs';
+import { startServer, launch, openAt, expectedAutoUrls, tipVisibleLines } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
@@ -203,7 +203,10 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     assert.equal(await tooltip(page).isVisible(), true);
     const tipText = await tooltip(page).innerText();
     // R35 / 决定 2：盖在格子上；2026-11 是 6 周月份 → 3 行（不显示「来源」），没有「点击修改」
-    assert.deepEqual(tipText.split('\n'), ['11月7日 周六', '休息日', '计薪 ¥0.00']);
+    // Task 18：来源行只在放得下时出现（实测决定），完整文字始终在 aria-describedby
+    const lines = await tipVisibleLines(page);
+    assert.deepEqual([lines[0], lines[1], lines.at(-1)], ['11月7日 周六', '休息日', '计薪 ¥0.00']);
+    assert.ok(lines.length === 3 || (lines.length === 4 && lines[2] === '按周末规则'), `lines: ${lines}`);
     assert.doesNotMatch(tipText, /点击修改|来源/);
     assert.equal(await tooltip(page).evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
     assert.equal(await tooltip(page).evaluate((el, b) => el.parentElement === b.parentElement, await sat.elementHandle()), true, 'rendered inside the hovered cell');
@@ -225,7 +228,8 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     await page.keyboard.press('ArrowLeft');
     assert.equal((await focused(page)).key, '2026-11-06');
     assert.equal(await tooltip(page).isVisible(), true, 'shows immediately on keyboard focus');
-    assert.match(await tooltip(page).innerText(), /11月6日 周五[\s\S]*工作日[\s\S]*计薪 ¥323\.81/);
+    const l6 = await tipVisibleLines(page);
+    assert.deepEqual([l6[0], l6[1], l6.at(-1)], ['11月6日 周五', '工作日', '计薪 ¥323.81']);
     await page.keyboard.press('Escape');
     assert.equal(await tooltip(page).isVisible(), false, 'Esc hides');
     await page.keyboard.press('ArrowLeft');
@@ -333,7 +337,7 @@ test('R39: 2027 fixed-date holidays carry the 「法定日期（《放假办法�
     await cell(page, '1月1日').hover();
     await page.clock.runFor(450);
     // 2027-01 是 5 周月份：4 行，第 3 行是来源（短写，不带「来源：」）
-    assert.deepEqual((await tooltip(page).innerText()).split('\n'), ['1月1日 周五', '法定假日·元旦', '《放假办法》', '计薪 ¥0.00']);
+    assert.deepEqual(await tipVisibleLines(page), ['1月1日 周五', '法定假日·元旦', '《放假办法》', '计薪 ¥0.00']);
     // R40：2027-02-06（周六）是春节初一：法定假日，来源「法定日期」；补假不猜，2 月 9 日仍是普通工作日
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await desc('2月6日'), '2月6日 周六，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');

@@ -414,14 +414,15 @@ test('summary row: workdays and daily wage live; missing-table tag in the summar
   });
 });
 
-// R40：2027 年 2 月（无表）：春节 2/5–2/8 标「假 春节」，周末也标；补假 / 调休不猜
+// R40：2027 年 2 月（无表）：春节 2/5–2/8 标旗子 + 「春节」，周末也标；补假 / 调休不猜
 test('2027-02 (no table): 春节 2/5-2/8 marked, summary 18 days, tag text, fits at 1280x585', () =>
   withPage('2027-02-04T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
     for (const [label, wd] of [['2月5日', '周五'], ['2月6日', '周六'], ['2月7日', '周日'], ['2月8日', '周一']]) {
       assert.match(await cell(page, label).getAttribute('aria-label'), new RegExp(`^${label} ${wd}，法定假日（春节）`), label);
-      assert.match(await cell(page, label).textContent(), /假.*春节|春节.*假/s, `${label} badge`);
+      assert.equal(await cell(page, label).locator('.day-label').textContent(), '春节', `${label} badge: flag + name only (Task 18)`);
+      assert.equal(await cell(page, label).locator('.day-label svg.icon-holiday').count(), 1, `${label} flag icon`);
     }
     assert.match(await cell(page, '2月9日').getAttribute('aria-label'), /^2月9日 周二，工作日/, 'no invented compensation day');
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
@@ -466,7 +467,7 @@ test('contrast ≥ 4.5:1 for weekend / holiday numbers and cell tags (computed f
     await cell(page, '11月5日').click();
     await page.getByRole('menuitemradio', { name: /^带薪假/ }).click();
     await page.getByRole('button', { name: /上月/ }).click();
-    for (const [label, sel, what] of [['10月1日', '.day-num', 'holiday number'], ['10月1日', '.day-tag', 'holiday tag 假'], ['10月10日', '.day-tag', 'make-up tag 班']]) {
+    for (const [label, sel, what] of [['10月1日', '.day-num', 'holiday number'], ['10月1日', '.day-tag', 'holiday flag + name (no 假 tag)'], ['10月10日', '.day-tag', 'make-up tag 班']]) {
       const [fg, bg] = await pair(label, sel);
       const r = ratio(fg, bg);
       console.log(`MEASURE ${JSON.stringify({ case: 'contrast', what, fg, bg, ratio: +r.toFixed(2) })}`);
@@ -726,7 +727,7 @@ for (const [state, init, act] of floatStates) {
     }, { init }));
 }
 
-// 决定 2：提示盖在格子本身（±2px），5 周月份 4 行、6 周月份 3 行（不显示「来源」），不盖到下面的格子；键盘聚焦一样
+// 决定 2 + Task 18（V1）：提示盖在格子本身（±2px），内容置中；「来源」只在放得下时出现（不再按 5 / 6 周一刀切），不盖到下面的格子；键盘聚焦一样
 async function tipCheck(page, label, lines, how) {
   const c = cell(page, label);
   if (how === 'hover') {
@@ -754,17 +755,21 @@ async function tipCheck(page, label, lines, how) {
       lines: shown.map((x) => x.textContent),
       clipped: tip.scrollHeight > tip.clientHeight + 0.5,
       lineBottoms: shown.map((x) => x.getBoundingClientRect().bottom),
+      align: getComputedStyle(tip).textAlign,
+      border: { width: getComputedStyle(tip).borderTopWidth, color: getComputedStyle(tip).borderTopColor },
+      expectBorder: getComputedStyle(tip.querySelector('.tip-status')).color,
+      bg: getComputedStyle(tip).backgroundColor,
     };
   });
   return { ...r, expect: lines };
 }
 for (const how of ['hover', 'keyboard']) {
-  test(`tooltip on the ${how === 'hover' ? 'hovered' : 'keyboard-focused'} cell: inside the cell (±2px), 4 lines in a 5-week month, 3 lines in a 6-week month, never over the cell below — four viewports`, () =>
+  test(`tooltip on the ${how === 'hover' ? 'hovered' : 'keyboard-focused'} cell: white card inside the cell (±2px), centred, status-colour border, source only when it fits, never over the cell below — four viewports`, () =>
     withPage(T1412, async (page) => {
       for (const [w, ht] of VIEWPORTS) {
         await page.setViewportSize({ width: w, height: ht });
         for (const [month, label, lines] of [
-          ['2026-11', '11月18日', ['11月18日 周三', '工作日', '计薪 ¥323.81']],
+          ['2026-11', '11月18日', ['11月18日 周三', '工作日', null, '计薪 ¥323.81']],
           ['2026-10', '10月1日', ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00']],
         ]) {
           await page.locator('.cal-today').click();
@@ -774,7 +779,15 @@ for (const how of ['hover', 'keyboard']) {
           assert.equal(r.hidden, false, `${month} @${w}: shown`);
           assert.equal(r.inCell, true, 'rendered inside the cell');
           for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2, `${month} @${w}: tooltip edge ${i} ${r.tip[i]} within ±2px of the cell ${r.cell[i]}`);
-          assert.deepEqual(r.lines, lines, `${month} @${w}: ${lines.length} lines`);
+          assert.deepEqual([r.lines[0], r.lines[1], r.lines.at(-1)], [lines[0], lines[1], lines[3]], `${month} @${w}: date / status / pay lines`);
+          if (r.lines.length === 4) assert.equal(r.lines[2], lines[2] ?? r.lines[2], `${month} @${w}: source line`);
+          assert.ok(r.lines.length >= 3 && r.lines.length <= 4);
+          if (month === '2026-10' && w >= 1366) assert.equal(r.lines.length, 4, `${month} @${w}: 5-week month at ≥ 1366 has room for the source line`);
+          assert.equal(r.align, 'center');
+          assert.equal(r.border.width, '2px');
+          assert.equal(r.border.color, r.expectBorder, `${month} @${w}: border uses the status colour`);
+          assert.equal(r.bg, 'rgb(255, 255, 255)', 'white card');
+          assert.ok(Math.abs((r.tip[0] + r.tip[2]) / 2 - (r.cell[0] + r.cell[2]) / 2) <= 0.5, 'centred on the cell');
           assert.equal(r.clipped, false, `${month} @${w}: no line clipped`);
           assert.ok(r.lineBottoms.every((b) => b <= r.tip[3] + 0.5), 'every line inside the tooltip');
           if (r.belowTop !== null) assert.ok(r.tip[3] <= r.belowTop, `${month} @${w}: does not cover the cell below (${r.tip[3]} > ${r.belowTop})`);
@@ -786,7 +799,7 @@ for (const how of ['hover', 'keyboard']) {
     }));
 }
 
-test('tooltip with error + info banners at 1280×585: the 5-week cell is shorter — falls back to 3 lines, nothing clipped', () =>
+test('tooltip with error + info banners at 1280×585: the 5-week cell is shorter — falls back to fewer lines / tighter spacing, nothing clipped', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     await tab(page, '基本设置').click();
@@ -1115,7 +1128,7 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
     check(await grab(page, ['.cal-note[data-tone="holiday"] .cal-note-text']));
     await cell(page, '10月1日').hover();
     await page.clock.runFor(450);
-    check(await grab(page, ['.day-tooltip .tip-title', '.day-tooltip .tip-status', '.day-tooltip .tip-source', '.day-tooltip .tip-pay']));
+    check(await grab(page, ['.day-tooltip .tip-title', '.day-tooltip .tip-status', '.day-tooltip .tip-source', '.day-tooltip .pay-label', '.day-tooltip .pay-amt']));
     await page.locator('.cal-today').click();
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
@@ -1324,7 +1337,22 @@ async function tipLines(page, key) {
   const r = await c.evaluate((b) => {
     const tip = document.querySelector('.day-tooltip');
     const desc = document.getElementById(b.getAttribute('aria-describedby')).textContent;
-    return { hidden: tip.hidden, desc, lines: [...tip.children].filter((x) => getComputedStyle(x).display !== 'none').map((x) => ({ text: x.textContent, cut: x.scrollWidth > x.clientWidth })) };
+    const tr = tip.getBoundingClientRect();
+    const vis = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
+    const first = vis[0].getBoundingClientRect();
+    const last = vis.at(-1).getBoundingClientRect();
+    const off = vis.map((x) => {
+      const rg = document.createRange();
+      rg.selectNodeContents(x);
+      const q = rg.getBoundingClientRect();
+      return Math.abs((q.left + q.right) / 2 - (tr.left + tr.right) / 2);
+    });
+    return {
+      hidden: tip.hidden, desc,
+      vclip: tip.scrollHeight > tip.clientHeight + 0.5, hclip: tip.scrollWidth > tip.clientWidth + 0.5,
+      padDiff: Math.abs((first.top - tr.top) - (tr.bottom - last.bottom)), maxOff: Math.max(...off),
+      lines: vis.map((x) => ({ text: x.textContent, cut: x.scrollWidth > x.clientWidth || [...x.querySelectorAll('*')].some((c) => c.scrollWidth > c.clientWidth) })),
+    };
   });
   await page.mouse.move(0, 0);
   return r;
@@ -1357,7 +1385,10 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     };
     const cuts = [];
     let checked = 0;
-    for (const [w, ht] of VIEWPORTS) {
+    const geo = [];
+    let minPadDiff = 0;
+    let maxOff = 0;
+    for (const [w, ht] of [...VIEWPORTS, [1000, 700], [1100, 700], [1150, 700], [1200, 700]]) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [ym, keys] of months) {
         await go(ym);
@@ -1366,20 +1397,141 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
           assert.equal(r.hidden, false, `${key} @${w}: shown`);
           checked++;
           for (const l of r.lines) if (l.cut) cuts.push(`${w}x${ht} ${key}: 「${l.text}」`);
+          if (r.vclip || r.hclip) cuts.push(`${w}x${ht} ${key}: tooltip clipped (v ${r.vclip}, h ${r.hclip})`);
+          if (r.padDiff > 1) geo.push(`${w}x${ht} ${key}: top/bottom padding differs by ${r.padDiff}`);
+          if (r.maxOff > 1) geo.push(`${w}x${ht} ${key}: a line is ${r.maxOff} off-centre`);
+          minPadDiff = Math.max(minPadDiff, r.padDiff);
+          maxOff = Math.max(maxOff, r.maxOff);
           // 完整文字（含来源与「点击修改」）在 aria-describedby
           assert.match(r.desc, /来源：.+，当日计薪 .+，点击修改$/, `${key}: full text in aria-describedby`);
         }
       }
     }
-    console.log(`MEASURE ${JSON.stringify({ case: 'R50 tooltip widths', checked, cuts })}`);
-    assert.deepEqual(cuts, [], 'no truncated tooltip line');
+    console.log(`MEASURE ${JSON.stringify({ case: 'R50 tooltip widths', checked, cuts, geo, worstPadDiff: minPadDiff, worstOffCentre: maxOff })}`);
+    assert.deepEqual(cuts, [], 'no truncated or clipped tooltip line');
+    assert.deepEqual(geo, [], 'content centred: top / bottom padding differ ≤ 1px, every line centred ≤ 1px');
     // 状态行的短写
     await page.setViewportSize({ width: 1280, height: 585 });
     await go('2026-05');
-    assert.deepEqual((await tipLines(page, '2026-05-01')).lines.map((l) => l.text), ['5月1日 周五', '法定假日·劳动节', '内置·官方通知', '计薪 ¥0.00']);
+    assert.deepEqual((await tipLines(page, '2026-05-01')).lines.map((l) => l.text), ['5月1日 周五', '法定假日·劳动节', '计薪 ¥0.00']); // 2026-05 是 6 周月份、1280×585：没有放来源的地方（aria-describedby 仍有，上面已断言）
     assert.equal((await tipLines(page, '2026-05-09')).lines[1].text, '调休上班·劳动节');
+    await page.setViewportSize({ width: 1366, height: 650 });
+    await go('2026-10');
+    assert.deepEqual((await tipLines(page, '2026-10-01')).lines.map((l) => l.text), ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00']); // 5 周月份、1366×650：放得下来源
+    await page.setViewportSize({ width: 1280, height: 585 });
     await go('2026-11');
     assert.deepEqual((await tipLines(page, '2026-11-03')).lines.map((l) => l.text).slice(0, 2), ['11月3日 周二', '工作日·今天']);
+  }));
+
+// Task 18：每一种提示（工作日 / 今天 / 周末 / 休息 / 法定假日 / 调休上班 / 带薪 / 无薪 / 手动标记 / 计薪为 0）的每个文字对白底 ≥ 4.5:1（由渲染后的颜色实算），
+// 在最大（1920×950）与最窄（1000×700，最小字号）视窗各量一次
+test('Task 18: tooltip text contrast ≥ 4.5:1 on its white card for every variant (computed from rendered colours)', () =>
+  withPage(T1412, async (page) => {
+    for (const [label, re] of [['11月5日', /^带薪假/], ['11月6日', /^无薪假/], ['11月7日', /改为上班/], ['11月9日', /改为休息/]]) {
+      await cell(page, label).click();
+      await page.getByRole('menuitemradio', { name: re }).click();
+    }
+    const variants = [
+      ['workday', 0, '2026-11-18'], ['today', 0, '2026-11-03'], ['weekend', 0, '2026-11-14'], ['paid', 0, '2026-11-05'], ['unpaid', 0, '2026-11-06'],
+      ['manual work (makeup colours)', 0, '2026-11-07'], ['manual rest', 0, '2026-11-09'], ['holiday (¥0.00)', -1, '2026-10-01'], ['makeup', -1, '2026-10-10'],
+    ];
+    let worst = Infinity;
+    for (const [w, ht] of [[1920, 950], [1000, 700]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [name, back, key] of variants) {
+        await page.locator('.cal-today').click();
+        if (back) await page.getByRole('button', { name: /上月/ }).click();
+        await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
+        await page.clock.runFor(450);
+        const rows = await page.evaluate(() => {
+          const tip = document.querySelector('.day-tooltip');
+          const bg = getComputedStyle(tip).backgroundColor;
+          return [...tip.querySelectorAll('.tip-title, .tip-status, .tip-source, .pay-label, .pay-amt')]
+            .filter((e) => e.getClientRects().length)
+            .map((e) => [e.className, getComputedStyle(e).color, bg]);
+        });
+        assert.ok(rows.length >= 4, `${name} @${w}: tooltip text found`);
+        for (const [cls, fg, bg] of rows) {
+          const r = ratio(fg, bg);
+          worst = Math.min(worst, r);
+          assert.ok(r >= 4.5, `${name} @${w} ${cls}: ${fg} on ${bg} = ${r.toFixed(2)}`);
+        }
+        await page.mouse.move(0, 0);
+      }
+    }
+    console.log(`MEASURE ${JSON.stringify({ case: 'Task 18 tooltip contrast', variants: variants.length * 2, worst: +worst.toFixed(2) })}`);
+  }));
+
+// Task 18：格子标签——法定假日只有旗子 + 节日名（没有「假」字）；调休上班保留「班」+ 节日名；任何格子的标签都不被截断（≥ 1000px 宽的各种视窗）；
+// 无障碍名称不变（仍写「法定假日（春节）」）。2026-01…2027-12 每一格；2027-05 用导入的虚构表把 7 个节日名各与「班」配一遍
+test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「班」 kept; no label truncated for 2026-01…2027-12 at 8 viewports; accessible names intact', () =>
+  withPage(T1412, async (page) => {
+    await tab(page, '基本设置').click();
+    await page.locator('#holiday-file').setInputFiles({ name: '2027.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2027) });
+    await page.locator('#holiday-result[data-tone="success"]').waitFor();
+    await tab(page, '月历').click();
+    const months = [];
+    for (const y of [2026, 2027]) for (let m = 1; m <= 12; m++) months.push([y, m]);
+    const go = async (y, m) => {
+      await page.locator('.cal-today').click();
+      const diff = (y - 2026) * 12 + (m - 11);
+      for (let i = 0; i < Math.abs(diff); i++) await page.getByRole('button', { name: diff < 0 ? /上月/ : /下月/ }).click();
+    };
+    const bad = [];
+    let cells = 0;
+    let holidayCells = 0;
+    let minSlack = Infinity;
+    let minWhere = '';
+    const names = new Set();
+    for (const [w, ht] of [...VIEWPORTS, [1000, 700], [1100, 700], [1150, 700], [1200, 700]]) {
+      await page.setViewportSize({ width: w, height: ht });
+      for (const [y, m] of months) {
+        await go(y, m);
+        const r = await page.evaluate(() => [...document.querySelectorAll('.cal-grid .day')].map((b) => {
+          const lab = b.querySelector('.day-label');
+          const nm = b.querySelector('.day-name');
+          const tag = b.querySelector('.day-tag');
+          let slack = null;
+          if (lab) {
+            // 余量 = 标签盒内宽 − 内容（图示 + 间距 + 名字）实际所需宽度
+            const kids = [...lab.children];
+            const need = kids.reduce((a, k) => {
+              if (k.classList.contains('day-name')) { const rg = document.createRange(); rg.selectNodeContents(k); return a + rg.getBoundingClientRect().width; }
+              return a + k.getBoundingClientRect().width;
+            }, 0) + Math.max(0, kids.length - 1) * parseFloat(getComputedStyle(lab).columnGap || 0);
+            const cs = getComputedStyle(b);
+            const avail = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+            slack = avail - need - parseFloat(getComputedStyle(lab).paddingRight);
+          }
+          return {
+            key: b.dataset.key, kind: [...b.classList].find((c) => c.startsWith('kind-')),
+            aria: b.getAttribute('aria-label'),
+            label: lab ? lab.textContent : null, tagText: tag ? tag.textContent : null, name: nm ? nm.textContent : null,
+            cut: [lab, nm, tag].some((e) => e && e.scrollWidth > e.clientWidth + 0.5), slack,
+            holidayIcon: Boolean(b.querySelector('.day-tag svg.icon-holiday')),
+          };
+        }));
+        for (const c of r) {
+          cells++;
+          if (c.cut) bad.push(`${w}x${ht} ${c.key}: truncated 「${c.label}」`);
+          if (c.slack !== null && c.name) {
+            names.add(`${c.tagText ? '班' : ''}${c.name}`);
+            if (c.slack < minSlack) { minSlack = c.slack; minWhere = `${w}x${ht} ${c.key} 「${c.label}」`; }
+          }
+          if (c.kind === 'kind-holiday') {
+            holidayCells++;
+            if (c.tagText !== '' || !c.holidayIcon) bad.push(`${w}x${ht} ${c.key}: holiday label must be flag + name only (tag 「${c.tagText}」)`);
+            if (/^假/.test(c.label ?? '') || /假/.test(c.tagText ?? '')) bad.push(`${c.key}: 「假」 prefix tag present`);
+            if (!new RegExp(`法定假日（${c.name}）`).test(c.aria)) bad.push(`${c.key}: accessible name lost the holiday: ${c.aria}`);
+          }
+          if (c.kind === 'kind-makeup' && c.name && c.tagText !== '班') bad.push(`${w}x${ht} ${c.key}: make-up keeps 「班」, got 「${c.tagText}」`);
+        }
+      }
+    }
+    console.log(`MEASURE ${JSON.stringify({ case: 'Task 18 cell labels', cells, holidayCells, bad: bad.slice(0, 10), minSlackPx: +minSlack.toFixed(2), minWhere, names: [...names] })}`);
+    assert.deepEqual(bad, [], 'no truncated label, no 「假」 tag, accessible names intact');
+    assert.ok(holidayCells > 50 && names.size >= 14, `covered ${holidayCells} holiday cells and ${names.size} name variants`);
+    assert.ok(minSlack >= 6, `smallest label slack ${minSlack.toFixed(2)}px at ${minWhere} (need ≥ 6px for the wider 微软雅黑)`);
   }));
 
 // C minor：周末图例色块在白底上看得出来（边框 ≥ 2.5:1，与其他色块的浅边框不同）
@@ -1408,17 +1560,18 @@ async function tipBalance(page, key) {
     const lines = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
     const first = lines[0].getBoundingClientRect();
     const last = lines.at(-1).getBoundingClientRect();
-    const fs = lines.map((x) => parseFloat(getComputedStyle(x).fontSize));
-    const fw = lines.map((x) => getComputedStyle(x).fontWeight);
+    const amt = tip.querySelector('.pay-amt');
+    const fs = [parseFloat(getComputedStyle(lines[0]).fontSize), parseFloat(getComputedStyle(amt).fontSize)];
+    const fw = [getComputedStyle(lines[0]).fontWeight, getComputedStyle(lines[1]).fontWeight, getComputedStyle(amt).fontWeight];
     return {
       top: Math.round((first.top - tr.top) * 10) / 10, bottom: Math.round((tr.bottom - last.bottom) * 10) / 10, h: Math.round(tr.height * 10) / 10,
-      n: lines.length, fs, fw, cut: lines.some((x) => x.scrollWidth > x.clientWidth), payColor: getComputedStyle(lines.at(-1)).color,
+      n: lines.length, fs, fw, cut: lines.some((x) => x.scrollWidth > x.clientWidth), payColor: getComputedStyle(amt).color, align: getComputedStyle(tip).textAlign,
     };
   });
   await page.mouse.move(0, 0);
   return r;
 }
-test('C3: tooltip content is vertically centred in the card (top/bottom space differ ≤ 1px) with a clear hierarchy — 4 viewports + a tall cell, 5- and 6-week months', () =>
+test('C3 / Task 18: tooltip content is vertically centred in the card (top/bottom space differ ≤ 1px) with a clear hierarchy (pay amount is the hero) — 4 viewports + a tall cell, 5- and 6-week months', () =>
   withPage(T1412, async (page) => {
     for (const [w, ht] of [...VIEWPORTS, [1920, 1300]]) {
       await page.setViewportSize({ width: w, height: ht });
@@ -1429,9 +1582,10 @@ test('C3: tooltip content is vertically centred in the card (top/bottom space di
         console.log(`MEASURE ${JSON.stringify({ case: 'C3 tooltip balance', w, ht, key, ...r })}`);
         assert.ok(Math.abs(r.top - r.bottom) <= 1, `${key} @${w}x${ht}: top ${r.top} vs bottom ${r.bottom}`);
         assert.equal(r.cut, false, `${key} @${w}x${ht}: no truncated line`);
-        assert.ok(r.fs[0] > r.fs[1], `date line larger (${r.fs})`);
-        assert.ok(Number(r.fw[0]) >= 700 && Number(r.fw[1]) <= 500, `date bold, status normal (${r.fw})`);
-        assert.equal(r.payColor, 'rgb(187, 247, 208)', 'pay line accent');
+        assert.ok(r.fs[1] > r.fs[0], `pay amount is the hero: larger than the date line (${r.fs})`);
+        assert.ok(Number(r.fw[0]) >= 600 && Number(r.fw[2]) >= 700, `date semibold, amount bold (${r.fw})`);
+        assert.equal(r.align, 'center');
+        assert.ok(['rgb(22, 101, 52)', 'rgb(75, 85, 99)'].includes(r.payColor), `amount uses brand-700 (or grey for ¥0.00): ${r.payColor}`);
       }
       if (w === 1280 || w === 1920 && ht === 950) {
         await page.locator('.cal-today').click();
@@ -1505,7 +1659,7 @@ test('C round 2: tooltip never truncates or clips at 1000×700, 1100×700, 1150�
     ];
     const bad = [];
     const sizes = [];
-    for (const [w, ht] of [[1000, 700], [1100, 700], [1150, 700], ...VIEWPORTS]) {
+    for (const [w, ht] of [[1000, 700], [1100, 700], [1150, 700], [1200, 700], ...VIEWPORTS]) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [ym, keys] of sets) {
         const [y, m] = ym.split('-').map(Number);
