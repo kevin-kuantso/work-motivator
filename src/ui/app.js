@@ -311,7 +311,7 @@ export function mountApp(doc, storage, clock) {
 
   // ---- 页面暂停提示（R34）----
   const perf = win.performance;
-  const readTick = readTicks(() => perf.now(), () => Date.now()); // 全域 Date，不是可注入的 clock
+  const readTick = readTicks(() => perf.now(), () => Date.now(), () => doc.visibilityState === 'hidden'); // 全域 Date，不是可注入的 clock
   let lastTick = null; // null = 还没 tick 过（第一次 tick 不提示）
   let skipGap = false; // 小窗开 / 关搬动计时器造成的间隔不算暂停
   let lastPauseNotice = -Infinity;

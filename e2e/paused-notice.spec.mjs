@@ -110,20 +110,41 @@ test('R43: 8 s hidden with ticks still firing normally → no notice on return',
     assert.equal(await notices(page), 0, 'plain tab switch: nothing');
   }));
 
-test('R43: stall while hidden → nothing while hidden, exactly one notice the moment the page becomes visible', () =>
+// R44：分页隐藏超过 5 分钟后 Chrome 每分钟才唤醒一次计时器——单调时钟的大间隔不算停过（回来时画面立即重画）
+test('R44: hidden 10 minutes with one tick per minute (intensive throttling) → NO notice', () =>
   withPage(T1412, async (page) => {
     await watchToasts(page);
     await setVisibility(page, 'hidden');
-    await page.clock.fastForward(60000);
+    for (let i = 0; i < 10; i += 1) await page.clock.fastForward(60000);
+    await setVisibility(page, 'visible');
+    await page.clock.runFor(500);
+    assert.equal(await notices(page), 0, 'no notice for throttled wake-ups');
+  }));
+
+test('R44: hidden + wall-clock-only jump (machine slept) → nothing while hidden, exactly one notice on becoming visible', () =>
+  withPage(T1412, async (page) => {
+    await watchToasts(page);
+    await setVisibility(page, 'hidden');
+    const wall = await page.evaluate(() => Date.now());
+    await page.clock.setSystemTime(new Date(wall + 60000)); // 只动墙上时钟
     await page.clock.runFor(1000);
     assert.equal((await toastState(page)).visible, false, 'not shown while hidden');
     assert.equal(await notices(page), 0);
     await setVisibility(page, 'visible');
     assert.deepEqual(await toastState(page), { visible: true, text: NOTICE, undo: false }, 'shown on becoming visible');
+    await page.clock.runFor(500);
     assert.equal(await notices(page), 1);
   }));
 
-test('R43: freeze/resume while hidden is held until visible', () =>
+test('R44: visible 6 s stall → immediate notice', () =>
+  withPage(T1412, async (page) => {
+    await watchToasts(page);
+    await page.clock.fastForward(6000);
+    assert.deepEqual(await toastState(page), { visible: true, text: NOTICE, undo: false });
+    assert.equal(await notices(page), 1);
+  }));
+
+test('R43/R44: hidden + resume event → held, one notice on becoming visible', () =>
   withPage(T1412, async (page) => {
     await watchToasts(page);
     await setVisibility(page, 'hidden');
