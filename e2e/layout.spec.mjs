@@ -17,6 +17,9 @@ async function shot(page, name) {
 
 const T1412 = '2026-11-03T14:12:00+08:00'; // 2026-11：周一为首共 6 周
 const VIEWPORTS = [[1280, 585], [1366, 650], [1536, 730], [1920, 950]];
+// Task 18：窄 / 矮视窗也是主要目标（1093×535 = 1366×768 @125%）；提示与格子标签的测试都要跑
+const NARROW_VP = [[1000, 700], [1093, 535], [1100, 700], [1150, 700], [1200, 700]];
+const ALL_VP = [...VIEWPORTS, ...NARROW_VP];
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用', '套用', '尚未公布'];
 
@@ -758,18 +761,19 @@ async function tipCheck(page, label, lines, how) {
       align: getComputedStyle(tip).textAlign,
       border: { width: getComputedStyle(tip).borderTopWidth, color: getComputedStyle(tip).borderTopColor },
       expectBorder: getComputedStyle(tip.querySelector('.tip-status')).color,
+      payInside: (() => { const a = tip.querySelector('.pay-amt').getBoundingClientRect(); return a.width > 0 && a.bottom <= tr.bottom - 1.5 && a.top >= tr.top + 1.5 && a.left >= tr.left + 1.5 && a.right <= tr.right - 1.5; })(),
       bg: getComputedStyle(tip).backgroundColor,
     };
   });
   return { ...r, expect: lines };
 }
 for (const how of ['hover', 'keyboard']) {
-  test(`tooltip on the ${how === 'hover' ? 'hovered' : 'keyboard-focused'} cell: white card inside the cell (±2px), centred, status-colour border, source only when it fits, never over the cell below — four viewports`, () =>
+  test(`tooltip on the ${how === 'hover' ? 'hovered' : 'keyboard-focused'} cell: white card inside the cell (±2px), centred, status-colour border, source only when it fits, never over the cell below — all viewports incl. 1093×535`, () =>
     withPage(T1412, async (page) => {
-      for (const [w, ht] of VIEWPORTS) {
+      for (const [w, ht] of ALL_VP) {
         await page.setViewportSize({ width: w, height: ht });
         for (const [month, label, lines] of [
-          ['2026-11', '11月18日', ['11月18日 周三', '工作日', null, '计薪 ¥323.81']],
+          ['2026-11', '11月18日', ['11月18日 周三', '工作日', '按默认规则', '计薪 ¥323.81']],
           ['2026-10', '10月1日', ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00']],
         ]) {
           await page.locator('.cal-today').click();
@@ -780,12 +784,13 @@ for (const how of ['hover', 'keyboard']) {
           assert.equal(r.inCell, true, 'rendered inside the cell');
           for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2, `${month} @${w}: tooltip edge ${i} ${r.tip[i]} within ±2px of the cell ${r.cell[i]}`);
           assert.deepEqual([r.lines[0], r.lines[1], r.lines.at(-1)], [lines[0], lines[1], lines[3]], `${month} @${w}: date / status / pay lines`);
-          if (r.lines.length === 4) assert.equal(r.lines[2], lines[2] ?? r.lines[2], `${month} @${w}: source line`);
-          assert.ok(r.lines.length >= 3 && r.lines.length <= 4);
+          if (r.lines.length === 4) assert.equal(r.lines[2], lines[2], `${month} @${w}: source line text`);
+          assert.ok(r.lines.length >= 3 && r.lines.length <= 4, `${month} @${w}: ${r.lines.length} lines`);
           if (month === '2026-10' && w >= 1366) assert.equal(r.lines.length, 4, `${month} @${w}: 5-week month at ≥ 1366 has room for the source line`);
           assert.equal(r.align, 'center');
           assert.equal(r.border.width, '2px');
           assert.equal(r.border.color, r.expectBorder, `${month} @${w}: border uses the status colour`);
+          assert.ok(r.payInside, `${month} @${w}: the pay amount is fully inside the card`);
           assert.equal(r.bg, 'rgb(255, 255, 255)', 'white card');
           assert.ok(Math.abs((r.tip[0] + r.tip[2]) / 2 - (r.cell[0] + r.cell[2]) / 2) <= 0.5, 'centred on the cell');
           assert.equal(r.clipped, false, `${month} @${w}: no line clipped`);
@@ -1388,7 +1393,7 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     const geo = [];
     let minPadDiff = 0;
     let maxOff = 0;
-    for (const [w, ht] of [...VIEWPORTS, [1000, 700], [1100, 700], [1150, 700], [1200, 700]]) {
+    for (const [w, ht] of ALL_VP) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [ym, keys] of months) {
         await go(ym);
@@ -1483,7 +1488,7 @@ test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「�
     let minSlack = Infinity;
     let minWhere = '';
     const names = new Set();
-    for (const [w, ht] of [...VIEWPORTS, [1000, 700], [1100, 700], [1150, 700], [1200, 700]]) {
+    for (const [w, ht] of ALL_VP) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [y, m] of months) {
         await go(y, m);
@@ -1509,6 +1514,7 @@ test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「�
             label: lab ? lab.textContent : null, tagText: tag ? tag.textContent : null, name: nm ? nm.textContent : null,
             cut: [lab, nm, tag].some((e) => e && e.scrollWidth > e.clientWidth + 0.5), slack,
             holidayIcon: Boolean(b.querySelector('.day-tag svg.icon-holiday')),
+            gap: lab ? parseFloat(getComputedStyle(lab).columnGap) : null, cw: b.parentElement.clientWidth,
           };
         }));
         for (const c of r) {
@@ -1524,6 +1530,7 @@ test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「�
             if (/^假/.test(c.label ?? '') || /假/.test(c.tagText ?? '')) bad.push(`${c.key}: 「假」 prefix tag present`);
             if (!new RegExp(`法定假日（${c.name}）`).test(c.aria)) bad.push(`${c.key}: accessible name lost the holiday: ${c.aria}`);
           }
+          if (c.kind === 'kind-makeup' && c.name && c.gap !== (c.cw <= 80 ? 1 : 3)) bad.push(`${w}x${ht} ${c.key}: 班 / name gap ${c.gap}px in a ${c.cw}px cell (want 3px, 1px only in the tightest tier)`);
           if (c.kind === 'kind-makeup' && c.name && c.tagText !== '班') bad.push(`${w}x${ht} ${c.key}: make-up keeps 「班」, got 「${c.tagText}」`);
         }
       }
@@ -1532,6 +1539,102 @@ test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「�
     assert.deepEqual(bad, [], 'no truncated label, no 「假」 tag, accessible names intact');
     assert.ok(holidayCells > 50 && names.size >= 14, `covered ${holidayCells} holiday cells and ${names.size} name variants`);
     assert.ok(minSlack >= 6, `smallest label slack ${minSlack.toFixed(2)}px at ${minWhere} (need ≥ 6px for the wider 微软雅黑)`);
+  }));
+
+// Task 18 fix round 1：每一种格子 × 每一种视窗（含 1093×535 = 1366×768 @125%）× 有 / 没有首次提示条（存过设置 = 没有提示条，格子更高）：
+// 提示完全放得下——计薪金额永远在卡片里、没有横纵向裁切、状态里的名字不在中间折行；大格子的金额至少是日期字号的 1.5 倍
+const SAVED = { init: `localStorage.setItem('work-motivator-v1', JSON.stringify({ version: 1, marks: { '2026-11-10': 'paidLeave', '2026-11-11': 'unpaidLeave', '2026-11-12': 'rest', '2026-11-14': 'work', '2026-10-14': 'paidLeave', '2026-10-15': 'unpaidLeave' } }));` };
+for (const [state, opts] of [['first-run banner shown', undefined], ['saved settings (no banner)', SAVED]]) {
+  test(`Task 18 r1: tooltip fits every cell of 2026-05 / 2026-10 / 2026-11 at all 9 viewports incl. 1093×535 — ${state}: pay amount inside, no clip, no mid-name break, hero ≥ 1.5× date on ≥ 1280`, () =>
+    withPage(T1412, async (page) => {
+      const bad = [];
+      const tiers = {};
+      let hovers = 0;
+      let minSlack = Infinity;
+      let minWhere = '';
+      let worstRatio = Infinity;
+      for (const [w, ht] of ALL_VP) {
+        await page.setViewportSize({ width: w, height: ht });
+        for (const back of [0, 1, 6]) { // 2026-11（6 周）、2026-10（5 周）、2026-05（6 周）
+          await page.locator('.cal-today').click();
+          for (let i = 0; i < back; i++) await page.getByRole('button', { name: /上月/ }).click();
+          const keys = await page.locator('.cal-grid button[data-key]').evaluateAll((bs) => bs.map((b) => b.dataset.key));
+          for (const key of keys) {
+            await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
+            await page.clock.runFor(450);
+            const r = await page.evaluate(() => {
+              const tip = document.querySelector('.day-tooltip');
+              const tr = tip.getBoundingClientRect();
+              const kids = [...tip.children].filter((x) => getComputedStyle(x).display !== 'none');
+              const amt = tip.querySelector('.pay-amt');
+              const ar = amt.getBoundingClientRect();
+              const split = [...tip.querySelectorAll('.u')].filter((u) => {
+                const rg = document.createRange();
+                rg.selectNodeContents(u);
+                return new Set([...rg.getClientRects()].map((q) => Math.round(q.top))).size > 1;
+              }).map((u) => u.textContent);
+              const content = kids.at(-1).getBoundingClientRect().bottom - kids[0].getBoundingClientRect().top;
+              return {
+                hidden: tip.hidden, tier: [...tip.classList].filter((c) => c.startsWith('is-') && c !== 'is-today').join(' ') || 'full',
+                vclip: tip.scrollHeight > tip.clientHeight + 0.5, hclip: tip.scrollWidth > tip.clientWidth + 0.5,
+                cut: kids.filter((x) => x.scrollWidth > x.clientWidth + 0.5 || [...x.querySelectorAll('*')].some((c) => c.scrollWidth > c.clientWidth + 0.5)).map((x) => x.textContent),
+                amtInside: ar.width > 0 && ar.bottom <= tr.bottom - 1.5 && ar.top >= tr.top + 1.5 && ar.left >= tr.left + 1.5 && ar.right <= tr.right - 1.5,
+                amtText: amt.textContent, split, slack: tip.clientHeight - content,
+                ratio: parseFloat(getComputedStyle(amt).fontSize) / parseFloat(getComputedStyle(tip.querySelector('.tip-title')).fontSize),
+                status: kids.some((x) => x.classList.contains('tip-status')),
+              };
+            });
+            hovers++;
+            tiers[r.tier] = (tiers[r.tier] ?? 0) + 1;
+            const where = `${w}x${ht} ${key}`;
+            if (r.hidden || r.vclip || r.hclip || r.cut.length || !r.amtInside || !/¥\d/.test(r.amtText) || r.split.length) bad.push(`${where}: ${JSON.stringify(r)}`);
+            if (!r.status) bad.push(`${where}: status line dropped (last resort used)`);
+            if (r.slack < minSlack) { minSlack = r.slack; minWhere = where; }
+            if (w >= 1280) { worstRatio = Math.min(worstRatio, r.ratio); if (r.ratio < 1.5 - 1e-6) bad.push(`${where}: amount only ${r.ratio.toFixed(2)}× the date line`); }
+          }
+          await page.mouse.move(0, 0);
+        }
+      }
+      console.log(`MEASURE ${JSON.stringify({ case: `Task 18 r1 tooltip fits (${state})`, hovers, tiers, minSlackPx: +minSlack.toFixed(2), minWhere, worstHeroRatioAtLeast1280: +worstRatio.toFixed(2), bad: bad.slice(0, 8), nBad: bad.length })}`);
+      assert.deepEqual(bad, []);
+    }, opts));
+}
+
+// Task 18 fix round 1（视觉裁定）：无薪假不用刺眼的暗红边（边框中性灰，只有状态文字是红）；今天的提示带 brand-50 底色（和工作日不同，且不盖掉格子自己的今天框的辨识度）；
+// 法定假日用青绿色组（和周末的中性灰不同）；周末 / 休息保持中性灰
+test('Task 18 r1: tooltip colour coding — unpaid has a neutral border + red text, today is tinted brand-50, holiday is teal, weekend neutral; all text ≥ 4.5:1', () =>
+  withPage(T1412, async (page) => {
+    await cell(page, '11月5日').click();
+    await page.getByRole('menuitemradio', { name: /^无薪假/ }).click();
+    const read = async (key, back) => {
+      await page.locator('.cal-today').click();
+      if (back) await page.getByRole('button', { name: /上月/ }).click();
+      await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
+      await page.clock.runFor(450);
+      const r = await page.evaluate(() => {
+        const tip = document.querySelector('.day-tooltip');
+        const cs = getComputedStyle(tip);
+        return { ring: cs.borderTopColor, bg: cs.backgroundColor, status: getComputedStyle(tip.querySelector('.tip-status')).color, texts: [...tip.querySelectorAll('.tip-title, .tip-status, .tip-source, .pay-label, .pay-amt')].filter((e) => e.getClientRects().length).map((e) => getComputedStyle(e).color) };
+      });
+      await page.mouse.move(0, 0);
+      for (const c of r.texts) assert.ok(ratio(c, r.bg) >= 4.5, `${key}: ${c} on ${r.bg}`);
+      return r;
+    };
+    const unpaid = await read('2026-11-05', 0);
+    assert.equal(unpaid.status, 'rgb(159, 18, 57)', 'status text stays red');
+    assert.notEqual(unpaid.ring, unpaid.status, 'border is not the dark red');
+    assert.equal(unpaid.ring, 'rgb(107, 114, 128)', 'neutral grey border');
+    const today = await read('2026-11-03', 0);
+    assert.equal(today.bg, 'rgb(240, 253, 244)', 'today tint = brand-50');
+    assert.equal(today.ring, 'rgb(21, 128, 61)');
+    const work = await read('2026-11-18', 0);
+    assert.equal(work.bg, 'rgb(255, 255, 255)');
+    const weekend = await read('2026-11-14', 0);
+    const holiday = await read('2026-10-01', 1);
+    assert.equal(holiday.ring, 'rgb(17, 94, 89)', 'holiday = teal');
+    assert.equal(holiday.status, 'rgb(17, 94, 89)');
+    assert.equal(weekend.ring, 'rgb(75, 85, 99)', 'weekend stays neutral grey');
+    assert.notEqual(holiday.ring, weekend.ring);
   }));
 
 // C minor：周末图例色块在白底上看得出来（边框 ≥ 2.5:1，与其他色块的浅边框不同）
@@ -1573,7 +1676,7 @@ async function tipBalance(page, key) {
 }
 test('C3 / Task 18: tooltip content is vertically centred in the card (top/bottom space differ ≤ 1px) with a clear hierarchy (pay amount is the hero) — 4 viewports + a tall cell, 5- and 6-week months', () =>
   withPage(T1412, async (page) => {
-    for (const [w, ht] of [...VIEWPORTS, [1920, 1300]]) {
+    for (const [w, ht] of [...ALL_VP, [1920, 1300]]) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [ym, key] of [['2026-11', '2026-11-03'], ['2026-11', '2026-11-18'], ['2026-10', '2026-10-01']]) {
         await page.locator('.cal-today').click();
@@ -1584,6 +1687,7 @@ test('C3 / Task 18: tooltip content is vertically centred in the card (top/botto
         assert.equal(r.cut, false, `${key} @${w}x${ht}: no truncated line`);
         assert.ok(r.fs[1] > r.fs[0], `pay amount is the hero: larger than the date line (${r.fs})`);
         assert.ok(Number(r.fw[0]) >= 600 && Number(r.fw[2]) >= 700, `date semibold, amount bold (${r.fw})`);
+        assert.ok(Number(r.fw[1]) <= 500, `status weight ≤ 500 (${r.fw[1]})`);
         assert.equal(r.align, 'center');
         assert.ok(['rgb(22, 101, 52)', 'rgb(75, 85, 99)'].includes(r.payColor), `amount uses brand-700 (or grey for ¥0.00): ${r.payColor}`);
       }
@@ -1659,7 +1763,7 @@ test('C round 2: tooltip never truncates or clips at 1000×700, 1100×700, 1150�
     ];
     const bad = [];
     const sizes = [];
-    for (const [w, ht] of [[1000, 700], [1100, 700], [1150, 700], [1200, 700], ...VIEWPORTS]) {
+    for (const [w, ht] of ALL_VP) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [ym, keys] of sets) {
         const [y, m] = ym.split('-').map(Number);
@@ -1779,14 +1883,14 @@ test('C round 3: every no-table year (2024 / 2025 / 2027 / 2036) shows a visible
   }));
 
 // 窄格子（< 1240px）里「周X」与「计薪 ¥…」是不可拆的单位：只在单位之间换行，仍不截断
-test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「计薪 ¥…」 never split; no truncation (1000×700, 1100×700)', () =>
+test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「计薪 ¥…」 never split; no truncation (1000×700 … 1200×700 incl. 1093×535); the holiday status breaks only at 「·」, never inside a name', () =>
   withPage(T1412, async (page) => {
     const bad = [];
-    for (const [w, ht] of [[1000, 700], [1100, 700]]) {
+    for (const [w, ht] of NARROW_VP) {
       await page.setViewportSize({ width: w, height: ht });
-      for (const [move, keys] of [[null, ['2026-11-03', '2026-11-18', '2026-11-28']], [/上月/, ['2026-10-10', '2026-10-01', '2026-10-17']]]) {
+      for (const [move, keys] of [[0, ['2026-11-03', '2026-11-18', '2026-11-28']], [1, ['2026-10-10', '2026-10-01', '2026-10-17']], [2, ['2026-09-20', '2026-09-25']], [6, ['2026-05-01', '2026-05-09']]]) {
         await page.locator('.cal-today').click();
-        if (move) await page.getByRole('button', { name: move }).click();
+        for (let i = 0; i < move; i++) await page.getByRole('button', { name: /上月/ }).click();
         for (const key of keys) {
           await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
           await page.clock.runFor(450);
@@ -1796,13 +1900,22 @@ test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「�
             const title = lines[0];
             const wk = [...title.querySelectorAll('.u')].find((u) => /^周/.test(u.textContent));
             const pay = tip.querySelector('.tip-pay');
+            // 每个「单位」（日期 / 周X / 状态里的 「法定假日·」「劳动节」…）的文字都在同一行上（Range 的矩形只有一个 top）：不会在名字中间折行
+            const split = [...tip.querySelectorAll('.u')].filter((u) => {
+              const rg = document.createRange();
+              rg.selectNodeContents(u);
+              return new Set([...rg.getClientRects()].map((q) => Math.round(q.top))).size > 1;
+            }).map((u) => u.textContent);
+            const amt = tip.querySelector('.pay-amt').getBoundingClientRect();
+            const tr = tip.getBoundingClientRect();
             return {
+              split, amtInside: amt.width > 0 && amt.bottom <= tr.bottom && amt.top >= tr.top,
               weekday: wk ? wk.getClientRects().length : -1, pay: pay.getClientRects().length, payText: pay.textContent,
               cut: lines.filter((x) => x.scrollWidth > x.clientWidth + 0.5).map((x) => x.textContent), vclip: tip.scrollHeight > tip.clientHeight + 0.5,
             };
           });
           await page.mouse.move(0, 0);
-          if (r.weekday !== 1 || r.pay !== 1 || r.cut.length || r.vclip) bad.push(`${w} ${key}: ${JSON.stringify(r)}`);
+          if (r.weekday !== 1 || r.pay !== 1 || r.cut.length || r.vclip || r.split.length || !r.amtInside) bad.push(`${w} ${key}: ${JSON.stringify(r)}`);
         }
       }
     }
