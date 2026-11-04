@@ -168,7 +168,7 @@ test('pickResult + resultView: one result; non-built-in years first; priorities'
   const v = (rs) => resultView(pickResult(rs), t);
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }, { year: 2027, protected: false, outcome: 'added' }]), { tone: 'success', text: '已更新：新增 2027 年假期表', detail: null });
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }, { year: 2027, protected: false, outcome: 'unpublished' }]),
-    { tone: 'info', text: '数据来源暂未发布 2027 年放假安排，发布后会自动更新。现在可以先在月历上自己标记。', detail: null });
+    { tone: 'info', text: '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: null });
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'network', reason: 'r1' }, { year: 2027, protected: false, outcome: 'network', reason: 'r2' }]),
     { tone: 'warn', text: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」', detail: '原因：r2' });
   assert.deepEqual(v([{ year: 2027, protected: false, outcome: 'invalid', reason: 'bad' }]), { tone: 'warn', text: '来源数据不完整，已拒绝，未采用', detail: '原因：bad' });
