@@ -120,7 +120,7 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     assert.equal(await page.locator('#status-card .card-gear').isVisible(), false);
   }, { init: stub() }));
 
-test('placeholder click, header button and gear all close the PiP; gear scrolls to settings', () =>
+test('placeholder click, header button and gear all close the PiP; gear opens 基本设置', () =>
   withPage(T1412, async (page) => {
     await floatBtn(page).click();
     await pip(page).locator('#status-card').waitFor();
@@ -134,14 +134,16 @@ test('placeholder click, header button and gear all close the PiP; gear scrolls 
     await floatBtn(page).click(); // 「收回小窗」
     assert.equal(await page.locator('#card-slot #status-card').count(), 1);
 
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.setViewportSize({ width: 1200, height: 300 });
+    const settingsTab = page.getByRole('tab', { name: '基本设置' });
+    assert.equal(await settingsTab.getAttribute('aria-selected'), 'false');
     await floatBtn(page).click();
+    assert.equal(await pip(page).locator('#status-card .card-gear').getAttribute('aria-label'), '收回小窗并打开基本设置');
     await pip(page).locator('#status-card .card-gear').click();
     assert.equal(await page.locator('#card-slot #status-card').count(), 1, 'gear brings the card back');
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window), null);
-    const top = await page.locator('#settings').evaluate((el) => el.getBoundingClientRect().top);
-    assert.ok(Math.abs(top) < 2, `settings scrolled into view (top=${top})`);
+    assert.equal(await settingsTab.getAttribute('aria-selected'), 'true', 'gear selects 基本设置');
+    assert.equal(await page.getByLabel('月薪').isVisible(), true, 'settings panel shown');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab-settings', 'focus on the 基本设置 tab');
   }, { init: stub() }));
 
 test('PiP timer keeps updating while the opener is hidden; no ghost timers after reopen', () =>
@@ -221,8 +223,8 @@ async function floatFits(page) {
   return { req, m };
 }
 async function setCheerAndPayday(page) {
+  await page.getByRole('tab', { name: '基本设置' }).click();
   await page.getByLabel('鼓励语').fill('今天也要好好加油，下班吃顿好的');
-  await page.getByRole('button', { name: /高级设置/ }).click();
   await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
 }
 

@@ -1,13 +1,18 @@
-// 月历：切换月份、图例常驻、点日期弹出小菜单（修改即存）、悬停 / 聚焦提示、无内置假期表的年份显示提示条。
+// 月历（spec §13.3）：工具列（切月、回到今天、PgUp / PgDn 提示）、摘要行（应出勤天数、日薪、缺表标签、重置本月标记）、
+// 只列当月出现类型的单行图例、弹性行高的格子；点日期弹出小菜单（修改即存），悬停 / 聚焦提示。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
 import { monthGrid } from './calendar-model.js';
+import { monthWage } from '../calc.js';
 import { applyOption, menuModel, dayTooltipModel, tooltipText } from './day-options.js';
 import { createDayMenu } from './day-menu.js';
 import { createDayTooltip } from './day-tooltip.js';
+import { money } from './format.js';
 
 const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid' };
 const MARK_KIND = { paidLeave: 'paid', unpaidLeave: 'unpaid', work: 'makeup', rest: 'rest' };
+// 图例顺序；「工作日」是普通格子，不列入图例（只列当月出现的特殊类型）
+const LEGEND_KINDS = ['weekend', 'holiday', 'makeup', 'rest', 'paid', 'unpaid'];
 const HOVER_MS = 400;
 
 // getTables：当前使用的假期表（app.js 持有，替换后调用 render 即可）。
@@ -16,50 +21,66 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
   const today0 = getToday();
   let view = { y: today0.getFullYear(), m: today0.getMonth() };
   let lastTodayKey = null;
-  let focusKey = null;
+  let focusKey = null; // 下一次重绘后要聚焦的日期（套用菜单、PgUp / PgDn）
+  let rovingKey = null; // 月历的 Tab 停靠点：跟着实际焦点走
+  let quiet = false; // 程序聚焦（Esc 关菜单、重绘后还原焦点）时不弹提示
 
   const tag = (kind) =>
     TAG_ICON[kind] ? h(doc, 'span', { class: 'day-tag' }, icon(doc, TAG_ICON[kind]), c.tags[kind]) : null;
 
-  const banner = h(doc, 'p', { class: 'banner banner-notice year-banner', role: 'status', hidden: true });
   const title = h(doc, 'span', { class: 'cal-title', id: 'cal-title', 'aria-live': 'polite' });
-  const reset = h(doc, 'button', { type: 'button', class: 'btn btn-ghost cal-reset', hidden: true, text: c.reset, onclick: resetMonth });
+  const todayBtn = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-today', onclick: goToday });
+  const summaryText = h(doc, 'span', { class: 'cal-summary-text' });
+  const yearTag = h(doc, 'span', { class: 'cal-year-tag', hidden: true });
+  const reset = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-ghost cal-reset', hidden: true, text: c.reset, onclick: resetMonth });
+  const legendItems = h(doc, 'span', { class: 'legend-items' });
   const grid = h(doc, 'div', { class: 'cal-grid', role: 'grid', 'aria-labelledby': 'cal-title' });
 
-  const legendItem = (kind, label, extra = null) =>
-    h(doc, 'span', { class: 'legend-item' },
-      h(doc, 'span', { class: `legend-swatch kind-${kind}` }, tag(kind), extra), label);
-  const legend = h(doc, 'div', { class: 'cal-legend' },
-    h(doc, 'span', { class: 'legend-title', text: c.legend }),
-    ['workday', 'weekend', 'holiday', 'makeup', 'paid', 'unpaid'].map((k) => legendItem(k, c.kinds[k])),
-    h(doc, 'span', { class: 'legend-item' }, h(doc, 'span', { class: 'legend-swatch is-today' }), c.todayLabel),
-    h(doc, 'span', { class: 'legend-item' }, h(doc, 'span', { class: 'legend-swatch' }, h(doc, 'span', { class: 'day-dot' })), c.manual));
+  // 图例色块只放图示（文字标签已说明类型），省宽度以保持单行
+  const legendItem = (kind, label) =>
+    h(doc, 'span', { class: 'legend-item', 'data-kind': kind },
+      h(doc, 'span', { class: `legend-swatch kind-${kind}` }, TAG_ICON[kind] ? icon(doc, TAG_ICON[kind]) : null), label);
 
-  const el = h(doc, 'section', { class: 'panel calendar', 'aria-labelledby': 'cal-heading' },
-    h(doc, 'h2', { id: 'cal-heading', text: c.title }),
-    banner,
+  const el = h(doc, 'section', { class: 'calendar', 'aria-label': c.title },
     h(doc, 'div', { class: 'cal-toolbar' },
-      h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: c.prev, onclick: () => move(-1) }),
+      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, onclick: () => move(-1) }),
       title,
-      h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: c.next, onclick: () => move(1) }),
-      h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: c.today, onclick: goToday }),
-      reset),
-    legend,
+      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, onclick: () => move(1) }),
+      todayBtn,
+      h(doc, 'span', { class: 'cal-keys' },
+        h(doc, 'kbd', { text: c.pageKeys.up }), c.pageKeys.sep, h(doc, 'kbd', { text: c.pageKeys.down }), c.pageKeys.label)),
+    h(doc, 'div', { class: 'cal-summary' }, summaryText, yearTag, reset),
+    h(doc, 'div', { class: 'cal-legend' },
+      h(doc, 'span', { class: 'legend-title', text: c.legend }),
+      legendItems,
+      h(doc, 'span', { class: 'legend-hint', text: c.legendHint })),
     grid);
-  const menu = createDayMenu(doc, el, { onChoose: apply });
+  const menu = createDayMenu(doc, el, { onChoose: apply, refocus: (btn) => focusQuietly(btn) });
   const tooltip = createDayTooltip(doc, el);
   el.append(menu.el, tooltip.el);
 
+  function focusQuietly(btn) {
+    quiet = true;
+    try {
+      btn.focus();
+    } finally {
+      quiet = false;
+    }
+  }
+
+  function show1(y, m) {
+    view = { y, m };
+    render();
+  }
+
   function move(delta) {
     const d = new Date(view.y, view.m + delta, 1);
-    view = { y: d.getFullYear(), m: d.getMonth() };
-    render();
+    show1(d.getFullYear(), d.getMonth());
   }
 
   function goToday() {
     const d = getToday();
-    view = { y: d.getFullYear(), m: d.getMonth() };
-    render();
+    show1(d.getFullYear(), d.getMonth());
   }
 
   function resetMonth() {
@@ -99,9 +120,26 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     }
   };
 
+  function setRoving(btn) {
+    rovingKey = btn.dataset.key;
+    for (const b of grid.querySelectorAll('button[tabindex="0"]')) if (b !== btn) b.tabIndex = -1;
+    btn.tabIndex = 0;
+  }
+
   function onKey(e, cell) {
     if (e.key === 'Escape') {
       tooltip.hide();
+      return;
+    }
+    if (e.key === 'PageUp' || e.key === 'PageDown') {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      e.preventDefault();
+      // APG 日期选择器：切到上 / 下个月，焦点停在同号日期，没有就落到月底
+      const first = new Date(view.y, view.m + (e.key === 'PageUp' ? -1 : 1), 1);
+      const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+      const target = new Date(first.getFullYear(), first.getMonth(), Math.min(cell.day, last));
+      focusKey = keyOf(target);
+      show1(first.getFullYear(), first.getMonth());
       return;
     }
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
@@ -110,11 +148,18 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     const last = new Date(view.y, view.m + 1, 0).getDate();
     const day = Math.min(last, Math.max(1, cell.day + step));
     const target = grid.querySelector(`button[data-day="${day}"]`);
-    if (target) {
-      for (const b of grid.querySelectorAll('button[tabindex="0"]')) b.tabIndex = -1;
-      target.tabIndex = 0;
-      target.focus();
-    }
+    if (target) target.focus();
+  }
+
+  const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  function renderLegend(cells) {
+    const kinds = new Set(cells.map((x) => x.kind));
+    legendItems.replaceChildren(...[
+      ...LEGEND_KINDS.filter((k) => kinds.has(k)).map((k) => legendItem(k, c.kinds[k])),
+      cells.some((x) => x.today) ? h(doc, 'span', { class: 'legend-item', 'data-kind': 'today' }, h(doc, 'span', { class: 'legend-swatch is-today' }), c.todayLabel) : null,
+      cells.some((x) => x.manual) ? h(doc, 'span', { class: 'legend-item', 'data-kind': 'manual' }, h(doc, 'span', { class: 'legend-swatch' }, h(doc, 'span', { class: 'day-dot' })), c.manual) : null,
+    ].filter(Boolean));
   }
 
   function render() {
@@ -129,21 +174,29 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     lastTodayKey = todayKey;
 
     const active = doc.activeElement;
-    const refocus = active && grid.contains(active) ? active.dataset.key : focusKey;
+    const refocus = focusKey ?? (active && grid.contains(active) ? active.dataset.key : null);
     focusKey = null;
 
     const tables = getTables();
     const model = monthGrid(view.y, view.m, cfg, marks, today, tables);
     tooltip.hide();
-    setText(title, c.monthTitle(view.y, view.m + 1));
-    show(banner, model.tableMissing);
-    setText(banner, model.tableMissing ? t.banner.yearMissing(view.y) : '');
+    const monthTitle = c.monthTitle(view.y, view.m + 1);
+    setText(title, monthTitle);
+    const isThisMonth = view.y === today.getFullYear() && view.m === today.getMonth();
+    setText(todayBtn, isThisMonth ? c.today : c.todayBack(c.monthTitle(today.getFullYear(), today.getMonth() + 1)));
+    todayBtn.classList.toggle('is-away', !isThisMonth);
+    const wage = monthWage(view.y, view.m, cfg, marks, tables);
+    setText(summaryText, c.summary(wage.workdays, `${t.currency}${money(wage.dailyWage)}`));
+    show(yearTag, model.tableMissing);
+    setText(yearTag, model.tableMissing ? t.card.yearMissing(view.y) : '');
     show(reset, model.hasMarks);
 
     const head = h(doc, 'div', { class: 'cal-row cal-head', role: 'row' },
       c.weekHeads.map((w, i) => h(doc, 'span', { class: `cal-colhead${i >= 5 ? ' is-weekend' : ''}`, role: 'columnheader', text: w })));
     const cells = model.weeks.flat().filter(Boolean);
-    const tabKey = cells.find((x) => x.key === refocus)?.key ?? cells.find((x) => x.today)?.key ?? cells[0].key;
+    renderLegend(cells);
+    const inMonth = (k) => (k && cells.some((x) => x.key === k) ? k : null);
+    const tabKey = inMonth(refocus) ?? inMonth(menu.key()) ?? inMonth(rovingKey) ?? cells.find((x) => x.today)?.key ?? cells[0].key;
     let toFocus = null;
     const rows = model.weeks.map((week) =>
       h(doc, 'div', { class: 'cal-row', role: 'row' },
@@ -168,12 +221,16 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
             onkeydown: (e) => onKey(e, cell),
             onmouseenter: () => { if (!menu.isOpen()) tooltip.later(btn, tip, HOVER_MS); },
             onmouseleave: () => tooltip.hide(),
-            onfocus: () => { if (!menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip); },
+            onfocus: () => {
+              setRoving(btn);
+              if (!quiet && !menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip);
+            },
             onblur: () => tooltip.hide(),
           },
           h(doc, 'span', { class: 'day-num', text: String(cell.day) }),
-          tag(cell.kind),
-          cell.holidayName ? h(doc, 'span', { class: 'day-name', text: cell.holidayName }) : null,
+          cell.kind in TAG_ICON || cell.holidayName
+            ? h(doc, 'span', { class: 'day-label' }, tag(cell.kind), cell.holidayName ? h(doc, 'span', { class: 'day-name', text: cell.holidayName }) : null)
+            : null,
           cell.manual ? h(doc, 'span', { class: 'day-dot', title: c.manualTitle }) : null);
           if (cell.key === refocus) toFocus = btn;
           return h(doc, 'span', { class: 'cal-cell', role: 'gridcell' }, btn,
@@ -181,7 +238,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
         })));
     const menuHadFocus = menu.hasFocus();
     grid.replaceChildren(head, ...rows);
-    if (toFocus) toFocus.focus();
+    if (toFocus) focusQuietly(toFocus);
     // 菜单打开时重绘（跨日、其他分页改了设置）：日期仍在画面上就原地更新，否则关闭且不丢焦点
     if (menu.isOpen()) {
       const key = menu.key();
@@ -191,10 +248,16 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
         menu.refresh(anchor, menuModel(cell.date, cfg, marks, tables));
       } else {
         menu.close(false);
-        if (menuHadFocus) grid.querySelector('button[tabindex="0"]')?.focus();
+        if (menuHadFocus) focusQuietly(grid.querySelector('button[tabindex="0"]'));
       }
     }
   }
 
-  return { el, render };
+  // 切换分页时收起菜单与提示（两者都浮在月历上）
+  function hideOverlays() {
+    tooltip.hide();
+    menu.close(false);
+  }
+
+  return { el, render, hideOverlays };
 }

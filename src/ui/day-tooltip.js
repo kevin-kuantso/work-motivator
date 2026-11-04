@@ -22,9 +22,11 @@ export function createDayTooltip(doc, container) {
     const right = Math.min(c.right, doc.documentElement.clientWidth) - GAP;
     const left = Math.max(c.left, 0) + GAP;
     const bottom = Math.min(c.bottom, win.innerHeight) - GAP;
+    const top = Math.max(c.top, 0) + GAP;
     const x = Math.max(left, Math.min(a.left, right - w));
     let y = a.bottom + GAP;
     if (y + ht > bottom) y = a.top - GAP - ht;
+    if (y < top) y = top; // 上下都放不下：贴着顶端（可能盖住格子，但不会被裁掉）
     el.style.left = `${Math.round(x - c.left)}px`;
     el.style.top = `${Math.round(y - c.top)}px`;
   }

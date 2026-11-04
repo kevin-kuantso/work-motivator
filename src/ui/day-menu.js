@@ -7,11 +7,12 @@ import { icon } from './icons.js';
 const OPTION_ICON = { default: 'reset', work: 'makeup', rest: 'rest', paidLeave: 'paid', unpaidLeave: 'unpaid' };
 const GAP = 4;
 
-export function createDayMenu(doc, container, { onChoose }) {
+// refocus(btn)：把焦点还给日期格（调用方用来区分程序聚焦，避免 Esc 后立刻弹出提示）。
+export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn.focus() }) {
   const win = doc.defaultView;
   const header = h(doc, 'p', { class: 'day-menu-header', id: 'day-menu-header' });
-  const list = h(doc, 'div', { class: 'day-menu-list', id: 'day-menu', role: 'menu', 'aria-labelledby': 'day-menu-header' });
-  const footer = h(doc, 'p', { class: 'day-menu-footer' });
+  const list = h(doc, 'div', { class: 'day-menu-list', id: 'day-menu', role: 'menu', 'aria-labelledby': 'day-menu-header', 'aria-describedby': 'day-menu-footer' });
+  const footer = h(doc, 'p', { class: 'day-menu-footer', id: 'day-menu-footer' });
   const el = h(doc, 'div', { class: 'day-menu', hidden: true }, header, list, footer);
   let anchor = null;
   let openKey = null;
@@ -119,7 +120,7 @@ export function createDayMenu(doc, container, { onChoose }) {
     a.setAttribute('aria-expanded', 'false');
     a.removeAttribute('aria-controls');
     anchor = null;
-    if (returnFocus && a.isConnected) a.focus();
+    if (returnFocus && a.isConnected) refocus(a);
   }
 
   function choose(id) {
