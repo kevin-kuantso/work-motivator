@@ -40,24 +40,32 @@ export function dayCounts(table) {
   return { off: Object.keys(table.off ?? {}).length, makeup: Object.keys(table.makeup ?? {}).length };
 }
 
-// 状态行：当年；11 月起（或已经有下一年的表时）再加下一年；检查过才附「上次检查 MM/DD」。
+// 状态（假期数据卡的年份胶囊）：当年；11 月起（或已经有下一年的表时）再加下一年；检查过才附「上次检查 MM/DD」。
 // 导入的年份只写「已导入文件」，不声称来源（文件可能来自任何地方，R30）。
-export function statusLine(now, tables, lastCheckMs, t) {
+// kind：builtin / online / file / missing（界面按 kind 上色：内置与联网 / 导入 = 有表，missing = 黄色）
+export function statusModel(now, tables, lastCheckMs, t) {
   const U = t.holidayUpdate;
   const y = now.getFullYear();
   const years = [y];
   if (now.getMonth() >= 10 || has(tables, y + 1)) years.push(y + 1);
-  const parts = years.map((yr) => {
+  const chips = years.map((yr) => {
     const tb = has(tables, yr) ? tables[yr] : null;
-    if (!tb) return U.missing(yr);
-    if (tb.source === 'builtin') return U.builtin(yr);
-    return tb.source === 'file' ? U.importedYear(yr) : U.online(yr);
+    if (!tb) return { year: yr, kind: 'missing', text: U.missing(yr) };
+    if (tb.source === 'builtin') return { year: yr, kind: 'builtin', text: U.builtin(yr) };
+    return tb.source === 'file' ? { year: yr, kind: 'file', text: U.importedYear(yr) } : { year: yr, kind: 'online', text: U.online(yr) };
   });
+  let lastCheck = null;
   if (typeof lastCheckMs === 'number') {
     const d = new Date(lastCheckMs);
-    parts.push(U.lastCheck(`${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`));
+    lastCheck = U.lastCheck(`${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`);
   }
-  return parts.join(U.sep);
+  return { chips, lastCheck };
+}
+
+// 同一状态的一行文字（「2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/04」）：测试与无障碍名称用
+export function statusLine(now, tables, lastCheckMs, t) {
+  const m = statusModel(now, tables, lastCheckMs, t);
+  return [...m.chips.map((c) => c.text), ...(m.lastCheck ? [m.lastCheck] : [])].join(t.holidayUpdate.sep);
 }
 
 // 多个年份的检查结果 → 只显示一个。未受保护的年份优先（那才是用户要的）；受保护年份（内置 / 导入文件）只会「相同」或「失败」，
@@ -69,12 +77,13 @@ export function pickResult(results) {
   const pool = other.length ? other : results.map((r) => (r.outcome === 'diff' ? { ...r, outcome: 'same' } : r));
   for (const o of other.length ? ORDER_OTHER : ORDER_BUILTIN) {
     const hits = pool.filter((r) => r.outcome === o);
-    if (hits.length) return { outcome: o, years: hits.map((r) => r.year), reason: hits.at(-1).reason ?? null };
+    if (hits.length) return { outcome: o, years: hits.map((r) => r.year), reason: hits.at(-1).reason ?? null, format: hits.at(-1).format === true };
   }
   return null;
 }
 
 // tone：success（绿）/ muted（灰）/ info（蓝，「暂未发布」不是错误）/ warn（黄）
+// formatHelp：被拒绝的原因是格式 / 内容不合格（validateHolidayYear）→ 结果后面附「查看格式示例」（R47）；连不上 / 超时 / 过大不附
 export function resultView(res, t) {
   if (!res) return null;
   const U = t.holidayUpdate;
@@ -84,7 +93,7 @@ export function resultView(res, t) {
     case 'refreshed': return { tone: 'success', text: U.refreshed(res.years), detail: null };
     case 'unpublished': return { tone: 'info', text: U.unpublished(res.years[0]), detail: null };
     case 'network': return { tone: 'warn', text: U.network, detail };
-    case 'invalid': return { tone: 'warn', text: U.invalid, detail };
+    case 'invalid': return { tone: 'warn', text: U.invalid, detail, formatHelp: res.format === true };
     default: return { tone: 'muted', text: U.same, detail: null };
   }
 }
@@ -100,7 +109,7 @@ export function customUrlSummary(url, t) {
 
 // ---- 流程编排 ----
 // ctx: { storage, clock, fetchImpl?, getTables, onTables, notify(msg, kind:'info'|'success', against?:'builtin'|'file'), onStatus(status) }
-// status: { checking, line, result:{tone,text,detail}|null, customUrl, customSummary }
+// status: { checking, line, status:{chips,lastCheck}, result:{tone,text,detail}|null, customUrl, customSummary }
 export function startHolidayUpdate(ctx) {
   const t = STRINGS;
   const U = t.holidayUpdate;
@@ -117,6 +126,7 @@ export function startHolidayUpdate(ctx) {
     onStatus({
       checking: pending > 0,
       line: statusLine(clock(), getTables(), loadLastCheck(storage), t),
+      status: statusModel(clock(), getTables(), loadLastCheck(storage), t),
       result,
       customUrl: url,
       customSummary: customUrlSummary(url, t),
@@ -151,7 +161,7 @@ export function startHolidayUpdate(ctx) {
       const cur = getTables()[year]; // 等待期间可能已被另一次检查 / 导入更新：以当下为准
       const prot = isProtected(cur);
       const base = { year, protected: prot, against: prot ? cur.source : null };
-      if (!r.ok) out.push({ ...base, outcome: r.kind, reason: r.reason });
+      if (!r.ok) out.push({ ...base, outcome: r.kind, reason: r.reason, format: r.format === true });
       else if (prot) {
         const n = diffCount(cur, r.table);
         out.push({ ...base, outcome: n ? 'diff' : 'same', n });
@@ -217,8 +227,9 @@ export function startHolidayUpdate(ctx) {
 
   function importFile(text) {
     seq++;
-    const fail = (reason, year) => {
-      result = { tone: 'warn', text: reason, detail: null };
+    // format：文件格式 / 内容不合格（不是 JSON、没有年份、validateHolidayYear 不通过）→ 附「查看格式示例」；「已内置」不是格式问题
+    const fail = (reason, year, format = true) => {
+      result = { tone: 'warn', text: reason, detail: null, formatHelp: format };
       emit();
       return year === undefined ? { ok: false, reason } : { ok: false, reason, year };
     };
@@ -231,7 +242,7 @@ export function startHolidayUpdate(ctx) {
     // 目标年份 = 文件自己的 year 字段（不按当前查看的月份猜）
     const year = isPlainObject(json) ? json.year : undefined;
     if (!Number.isInteger(year) || year < 1000 || year > 9999) return fail(U.importNoYear);
-    if (getTables()[year]?.source === 'builtin') return fail(U.importBuiltin(year), year);
+    if (getTables()[year]?.source === 'builtin') return fail(U.importBuiltin(year), year, false);
     const v = validateHolidayYear(json, year);
     if (!v.ok) return fail(v.reason, year);
     apply(year, v.table, v.papers, FILE_SOURCE);

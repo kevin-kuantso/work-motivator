@@ -126,9 +126,10 @@ export async function fetchHolidayYear(year, opts = {}) {
   let kind = 'network';
   let last = R.noSource;
   let lastOfKind = R.noSource;
-  const note = (k, reason) => {
+  let formatOfKind = false; // 选中的失败原因是否来自 validateHolidayYear（格式 / 内容不合格；R47：界面据此提供「查看格式示例」）
+  const note = (k, reason, format = false) => {
     last = reason;
-    if (RANK[k] >= RANK[kind]) { kind = k; lastOfKind = reason; }
+    if (RANK[k] >= RANK[kind]) { kind = k; lastOfKind = reason; formatOfKind = format; }
   };
   for (const template of sources) {
     const url = buildSourceUrl(template, year);
@@ -171,14 +172,15 @@ export async function fetchHolidayYear(year, opts = {}) {
       }
       const v = validateHolidayYear(json, year);
       if (v.ok) return { ok: true, table: v.table, papers: v.papers, source: url };
-      note(isUnpublishedYear(json, year) ? 'unpublished' : 'invalid', v.reason);
+      if (isUnpublishedYear(json, year)) note('unpublished', v.reason);
+      else note('invalid', v.reason, true);
     } catch {
       note('network', timedOut ? R.timeout : R.network);
     } finally {
       clearTimeout(timer);
     }
   }
-  return { ok: false, kind, reason: R.allFailed(kind === 'network' ? last : lastOfKind) };
+  return { ok: false, kind, reason: R.allFailed(kind === 'network' ? last : lastOfKind), format: kind === 'invalid' && formatOfKind };
 }
 
 export function yearsToAutoCheck(now, tables, lastCheckMs) {

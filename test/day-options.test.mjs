@@ -93,7 +93,10 @@ test('menuModel: header, previews for denominator-changing options, footer', () 
 test('dayTooltipModel: status, source label and pay for every day type', () => {
   const tip = (date, marks = {}, tables = HOLIDAYS_CN, c = cfg) => dayTooltipModel(date, c, marks, tables, at(11, 3));
   const wd = tip(at(11, 4));
-  assert.deepEqual(wd, { title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改' });
+  assert.deepEqual(wd, {
+    title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改',
+    sourceLabel: '按默认规则', payShort: '计薪 ¥323.81',
+  });
   assert.equal(tip(at(11, 3)).title, '11月3日 周二（今天）');
   const sat = tip(at(11, 7));
   assert.equal(sat.status, '休息日');
@@ -126,6 +129,11 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   // R30：导入的文件只写「导入文件」，不声称官方来源
   const file = { 2027: { ...online[2027], source: 'file' } };
   assert.equal(tip(at(1, 1, 2027), {}, file).source, '来源：导入文件');
+  // 盖在格子上的短写（Task 14）：来源只写类别，计薪写「计薪 ¥x」
+  assert.equal(tip(at(1, 1, 2027), {}, file).sourceLabel, '导入文件');
+  assert.equal(hol.sourceLabel, '内置·官方通知');
+  assert.equal(mk.payShort, '计薪 ¥377.78');
+  assert.equal(tip(at(1, 1, 2027), {}, {}).sourceLabel, '法定日期（《放假办法》）');
   assert.equal(tip(at(1, 1, 2027), {}, online).status, '法定假日（元旦）');
   assert.equal(tip(at(1, 9, 2027), {}, online).status, '调休上班（元旦）');
   assert.equal(tip(at(1, 4, 2027)).source, '来源：按默认规则', 'no table, weekday → default rule');

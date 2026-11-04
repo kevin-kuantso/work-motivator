@@ -80,7 +80,17 @@ async function until(page, fn, arg, timeout = 5000) {
 }
 const tab = (page, name) => page.getByRole('tab', { name });
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
-const statusLine = (page) => text(page, '#holiday-status');
+// 假期数据状态（Task 14：年份胶囊 + 上次检查）：可见胶囊的文字按顺序以「 · 」连起来；分组的无障碍名称必须是同一句
+const statusLine = async (page) => {
+  const r = await page.evaluate(() => {
+    const el = document.getElementById('holiday-status');
+    const parts = [...el.querySelectorAll('.chip, .chip-note')].filter((e) => !e.hidden).map((e) => e.textContent.trim());
+    return { line: parts.join(' · '), aria: el.getAttribute('aria-label'), role: el.getAttribute('role') };
+  });
+  assert.equal(r.role, 'group');
+  assert.equal(r.aria, `假期数据状态：${r.line}`, 'group name = the same sentence');
+  return r.line;
+};
 const result = async (page) => {
   const el = page.locator('#holiday-result');
   if (!(await el.isVisible())) return null;
@@ -109,7 +119,7 @@ test('before Nov 1: zero external requests on load and while using the app; stat
     await tab(page, '基本设置').click();
     await page.getByLabel('月薪').fill('7000');
     await page.locator('.adv-toggle').click();
-    assert.equal(await statusLine(page), '2026 内置');
+    assert.equal(await statusLine(page), '2026 年 · 内置');
     assert.equal(await result(page), null);
     await page.reload();
     await holidayIdle(page);
@@ -128,13 +138,13 @@ test('from 2026-11-04: auto-check fetches 2027, applies it, quiet toast (no 「�
     const name = await page.locator('.cal-grid button[data-key="2027-01-01"] .day-name').textContent();
     assert.equal(name, '元旦');
     await tab(page, '基本设置').click();
-    assert.equal(await statusLine(page), '2026 内置 · 2027 联网更新（来源：国办通知） · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 联网更新 · 上次检查 11/04');
     assert.equal(await result(page), null, 'auto success: toast only');
     const rec = await holidayRecord(page);
     assert.deepEqual(Object.keys(rec.years), ['2027']);
     await page.reload();
     assert.ok(await holidayIdle(page));
-    assert.equal(await statusLine(page), '2026 内置 · 2027 联网更新（来源：国办通知） · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 联网更新 · 上次检查 11/04');
     await goMonth(page, 2);
     assert.equal(await yearTag(page).isVisible(), false, 'still applied after reload');
     assert.deepEqual(external, [CDN(2027)], 'no second request the same day');
@@ -161,7 +171,7 @@ test('empty upstream 2027 file → 「数据来源暂未发布」 info (not an e
     assert.deepEqual(await result(page), { tone: 'info', text: '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: '' });
     const colors = await page.locator('#holiday-result').evaluate((e) => getComputedStyle(e).backgroundColor);
     assert.equal(colors, 'rgb(224, 242, 254)', 'info colour (#E0F2FE), not warn / error');
-    assert.equal(await statusLine(page), '2026 内置 · 2027 未内置（可联网更新） · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/04');
     assert.equal(await page.locator('.notices .banner-error').isVisible(), false);
     await tab(page, '月历').click();
     await goMonth(page, 2);
@@ -270,7 +280,7 @@ test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed
     assert.deepEqual(btns, ['×'], 'dismissible; no 「查看差异」');
     await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await page.locator('.notices .banner-info').isVisible(), false);
-    assert.equal(await statusLine(page), '2026 内置 · 上次检查 06/01');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 上次检查 06/01');
     // 内置表没被覆盖：10/7 仍是法定假日，10/11 仍是周末
     await tab(page, '月历').click();
     await goMonth(page, 4);
@@ -286,7 +296,7 @@ test('import 假期表文件: success counts, rejection reason, missing year, bu
     await importHoliday(page, synth2027());
     await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
     assert.deepEqual(await result(page), { tone: 'success', text: '已导入 2027 年假期表（放假 10 天，调休上班 1 天）', detail: '' });
-    assert.equal(await statusLine(page), '2026 内置 · 2027 已导入文件 · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 已导入文件 · 上次检查 11/04');
     await tab(page, '月历').click();
     await goMonth(page, 2);
     assert.equal(await yearTag(page).isVisible(), false);
@@ -309,13 +319,13 @@ test('高级设置: aria-expanded toggles; invalid 自定义网址 rejected and 
     await tab(page, '基本设置').click();
     const toggle = page.locator('.adv-toggle');
     assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
-    assert.equal(await text(page, '.adv-summary'), '自定义网址：未设置');
+    assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
     await toggle.click();
     assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
-    const input = page.getByLabel('自定义网址');
+    const input = page.getByLabel('自定义数据网址');
     assert.equal(await input.isVisible(), true);
     assert.equal(await input.getAttribute('placeholder'), 'https://example.com/{year}.json');
-    assert.equal(await text(page, '#hint-custom-url'), '用 {year} 代表年份');
+    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。');
     for (const bad of ['http://mirror.example.org/{year}.json', 'https://mirror.example.org/2027.json']) {
       await input.fill(bad);
       await input.press('Enter');
@@ -323,14 +333,14 @@ test('高级设置: aria-expanded toggles; invalid 自定义网址 rejected and 
       assert.equal(await text(page, '#err-custom-url'), '网址必须以 https:// 开头，并包含 {year}');
       assert.equal(await input.getAttribute('aria-invalid'), 'true');
       assert.equal((await holidayRecord(page))?.customUrl, undefined, 'not saved');
-      assert.equal(await text(page, '.adv-summary'), '自定义网址：未设置');
+      assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
     }
     await input.fill('https://mirror.example.org/hc/{year}.json');
     await input.blur();
     assert.equal(await text(page, '#err-custom-url'), '');
     assert.equal(await input.getAttribute('aria-invalid'), null);
     assert.equal((await holidayRecord(page)).customUrl, 'https://mirror.example.org/hc/{year}.json');
-    assert.equal(await text(page, '.adv-summary'), '自定义网址：mirror.example.org');
+    assert.equal(await text(page, '.adv-summary'), '自定义数据网址：mirror.example.org');
     await page.route('https://mirror.example.org/**', (route) => {
       log.push(route.request().url());
       const y = /(\d{4})\.json$/.exec(route.request().url())[1];
@@ -346,7 +356,7 @@ test('高级设置: aria-expanded toggles; invalid 自定义网址 rejected and 
     // 清空 = 未设置
     await input.fill('');
     await input.blur();
-    assert.equal(await text(page, '.adv-summary'), '自定义网址：未设置');
+    assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
     assert.equal((await holidayRecord(page)).customUrl, undefined);
   }));
 
@@ -369,13 +379,13 @@ test('two tabs: holidays key change in one tab refreshes the other (status line,
     await importHoliday(p1, synth2027());
     await until(p2, () => document.querySelector('.cal-year-tag').hidden);
     await tab(p2, '基本设置').click();
-    assert.equal(await statusLine(p2), '2026 内置 · 2027 已导入文件 · 上次检查 11/04');
+    assert.equal(await statusLine(p2), '2026 年 · 内置 · 2027 年 · 已导入文件 · 上次检查 11/04');
     assert.equal(await p2.evaluate(() => window.__hWrites), w0, 'applying a remote change does not write');
     // 自定义网址也同步
     await p1.locator('.adv-toggle').click();
-    await p1.getByLabel('自定义网址').fill('https://mirror.example.org/{year}.json');
-    await p1.getByLabel('自定义网址').blur();
-    await until(p2, () => document.querySelector('.adv-summary').textContent === '自定义网址：mirror.example.org');
+    await p1.getByLabel('自定义数据网址').fill('https://mirror.example.org/{year}.json');
+    await p1.getByLabel('自定义数据网址').blur();
+    await until(p2, () => document.querySelector('.adv-summary').textContent === '自定义数据网址：mirror.example.org');
     assert.equal(await p2.evaluate(() => window.__hWrites), w0);
     assert.deepEqual(errors.map(String), []);
     assert.deepEqual(consoleErrors, []);
@@ -406,19 +416,18 @@ test('a11y + keyboard: the new controls have names and are reachable by Tab; mai
     await tab(page, '基本设置').click();
     for (const name of ['检查更新', '导入假期表文件']) assert.equal(await page.getByRole('button', { name }).count(), 1, name);
     assert.equal(await page.getByRole('button', { name: /高级设置/ }).count(), 1);
-    // Tab 顺序：……检查更新 → 导入假期表文件 → 导出备份 → 导入备份 → 高级设置 → 自定义网址
-    await page.locator('#f-payday').focus();
+    // Tab 顺序（Task 14：左栏最后是鼓励语，然后右栏）：检查更新 → 导入假期表文件 → 格式示例 → 导出备份 → 导入备份 → 高级设置 → 自定义数据网址
+    await page.locator('#f-cheer').focus();
     const seq = [];
     for (let i = 0; i < 6; i++) {
       await page.keyboard.press('Tab');
       seq.push(await page.evaluate(() => document.activeElement.id || document.activeElement.className));
     }
-    assert.deepEqual(seq.slice(0, 5), ['btn-holiday-check', 'btn-holiday-import', 'btn-export', 'btn-import', 'adv-toggle']);
-    await page.keyboard.press('Shift+Tab'); // 回到 高级设置
-    await page.keyboard.press('Enter');
+    assert.deepEqual(seq, ['btn-holiday-check', 'btn-holiday-import', 'btn-example', 'btn-export', 'btn-import', 'adv-toggle']);
+    await page.keyboard.press('Enter'); // 展开高级设置
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'f-custom-url');
-    const acc = await page.getByRole('textbox', { name: '自定义网址' }).count();
+    const acc = await page.getByRole('textbox', { name: '自定义数据网址' }).count();
     assert.equal(acc, 1);
     assert.deepEqual(await page.locator('#holiday-result').evaluate((e) => [e.getAttribute('role'), e.getAttribute('aria-live')]), ['status', 'polite'], 'result area is a live status region');
     // 每种状态的文字都扫一遍
@@ -430,8 +439,8 @@ test('a11y + keyboard: the new controls have names and are reachable by Tab; mai
     await importHoliday(page, synth2027());
     await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
     await grab();
-    await page.getByLabel('自定义网址').fill('x');
-    await page.getByLabel('自定义网址').blur();
+    await page.getByLabel('自定义数据网址').fill('x');
+    await page.getByLabel('自定义数据网址').blur();
     await grab();
     const all = texts.join('\n');
     assert.deepEqual(TRAD.filter((c) => all.includes(c)), [], 'no Traditional characters');
@@ -492,7 +501,7 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     await tab(page, '基本设置').click();
     await importHoliday(page, synth2027());
     await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
-    assert.equal(await statusLine(page), '2026 内置 · 2027 已导入文件 · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 已导入文件 · 上次检查 11/04');
     await tab(page, '月历').click();
     await goMonth(page, 2);
     const desc = await page.locator('#day-desc-2027-01-01').textContent();
@@ -500,7 +509,8 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     assert.doesNotMatch(desc, /联网更新|官方通知/, 'no claim of origin for a file');
     await page.locator('.cal-grid button[data-key="2027-01-01"]').hover();
     await page.clock.runFor(500); // 悬停 0.4 秒后出现提示
-    assert.match(await page.locator('.day-tooltip').innerText(), /来源：导入文件/);
+    // 盖在格子上的提示用短写（2027-01 是 5 周月份，4 行）：第 3 行是来源
+    assert.deepEqual((await page.locator('.day-tooltip').innerText()).split('\n'), ['1月1日 周五', '法定假日（元旦）', '导入文件', '计薪 ¥0.00']);
     // 联网有不同的 2027：不覆盖导入的文件，页面级提示
     const changed = JSON.parse(synth2027());
     changed.days = changed.days.filter((d) => d.date !== '2027-01-03');
@@ -525,7 +535,7 @@ test('R30: an ONLINE year is replaced by changed online data: 「已更新：202
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已更新：2027 年联网数据有变化，已采用', detail: '' });
     assert.equal((await holidayRecord(page)).years['2027'].table.off['2027-01-03'], undefined, 'replaced');
-    assert.equal(await statusLine(page), '2026 内置 · 2027 联网更新（来源：国办通知） · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 联网更新 · 上次检查 11/04');
   }, { routes: { 2026: REAL_2026, 2027: () => body2027 } });
 });
 
@@ -533,7 +543,7 @@ test('R32: 1280×585 with 高级设置 expanded + invalid 自定义网址: the e
   withPage(NOV4, async (page) => {
     await tab(page, '基本设置').click();
     await page.locator('.adv-toggle').click();
-    const input = page.getByLabel('自定义网址');
+    const input = page.getByLabel('自定义数据网址');
     await input.fill('https://cdn.jsdelivr.net@evil.com/{year}.json');
     await input.blur();
     assert.equal(await text(page, '#err-custom-url'), '网址里不能带用户名或密码（@ 前面的部分）');
@@ -583,3 +593,89 @@ test('harness self-check (R19/R32): protocol-relative //host, wss:// and ws:// a
     await o.context.close();
   }
 });
+
+// ---- R47：格式不合格才附「查看格式示例」；点了展开示例、带进右栏视野、焦点到示例的展开钮 ----
+const helpBtn = (page) => page.locator('#btn-result-example');
+async function revealedByHelp(page, btnSel) {
+  await page.locator(btnSel).click();
+  return page.evaluate(() => {
+    const col = document.querySelectorAll('.set-col')[1].getBoundingClientRect();
+    const ex = document.getElementById('holiday-example');
+    const t = document.getElementById('btn-example').getBoundingClientRect();
+    return {
+      expanded: document.getElementById('btn-example').getAttribute('aria-expanded'), shown: !ex.hidden,
+      focus: document.activeElement?.id, toggleInView: t.top >= col.top - 0.5 && t.bottom <= col.bottom + 0.5,
+      exTopInView: ex.getBoundingClientRect().top >= col.top - 0.5 && ex.getBoundingClientRect().top < col.bottom,
+      pageScroll: document.documentElement.scrollHeight > innerHeight,
+    };
+  });
+}
+const REVEALED = { expanded: 'true', shown: true, focus: 'btn-example', toggleInView: true, exTopInView: true, pageScroll: false };
+
+test('R47: import rejected for a FORMAT reason → one result + 「查看格式示例」; not for 「已内置」 or success; the button reveals the example', () =>
+  withPage(NOV4, async (page) => {
+    await tab(page, '基本设置').click();
+    const wait = (s) => until(page, (x) => document.querySelector('.holiday-result-text').textContent === x, s);
+    const one = () => page.evaluate(() => document.querySelectorAll('#holiday-result:not([hidden])').length);
+    await importHoliday(page, synth2027({ papers: ['https://example.org/notice.htm'] }));
+    await wait('假期数据的出处不是国务院官网（www.gov.cn）的链接');
+    assert.equal(await helpBtn(page).isVisible(), true, 'format failure → help button');
+    assert.equal(await one(), 1, 'still exactly one result message');
+    await importHoliday(page, 'not json at all');
+    await wait('文件里没有可用的年份和放假数据，未导入');
+    assert.equal(await helpBtn(page).isVisible(), true, 'not JSON / no year is a format problem too');
+    await importHoliday(page, REAL_2026);
+    await wait('2026 年假期已内置，未采用导入的数据');
+    assert.equal(await helpBtn(page).isVisible(), false, '「已内置」 is not a format problem');
+    await importHoliday(page, synth2027({ days: [day('2027-01-01', true, '元旦'), day('2027-01-04', false, '元旦')] })); // 1/4 是周一
+    await wait('假期数据中有调休上班日不在周六或周日');
+    assert.equal(await helpBtn(page).isVisible(), true);
+    await page.setViewportSize({ width: 1280, height: 585 });
+    assert.deepEqual(await revealedByHelp(page, '#btn-result-example'), REVEALED);
+    await importHoliday(page, synth2027());
+    await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
+    assert.equal(await helpBtn(page).isVisible(), false, 'success → no help button');
+  }));
+
+test('R47: online update rejected for a format reason → help button; network failure / unpublished → none', async () => {
+  const badMakeup = synth2027({ days: [day('2027-01-01', true, '元旦'), day('2027-01-04', false, '元旦')] });
+  await withPage(NOV4, async (page) => {
+    await checkNow(page);
+    const r = await result(page);
+    assert.equal(r.tone, 'warn');
+    assert.equal(r.text, '来源数据不完整，已拒绝，未采用');
+    assert.match(r.detail, /调休上班日不在周六或周日/);
+    assert.equal(await helpBtn(page).isVisible(), true);
+    await page.setViewportSize({ width: 1280, height: 585 });
+    assert.deepEqual(await revealedByHelp(page, '#btn-result-example'), REVEALED);
+  }, { routes: { 2026: REAL_2026, 2027: badMakeup } });
+  await withPage(NOV4, async (page) => {
+    await checkNow(page);
+    assert.equal((await result(page)).text, '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」');
+    assert.equal(await helpBtn(page).isVisible(), false, 'network failure: no format help');
+  });
+  await withPage(NOV4, async (page) => {
+    await checkNow(page);
+    assert.equal((await result(page)).tone, 'info');
+    assert.equal(await helpBtn(page).isVisible(), false, 'unpublished: no format help');
+  }, { routes: { 2026: REAL_2026, 2027: EMPTY_2027 } });
+  await withPage(NOV4, async (page) => {
+    await checkNow(page);
+    assert.match((await result(page)).detail, /不是有效的 JSON 文本/);
+    assert.equal(await helpBtn(page).isVisible(), false, 'not JSON from a server (e.g. a proxy page) is not a file-format problem');
+  }, { routes: { 2026: REAL_2026, 2027: '<html>blocked</html>' } });
+});
+
+test('R47: 高级设置 hint + 「查看格式示例」 expands the example in 假期数据, brings it into view and focuses its toggle', () =>
+  withPage(NOV4, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await tab(page, '基本设置').click();
+    await page.locator('.adv-toggle').click();
+    assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」相同。');
+    assert.equal(await page.locator('#btn-adv-example').textContent(), '查看格式示例');
+    assert.equal(await page.locator('#holiday-example').isVisible(), false);
+    assert.deepEqual(await revealedByHelp(page, '#btn-adv-example'), REVEALED);
+    // 再按一次：已展开时仍只是带进视野、聚焦，不会收起
+    await page.locator('#adv-toggle').scrollIntoViewIfNeeded();
+    assert.deepEqual(await revealedByHelp(page, '#btn-adv-example'), REVEALED);
+  }));

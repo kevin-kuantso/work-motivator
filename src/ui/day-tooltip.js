@@ -1,10 +1,10 @@
-// 日期格悬停 / 聚焦提示（spec §12.2）。纯视觉层：aria-hidden，屏幕阅读器经由格子的
-// aria-describedby 读取同一段文字；pointer-events: none，不拦截点击。
+// 日期格悬停 / 聚焦提示（spec §12.2，R35 / 决定 2）：直接盖在该格上（同样大小，inset:0，左上对齐），
+// 永远不会盖到下面或旁边的格子；不再有「点击修改」一行。纯视觉层：aria-hidden，屏幕阅读器经由格子的
+// aria-describedby 读取完整文字（含来源）；pointer-events: none，不拦截点击。
+// 4 行：日期｜状态｜来源｜计薪；6 周月份（compact）或 4 行放不下时拿掉「来源」行，只剩 3 行。
 import { h } from './dom.js';
 
-const GAP = 4;
-
-export function createDayTooltip(doc, container) {
+export function createDayTooltip(doc) {
   const win = doc.defaultView;
   const el = h(doc, 'div', { class: 'day-tooltip', 'aria-hidden': 'true', hidden: true });
   let timer = null;
@@ -14,41 +14,27 @@ export function createDayTooltip(doc, container) {
     timer = null;
   }
 
-  function place(btn) {
-    const c = container.getBoundingClientRect();
-    const a = btn.getBoundingClientRect();
-    const w = el.offsetWidth;
-    const ht = el.offsetHeight;
-    const right = Math.min(c.right, doc.documentElement.clientWidth) - GAP;
-    const left = Math.max(c.left, 0) + GAP;
-    const bottom = Math.min(c.bottom, win.innerHeight) - GAP;
-    const top = Math.max(c.top, 0) + GAP;
-    const x = Math.max(left, Math.min(a.left, right - w));
-    let y = a.bottom + GAP;
-    if (y + ht > bottom) y = a.top - GAP - ht;
-    if (y < top) y = top; // 上下都放不下：贴着顶端（可能盖住格子，但不会被裁掉）
-    el.style.left = `${Math.round(x - c.left)}px`;
-    el.style.top = `${Math.round(y - c.top)}px`;
-  }
-
-  function show(btn, m) {
+  function show(btn, m, compact = false) {
     cancel();
-    if (!btn.isConnected) return;
+    const cell = btn.parentElement;
+    if (!btn.isConnected || !cell) return;
     el.replaceChildren(
-      h(doc, 'strong', { class: 'tip-title', text: m.title }),
+      h(doc, 'span', { class: 'tip-title', text: m.title }),
       h(doc, 'span', { class: 'tip-status', text: m.status }),
-      h(doc, 'span', { class: 'tip-source', text: m.source }),
-      h(doc, 'span', { class: 'tip-pay', text: m.pay }),
-      h(doc, 'span', { class: 'tip-hint', text: m.hint }));
+      h(doc, 'span', { class: 'tip-source', text: m.sourceLabel }),
+      h(doc, 'span', { class: 'tip-pay', text: m.payShort }));
+    el.classList.toggle('is-compact', compact);
+    if (el.parentElement !== cell) cell.append(el);
     el.hidden = false;
-    place(btn);
+    // 格子比预期矮（例如提示条很多时）：4 行放不下就退回 3 行，不裁掉计薪那一行
+    if (!compact && el.scrollHeight > el.clientHeight + 1) el.classList.add('is-compact');
   }
 
-  function later(btn, m, ms) {
+  function later(btn, m, ms, compact) {
     cancel();
     timer = win.setTimeout(() => {
       timer = null;
-      show(btn, m);
+      show(btn, m, compact);
     }, ms);
   }
 

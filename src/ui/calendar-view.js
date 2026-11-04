@@ -1,5 +1,6 @@
-// 月历（spec §13.3）：工具列（切月、回到今天；PgUp / PgDn 只写在切月按钮的悬停提示里）、摘要行（应出勤天数、日薪、缺表标签、重置本月标记）、
-// 只列当月出现类型的单行图例、弹性行高的格子；点日期弹出小菜单（修改即存），悬停 / 聚焦提示。
+// 月历（spec §13.3）：工具列（切月、回到今天；PgUp / PgDn 只写在切月按钮的悬停提示里）、
+// 摘要行（应出勤天数、日薪、情境胶囊、缺表标签、重置本月标记）、固定列出全部 7 种的单行图例（R36）、弹性行高的格子；
+// 点日期弹出小菜单（修改即存），悬停 / 聚焦提示直接盖在该格上（R35）。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
 import { monthGrid } from './calendar-model.js';
@@ -8,11 +9,12 @@ import { applyOption, menuModel, dayTooltipModel, tooltipText } from './day-opti
 import { createDayMenu } from './day-menu.js';
 import { createDayTooltip } from './day-tooltip.js';
 import { money } from './format.js';
+import { monthContext, missingTableTag } from './holiday-context.js';
 
 const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid' };
 const MARK_KIND = { paidLeave: 'paid', unpaidLeave: 'unpaid', work: 'makeup', rest: 'rest' };
-// 图例顺序；「工作日」是普通格子，不列入图例（只列当月出现的特殊类型）
-const LEGEND_KINDS = ['weekend', 'holiday', 'makeup', 'rest', 'paid', 'unpaid'];
+// 图例：永远列出全部类型（R36），顺序固定；「工作日」是普通格子，不列入
+const LEGEND_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid'];
 const HOVER_MS = 400;
 
 // getTables：当前使用的假期表（app.js 持有，替换后调用 render 即可）。
@@ -31,6 +33,10 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
   const title = h(doc, 'span', { class: 'cal-title', id: 'cal-title', 'aria-live': 'polite' });
   const todayBtn = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-today', onclick: goToday });
   const summaryText = h(doc, 'span', { class: 'cal-summary-text' });
+  const noteIcon = h(doc, 'span', { class: 'cal-note-icon' });
+  const noteText = h(doc, 'span', { class: 'cal-note-text' });
+  const noteSub = h(doc, 'span', { class: 'cal-note-sub' });
+  const note = h(doc, 'span', { class: 'cal-note' }, noteIcon, noteText, noteSub);
   const yearTag = h(doc, 'span', { class: 'cal-year-tag', hidden: true });
   const reset = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-ghost cal-reset', hidden: true, text: c.reset, onclick: resetMonth });
   const legendItems = h(doc, 'span', { class: 'legend-items' });
@@ -47,15 +53,15 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
       title,
       h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, title: c.nextTitle, onclick: () => move(1) }),
       todayBtn),
-    h(doc, 'div', { class: 'cal-summary' }, summaryText, yearTag, reset),
+    h(doc, 'div', { class: 'cal-summary' }, summaryText, note, yearTag, reset),
     h(doc, 'div', { class: 'cal-legend' },
       h(doc, 'span', { class: 'legend-title', text: c.legend }),
       legendItems,
       h(doc, 'span', { class: 'legend-hint', text: c.legendHint })),
     grid);
   const menu = createDayMenu(doc, el, { onChoose: apply, refocus: (btn) => focusQuietly(btn) });
-  const tooltip = createDayTooltip(doc, el);
-  el.append(menu.el, tooltip.el);
+  const tooltip = createDayTooltip(doc);
+  el.append(menu.el);
 
   function focusQuietly(btn) {
     quiet = true;
@@ -151,13 +157,21 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
 
   const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  function renderLegend(cells) {
-    const kinds = new Set(cells.map((x) => x.kind));
-    legendItems.replaceChildren(...[
-      ...LEGEND_KINDS.filter((k) => kinds.has(k)).map((k) => legendItem(k, c.kinds[k])),
-      cells.some((x) => x.today) ? h(doc, 'span', { class: 'legend-item', 'data-kind': 'today' }, h(doc, 'span', { class: 'legend-swatch is-today' }), c.todayLabel) : null,
-      cells.some((x) => x.manual) ? h(doc, 'span', { class: 'legend-item', 'data-kind': 'manual' }, h(doc, 'span', { class: 'legend-swatch' }, h(doc, 'span', { class: 'day-dot' })), c.manual) : null,
-    ].filter(Boolean));
+  // 图例只建一次（内容不随月份变）
+  legendItems.replaceChildren(
+    ...LEGEND_KINDS.map((k) => legendItem(k, c.kinds[k])),
+    h(doc, 'span', { class: 'legend-item', 'data-kind': 'today' }, h(doc, 'span', { class: 'legend-swatch is-today' }), c.todayLabel),
+    h(doc, 'span', { class: 'legend-item', 'data-kind': 'manual' }, h(doc, 'span', { class: 'legend-swatch' }, h(doc, 'span', { class: 'day-dot' })), c.manual));
+
+  function renderNote(tables, today) {
+    const m = monthContext(view.y, view.m, tables, today, t);
+    note.dataset.tone = m.tone;
+    noteIcon.replaceChildren(m.check ? icon(doc, 'check') : m.tone === 'holiday' ? icon(doc, 'holiday') : '');
+    show(noteIcon, m.check || m.tone === 'holiday');
+    setText(noteText, m.text);
+    setText(noteSub, m.sub ?? '');
+    show(noteSub, Boolean(m.sub));
+    if (note.title !== m.title) note.title = m.title;
   }
 
   function render() {
@@ -185,15 +199,18 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     todayBtn.classList.toggle('is-away', !isThisMonth);
     const wage = monthWage(view.y, view.m, cfg, marks, tables);
     setText(summaryText, c.summary(wage.workdays, `${t.currency}${money(wage.dailyWage)}`));
-    show(yearTag, model.tableMissing);
-    setText(yearTag, model.tableMissing ? t.card.yearMissing(view.y) : '');
-    yearTag.title = model.tableMissing ? t.card.yearMissingLong(view.y) : '';
+    // R41：缺表标签只在当年与之后的年份显示，措辞按该年实际标出的日子
+    const missing = missingTableTag(view.y, today, tables, t);
+    show(yearTag, Boolean(missing));
+    setText(yearTag, missing ? missing.text : '');
+    yearTag.title = missing ? missing.title : '';
+    renderNote(tables, today);
     show(reset, model.hasMarks);
 
     const head = h(doc, 'div', { class: 'cal-row cal-head', role: 'row' },
       c.weekHeads.map((w, i) => h(doc, 'span', { class: `cal-colhead${i >= 5 ? ' is-weekend' : ''}`, role: 'columnheader', text: w })));
     const cells = model.weeks.flat().filter(Boolean);
-    renderLegend(cells);
+    const compact = model.weeks.length >= 6; // 6 周的月份格子较矮：提示拿掉「来源」行（决定 2）
     const inMonth = (k) => (k && cells.some((x) => x.key === k) ? k : null);
     const tabKey = inMonth(refocus) ?? inMonth(menu.key()) ?? inMonth(rovingKey) ?? cells.find((x) => x.today)?.key ?? cells[0].key;
     let toFocus = null;
@@ -218,11 +235,11 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
             'aria-expanded': 'false',
             onclick: () => toggleMenu(cell, btn),
             onkeydown: (e) => onKey(e, cell),
-            onmouseenter: () => { if (!menu.isOpen()) tooltip.later(btn, tip, HOVER_MS); },
+            onmouseenter: () => { if (!menu.isOpen()) tooltip.later(btn, tip, HOVER_MS, compact); },
             onmouseleave: () => tooltip.hide(),
             onfocus: () => {
               setRoving(btn);
-              if (!quiet && !menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip);
+              if (!quiet && !menu.isOpen() && keyboardFocus(btn)) tooltip.show(btn, tip, compact);
             },
             onblur: () => tooltip.hide(),
           },
