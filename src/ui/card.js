@@ -98,5 +98,6 @@ export function renderCard(root, snap, cfg, t) {
   setText(r.payday, m.payday ?? '');
   show(r.year, m.yearNote !== null);
   setText(r.year, m.yearNote ?? '');
+  r.year.title = m.yearTitle;
   return m;
 }

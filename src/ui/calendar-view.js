@@ -187,6 +187,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     setText(summaryText, c.summary(wage.workdays, `${t.currency}${money(wage.dailyWage)}`));
     show(yearTag, model.tableMissing);
     setText(yearTag, model.tableMissing ? t.card.yearMissing(view.y) : '');
+    yearTag.title = model.tableMissing ? t.card.yearMissingLong(view.y) : '';
     show(reset, model.hasMarks);
 
     const head = h(doc, 'div', { class: 'cal-row cal-head', role: 'row' },
