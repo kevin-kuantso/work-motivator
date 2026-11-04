@@ -31,13 +31,13 @@ export const launch = () => chromium.launch({ channel: 'chrome', headless: true 
 
 // 本机（e2e 服务器）以外的 http(s) 请求一律中止并记录（R19）：测试永远不碰真实网络。
 // 需要回应的测试用 page.route(...) 提供 fixture（page.route 优先于这里的 context.route）。
+// 只有 http / https 到 localhost / 127.0.0.1 才算本机（R32）；ws / wss、协议相对网址解析出的外部主机、其他一切都中止并计数。
 export const isLocal = (u) => {
   try {
     const { protocol, hostname } = new URL(u);
-    if (protocol !== 'http:' && protocol !== 'https:') return true; // data: / blob: / about: 不算外部
-    return hostname === 'localhost' || hostname === '127.0.0.1';
+    return (protocol === 'http:' || protocol === 'https:') && (hostname === 'localhost' || hostname === '127.0.0.1');
   } catch {
-    return true;
+    return false;
   }
 };
 
@@ -79,6 +79,8 @@ export async function openAt(browser, url, iso, { init, reducedMotion, viewport,
   const external = [];
   context.on('request', (r) => { if (!isLocal(r.url())) external.push(r.url()); });
   await context.route((u) => !isLocal(u.href), (route) => route.abort('internetdisconnected'));
+  // WebSocket 不走 route：另外拦截（记录后直接关闭，不连到任何服务器）
+  await context.routeWebSocket((u) => !isLocal(u.href), (ws) => { external.push(ws.url()); ws.close(); });
   const page = await context.newPage();
   page.setDefaultTimeout(5000);
   const errors = [];

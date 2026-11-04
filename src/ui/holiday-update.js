@@ -6,12 +6,14 @@ import {
   fetchHolidayYear, mergeTables, validateHolidayYear, yearsToAutoCheck, sourcesWith, validateCustomUrl, buildSourceUrl,
 } from '../holiday-data.js';
 import {
-  loadOnlineTables, saveOnlineYear, loadLastCheck, saveLastCheck, loadCustomUrl, saveCustomUrl,
+  loadOnlineTables, saveOnlineYear, loadLastCheck, saveLastCheck, loadCustomUrl, saveCustomUrl, FILE_SOURCE,
 } from '../holiday-store.js';
 import { STRINGS } from '../strings.zh-CN.js';
 
-// 导入的文件在记录里的 source 标记（联网的则是实际网址）
-export const FILE_SOURCE = 'file';
+export { FILE_SOURCE };
+
+// 受保护的年份（R30）：内置表与用户导入的文件，联网数据只比较、从不覆盖；只有联网年份可被联网新数据替换。
+const isProtected = (tb) => tb?.source === 'builtin' || tb?.source === 'file';
 
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -39,7 +41,8 @@ export function dayCounts(table) {
 }
 
 // 状态行：当年；11 月起（或已经有下一年的表时）再加下一年；检查过才附「上次检查 MM/DD」。
-export function statusLine(now, tables, meta, lastCheckMs, t) {
+// 导入的年份只写「已导入文件」，不声称来源（文件可能来自任何地方，R30）。
+export function statusLine(now, tables, lastCheckMs, t) {
   const U = t.holidayUpdate;
   const y = now.getFullYear();
   const years = [y];
@@ -48,7 +51,7 @@ export function statusLine(now, tables, meta, lastCheckMs, t) {
     const tb = has(tables, yr) ? tables[yr] : null;
     if (!tb) return U.missing(yr);
     if (tb.source === 'builtin') return U.builtin(yr);
-    return meta?.[yr]?.source === FILE_SOURCE ? U.importedYear(yr) : U.online(yr);
+    return tb.source === 'file' ? U.importedYear(yr) : U.online(yr);
   });
   if (typeof lastCheckMs === 'number') {
     const d = new Date(lastCheckMs);
@@ -57,12 +60,12 @@ export function statusLine(now, tables, meta, lastCheckMs, t) {
   return parts.join(U.sep);
 }
 
-// 多个年份的检查结果 → 只显示一个。非内置年份优先（那才是用户要的）；内置年份只会「相同」或「失败」，
-// 与内置表不同的（diff）不套用，由页面级提示另行告知，这里按「已是最新」处理。
+// 多个年份的检查结果 → 只显示一个。未受保护的年份优先（那才是用户要的）；受保护年份（内置 / 导入文件）只会「相同」或「失败」，
+// 与之不同的（diff）不套用，由页面级提示另行告知，这里按「已是最新」处理。
 const ORDER_OTHER = ['added', 'refreshed', 'invalid', 'network', 'unpublished', 'same'];
 const ORDER_BUILTIN = ['invalid', 'network', 'same'];
 export function pickResult(results) {
-  const other = results.filter((r) => !r.builtin);
+  const other = results.filter((r) => !r.protected);
   const pool = other.length ? other : results.map((r) => (r.outcome === 'diff' ? { ...r, outcome: 'same' } : r));
   for (const o of other.length ? ORDER_OTHER : ORDER_BUILTIN) {
     const hits = pool.filter((r) => r.outcome === o);
@@ -96,14 +99,16 @@ export function customUrlSummary(url, t) {
 }
 
 // ---- 流程编排 ----
-// ctx: { storage, clock, fetchImpl?, getTables, onTables, notify(msg, kind:'info'|'success'), onStatus(status) }
+// ctx: { storage, clock, fetchImpl?, getTables, onTables, notify(msg, kind:'info'|'success', against?:'builtin'|'file'), onStatus(status) }
 // status: { checking, line, result:{tone,text,detail}|null, customUrl, customSummary }
 export function startHolidayUpdate(ctx) {
   const t = STRINGS;
   const U = t.holidayUpdate;
   const { storage, clock, getTables, onTables, notify, onStatus } = ctx;
-  let meta = {};
   let result = null;
+  // 结果区一次只显示一个，最新的用户操作优先（R32）：每次手动检查 / 导入把 seq 加一；
+  // 检查结束时若期间已有更新的用户操作，不覆盖它的结果；后台自动检查从不覆盖用户操作的结果。
+  let seq = 0;
   let pending = 0; // 排队中 + 执行中的检查数
   let chain = Promise.resolve();
 
@@ -111,7 +116,7 @@ export function startHolidayUpdate(ctx) {
     const url = loadCustomUrl(storage);
     onStatus({
       checking: pending > 0,
-      line: statusLine(clock(), getTables(), meta, loadLastCheck(storage), t),
+      line: statusLine(clock(), getTables(), loadLastCheck(storage), t),
       result,
       customUrl: url,
       customSummary: customUrlSummary(url, t),
@@ -123,17 +128,18 @@ export function startHolidayUpdate(ctx) {
   // 从储存重新读取联网 / 导入的表（开页、其他分页改了假期数据）；只读不写。
   function reload() {
     const l = loadOnlineTables(storage);
-    meta = l.meta;
     onTables(mergeTables(builtinOnly(), l.tables));
     emit();
   }
 
+  // source：联网时为下载网址，导入时为 FILE_SOURCE。内置年份永不覆盖；联网数据也不覆盖导入的文件。
   function apply(year, table, papers, source) {
-    if (getTables()[year]?.source === 'builtin') return; // 内置年份永不覆盖
+    const cur = getTables()[year];
+    const fromFile = source === FILE_SOURCE;
+    if (cur?.source === 'builtin' || (!fromFile && cur?.source === 'file')) return;
     const fetchedAt = clock().getTime();
     saveOnlineYear(storage, year, { table, papers, source, fetchedAt }); // 储存失败也先在本次会话里生效
-    meta = { ...meta, [year]: { source, papers, fetchedAt } };
-    onTables({ ...getTables(), [year]: { off: table.off, makeup: table.makeup, source: 'online' } });
+    onTables({ ...getTables(), [year]: { off: table.off, makeup: table.makeup, source: fromFile ? 'file' : 'online' } });
   }
 
   async function checkYears(years) {
@@ -143,15 +149,16 @@ export function startHolidayUpdate(ctx) {
     for (const year of years) {
       const r = await fetchHolidayYear(year, { sources, fetchImpl: ctx.fetchImpl });
       const cur = getTables()[year]; // 等待期间可能已被另一次检查 / 导入更新：以当下为准
-      const builtin = cur?.source === 'builtin';
-      if (!r.ok) out.push({ year, builtin, outcome: r.kind, reason: r.reason });
-      else if (builtin) {
+      const prot = isProtected(cur);
+      const base = { year, protected: prot, against: prot ? cur.source : null };
+      if (!r.ok) out.push({ ...base, outcome: r.kind, reason: r.reason });
+      else if (prot) {
         const n = diffCount(cur, r.table);
-        out.push({ year, builtin, outcome: n ? 'diff' : 'same', n });
-      } else if (cur && sameTable(cur, r.table)) out.push({ year, builtin, outcome: 'same' });
+        out.push({ ...base, outcome: n ? 'diff' : 'same', n });
+      } else if (cur && sameTable(cur, r.table)) out.push({ ...base, outcome: 'same' });
       else {
         apply(year, r.table, r.papers, r.source);
-        out.push({ year, builtin, outcome: cur ? 'refreshed' : 'added' });
+        out.push({ ...base, outcome: cur ? 'refreshed' : 'added' });
       }
     }
     return out;
@@ -176,6 +183,7 @@ export function startHolidayUpdate(ctx) {
 
   function autoCheckIfNeeded() {
     if (!yearsToAutoCheck(clock(), getTables(), loadLastCheck(storage)).length) return Promise.resolve();
+    const mine = seq;
     return serial(async () => {
       const years = yearsToAutoCheck(clock(), getTables(), loadLastCheck(storage));
       if (!years.length) return;
@@ -187,23 +195,28 @@ export function startHolidayUpdate(ctx) {
       }
       // 「暂未发布」不是失败：在假期数据区安静地说明；连不上 / 数据不合格则静默
       const unp = out.find((o) => o.outcome === 'unpublished');
-      if (unp) result = resultView({ outcome: 'unpublished', years: [unp.year] }, t);
+      if (unp && seq === mine && result === null) result = resultView({ outcome: 'unpublished', years: [unp.year] }, t);
     });
   }
 
   function checkNow() {
+    const mine = ++seq;
     result = null;
     return serial(async () => {
       const now = clock();
       const y = now.getFullYear();
       const out = await checkYears(now.getMonth() >= 10 ? [y, y + 1] : [y]);
-      result = resultView(pickResult(out), t);
-      const n = out.reduce((s, o) => s + (o.outcome === 'diff' ? o.n : 0), 0);
-      if (n) notify(U.diff(n), 'info');
+      if (seq === mine) result = resultView(pickResult(out), t); // 期间用户又导入 / 再查：不覆盖更新的结果
+      // 与受保护年份不同：页面级提示，内置与导入文件分别说明（两者都不会被覆盖）
+      for (const against of ['builtin', 'file']) {
+        const n = out.reduce((sum, o) => sum + (o.outcome === 'diff' && o.against === against ? o.n : 0), 0);
+        if (n) notify(against === 'builtin' ? U.diff(n) : U.diffFile(n), 'info', against);
+      }
     });
   }
 
   function importFile(text) {
+    seq++;
     const fail = (reason, year) => {
       result = { tone: 'warn', text: reason, detail: null };
       emit();

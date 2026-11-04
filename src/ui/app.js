@@ -194,8 +194,10 @@ export function mountApp(doc, storage, clock) {
     fetchImpl: (...a) => win.fetch(...a),
     getTables: () => tables,
     onTables: setTables,
-    // info = 页面级、可关闭的提示（联网数据与内置表不同）；success = 不打扰的 toast（不带「查看」）
-    notify: (msg, kind) => (kind === 'info' ? banners.queueInfo('holidayDiff', msg) : quietToast(msg)),
+    // info = 页面级、可关闭的提示（联网数据与内置表 / 导入的表不同）；success = 不打扰的 toast（不带「查看」）
+    notify: (msg, kind, against) => (kind === 'info'
+      ? banners.queueInfo(against === 'file' ? 'holidayDiffFile' : 'holidayDiff', msg)
+      : quietToast(msg)),
     onStatus: holidayPanel.update,
   });
   holiday.reload(); // 开页：读取已保存的联网 / 导入假期表

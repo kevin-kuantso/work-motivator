@@ -122,6 +122,9 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   // 联网表：source 'online'
   const online = { 2027: { off: { '2027-01-01': '元旦' }, makeup: { '2027-01-09': '元旦' }, source: 'online' } };
   assert.equal(tip(at(1, 1, 2027), {}, online).source, '来源：联网更新·官方通知');
+  // R30：导入的文件只写「导入文件」，不声称官方来源
+  const file = { 2027: { ...online[2027], source: 'file' } };
+  assert.equal(tip(at(1, 1, 2027), {}, file).source, '来源：导入文件');
   assert.equal(tip(at(1, 1, 2027), {}, online).status, '法定假日（元旦）');
   assert.equal(tip(at(1, 9, 2027), {}, online).status, '调休上班（元旦）');
   assert.equal(tip(at(1, 1, 2027)).source, '来源：按默认规则', 'no table, weekday → default rule');

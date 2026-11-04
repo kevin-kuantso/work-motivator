@@ -5,7 +5,7 @@ import { h, show, setText } from './dom.js';
 
 const ERROR_ORDER = ['storageFail', 'loadIssue'];
 // 联网数据与内置表不同的提示是用户按「检查更新」的直接结果，排在备份建议之前
-const INFO_ORDER = ['firstRun', 'holidayDiff', 'backupNudge'];
+const INFO_ORDER = ['firstRun', 'holidayDiff', 'holidayDiffFile', 'backupNudge'];
 
 // 纯函数：errors = Map<id, { content, dismissible, actions:[{key,label,...}] }> → 合并后的一条（或 null）
 export function mergeErrors(errors, sep) {

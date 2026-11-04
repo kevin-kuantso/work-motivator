@@ -1,6 +1,8 @@
 import { validateHolidayYear, validateCustomUrl } from './holiday-data.js';
 
 export const HOLIDAYS_STORAGE_KEY = 'work-motivator-v1-holidays';
+// 导入的假期表文件在记录里的 source 标记（联网获取的记录的是实际网址）
+export const FILE_SOURCE = 'file';
 
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -43,9 +45,10 @@ export function loadOnlineTables(storage) {
       if (!json) continue;
       const v = validateHolidayYear(json, year);
       if (!v.ok) continue;
-      if (typeof entry.source !== 'string') continue;
+      if (typeof entry.source !== 'string' || entry.source === '') continue;
       if (typeof entry.fetchedAt !== 'number' || !Number.isFinite(entry.fetchedAt)) continue;
-      tables[year] = { off: v.table.off, makeup: v.table.makeup, source: 'online' };
+      // R30：导入的文件记为 'file'（不声称来源），其余（记录的是下载网址）为 'online'
+      tables[year] = { off: v.table.off, makeup: v.table.makeup, source: entry.source === FILE_SOURCE ? 'file' : 'online' };
       meta[year] = { source: entry.source, papers: v.papers, fetchedAt: entry.fetchedAt };
     }
   }

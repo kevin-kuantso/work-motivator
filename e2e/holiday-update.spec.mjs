@@ -4,13 +4,14 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { startServer, launch, openAt, root, holidayIdle, expectedAutoUrls } from './harness.mjs';
+import { startServer, launch, openAt, root, holidayIdle, expectedAutoUrls, isLocal } from './harness.mjs';
 
 const JUNE = '2026-06-01T10:00:00+08:00'; // 11 月前：不应有任何外部请求
 const NOV4 = '2026-11-04T10:00:00+08:00'; // 11 月起：自动检查 2027
 const JAN4 = '2027-01-04T10:00:00+08:00'; // 当年（2027）没有内置表
 const HOSTS = /^https:\/\/(raw\.githubusercontent\.com|cdn\.jsdelivr\.net|fastly\.jsdelivr\.net)\//;
-const RAW = (y) => `https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/${y}.json`;
+// R37：默认来源顺序 cdn.jsdelivr.net → fastly.jsdelivr.net → raw.githubusercontent.com
+const CDN = (y) => `https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/${y}.json`;
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當聯檢發佈'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用', '套用', '尚未公布', '网络不通', '档案'];
 
@@ -118,7 +119,7 @@ test('before Nov 1: zero external requests on load and while using the app; stat
 
 test('from 2026-11-04: auto-check fetches 2027, applies it, quiet toast (no 「查看」), summary tag disappears, persists after reload', () =>
   withPage(NOV4, async (page, { external, autoUrls }) => {
-    assert.deepEqual(autoUrls, [RAW(2027)], 'only 2027, first source answered');
+    assert.deepEqual(autoUrls, [CDN(2027)], 'only 2027, first source (cdn.jsdelivr.net) answered');
     assert.equal(await text(page, '.toast .toast-text'), '已获取 2027 年假期表');
     assert.equal(await page.locator('.toast .toast-action').isVisible(), false, 'no 「查看」 / no action');
     await goMonth(page, 2); // 2027-01
@@ -136,7 +137,7 @@ test('from 2026-11-04: auto-check fetches 2027, applies it, quiet toast (no 「�
     assert.equal(await statusLine(page), '2026 内置 · 2027 联网更新（来源：国办通知） · 上次检查 11/04');
     await goMonth(page, 2);
     assert.equal(await yearTag(page).isVisible(), false, 'still applied after reload');
-    assert.deepEqual(external, [RAW(2027)], 'no second request the same day');
+    assert.deepEqual(external, [CDN(2027)], 'no second request the same day');
   }, { routes: { 2027: synth2027() } }));
 
 test('2027-01-04 (current year missing): status card year tag disappears once the table arrives', () =>
@@ -194,7 +195,7 @@ test('auto-check failure is silent; manual check shows the specific message (检
     const r = await result(page);
     assert.equal(r.tone, 'warn');
     assert.equal(r.text, '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」');
-    assert.match(r.detail, /^原因：所有数据源都获取失败：网络连接失败$/);
+    assert.match(r.detail, /^原因：所有数据源都获取失败：连接数据源失败$/);
     assert.equal(await page.evaluate(() => document.activeElement.id), 'btn-holiday-check');
   });
 });
@@ -285,7 +286,7 @@ test('import 假期表文件: success counts, rejection reason, missing year, bu
     await importHoliday(page, synth2027());
     await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
     assert.deepEqual(await result(page), { tone: 'success', text: '已导入 2027 年假期表（放假 10 天，调休上班 1 天）', detail: '' });
-    assert.equal(await statusLine(page), '2026 内置 · 2027 已导入文件（来源：国办通知） · 上次检查 11/04');
+    assert.equal(await statusLine(page), '2026 内置 · 2027 已导入文件 · 上次检查 11/04');
     await tab(page, '月历').click();
     await goMonth(page, 2);
     assert.equal(await yearTag(page).isVisible(), false);
@@ -368,7 +369,7 @@ test('two tabs: holidays key change in one tab refreshes the other (status line,
     await importHoliday(p1, synth2027());
     await until(p2, () => document.querySelector('.cal-year-tag').hidden);
     await tab(p2, '基本设置').click();
-    assert.equal(await statusLine(p2), '2026 内置 · 2027 已导入文件（来源：国办通知） · 上次检查 11/04');
+    assert.equal(await statusLine(p2), '2026 内置 · 2027 已导入文件 · 上次检查 11/04');
     assert.equal(await p2.evaluate(() => window.__hWrites), w0, 'applying a remote change does not write');
     // 自定义网址也同步
     await p1.locator('.adv-toggle').click();
@@ -480,5 +481,105 @@ test('1280×585: 基本设置 shows the holiday group in every state without pag
       assert.equal(m.tablistVisible, true);
       assert.equal(m.resultInView, true, `${what}: result visible inside the panel`);
     }, { ...opts, viewport: { width: 1280, height: 585 } });
+  }
+});
+
+// ---- fix round 1（R30 / R32）----
+
+test('R30: an imported year is labelled 「导入文件」 (tooltip, status line) and online data never overwrites it; online years are refreshed', async () => {
+  let body2027 = synth2027();
+  await withPage(NOV4, async (page) => {
+    await tab(page, '基本设置').click();
+    await importHoliday(page, synth2027());
+    await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
+    assert.equal(await statusLine(page), '2026 内置 · 2027 已导入文件 · 上次检查 11/04');
+    await tab(page, '月历').click();
+    await goMonth(page, 2);
+    const desc = await page.locator('#day-desc-2027-01-01').textContent();
+    assert.match(desc, /来源：导入文件/);
+    assert.doesNotMatch(desc, /联网更新|官方通知/, 'no claim of origin for a file');
+    await page.locator('.cal-grid button[data-key="2027-01-01"]').hover();
+    await page.clock.runFor(500); // 悬停 0.4 秒后出现提示
+    assert.match(await page.locator('.day-tooltip').innerText(), /来源：导入文件/);
+    // 联网有不同的 2027：不覆盖导入的文件，页面级提示
+    const changed = JSON.parse(synth2027());
+    changed.days = changed.days.filter((d) => d.date !== '2027-01-03');
+    body2027 = JSON.stringify(changed);
+    await checkNow(page);
+    assert.equal(await text(page, '.notices .banner-info .banner-text'), '这是默认值，可在设置里修改', 'first-run hint first');
+    await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
+    assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiffFile');
+    assert.equal(await text(page, '.notices .banner-info .banner-text'), '联网数据与导入的表有 1 处不同，未采用');
+    assert.equal((await holidayRecord(page)).years['2027'].source, 'file');
+    assert.equal((await holidayRecord(page)).years['2027'].table.off['2027-01-03'], '元旦', 'file table untouched');
+  }, { routes: { 2026: REAL_2026, 2027: () => body2027 } });
+});
+
+test('R30: an ONLINE year is replaced by changed online data: 「已更新：2027 年联网数据有变化，已采用」', async () => {
+  let body2027 = synth2027();
+  await withPage(NOV4, async (page) => {
+    assert.equal(await text(page, '.toast .toast-text'), '已获取 2027 年假期表');
+    const changed = JSON.parse(synth2027());
+    changed.days = changed.days.filter((d) => d.date !== '2027-01-03');
+    body2027 = JSON.stringify(changed);
+    await checkNow(page);
+    assert.deepEqual(await result(page), { tone: 'success', text: '已更新：2027 年联网数据有变化，已采用', detail: '' });
+    assert.equal((await holidayRecord(page)).years['2027'].table.off['2027-01-03'], undefined, 'replaced');
+    assert.equal(await statusLine(page), '2026 内置 · 2027 联网更新（来源：国办通知） · 上次检查 11/04');
+  }, { routes: { 2026: REAL_2026, 2027: () => body2027 } });
+});
+
+test('R32: 1280×585 with 高级设置 expanded + invalid 自定义网址: the error is visible in the panel and the tab labels stay visible', () =>
+  withPage(NOV4, async (page) => {
+    await tab(page, '基本设置').click();
+    await page.locator('.adv-toggle').click();
+    const input = page.getByLabel('自定义网址');
+    await input.fill('https://cdn.jsdelivr.net@evil.com/{year}.json');
+    await input.blur();
+    assert.equal(await text(page, '#err-custom-url'), '网址里不能带用户名或密码（@ 前面的部分）');
+    const m = await page.evaluate(() => {
+      const sp = document.getElementById('panel-settings').getBoundingClientRect();
+      const e = document.getElementById('err-custom-url').getBoundingClientRect();
+      const tl = document.querySelector('[role=tablist]').getBoundingClientRect();
+      const p = document.getElementById('panel-settings');
+      return { inView: e.top >= sp.top && e.bottom <= sp.bottom + 0.5 && e.height > 0, tabs: tl.top >= 0 && tl.bottom <= innerHeight, pageScroll: document.documentElement.scrollHeight > innerHeight, inner: p.scrollHeight - p.clientHeight, scrolled: p.scrollTop };
+    });
+    console.log(`MEASURE ${JSON.stringify({ case: 'adv expanded + invalid url @1280x585', ...m })}`);
+    assert.equal(m.inView, true, 'error message visible inside the panel');
+    assert.equal(m.tabs, true, 'tab labels visible');
+    assert.equal(m.pageScroll, false, 'no page scroll (panel-internal scroll only)');
+    for (const [bad, msg] of [
+      ['https://example.org/a.json#{year}', '{year} 必须写在网址的路径或查询参数里，不能写在域名、端口或 # 后面'],
+      ['https://example.org\\x/{year}', '网址里不能有反斜杠（\\）'],
+      ['https://example.org/​{year}', '网址里只能用半角字母、数字和常见符号，不能有空格、不可见字符或中文'],
+    ]) {
+      await input.fill(bad);
+      await input.blur();
+      assert.equal(await text(page, '#err-custom-url'), msg, bad);
+    }
+    assert.equal((await holidayRecord(page))?.customUrl, undefined, 'nothing saved');
+  }, { viewport: { width: 1280, height: 585 } }));
+
+test('harness self-check (R19/R32): protocol-relative //host, wss:// and ws:// are aborted and counted; only http(s) to localhost is local', async () => {
+  for (const u of ['http://localhost:1/x', 'http://127.0.0.1:2/y', 'https://localhost/z']) assert.equal(isLocal(u), true, u);
+  for (const u of ['ws://localhost:1/', 'wss://localhost/', 'https://evil.example/', 'wss://evil.example/s', '//evil.example/x', 'data:text/plain,x', 'ftp://localhost/', 'http://localhost.evil.example/']) assert.equal(isLocal(u), false, u);
+  const o = await openAt(browser, server.url, JUNE);
+  try {
+    const r = await o.page.evaluate(async () => {
+      const out = {};
+      try { await fetch('//evil.example/x.js'); out.rel = 'loaded'; } catch { out.rel = 'blocked'; }
+      out.ws = await new Promise((res) => {
+        const ws = new WebSocket('wss://evil.example/s');
+        ws.onopen = () => res('open');
+        ws.onclose = () => res('closed');
+        ws.onerror = () => {};
+      });
+      return out;
+    });
+    assert.deepEqual(r, { rel: 'blocked', ws: 'closed' });
+    assert.ok(o.external.includes('http://evil.example/x.js'), `protocol-relative counted: ${o.external}`);
+    assert.ok(o.external.includes('wss://evil.example/s'), `wss counted: ${o.external}`);
+  } finally {
+    await o.context.close();
   }
 });
