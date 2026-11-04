@@ -302,7 +302,7 @@ async function main() {
     await shot(A, 'main-before');
 
     // ===== 1 开启 =====
-    const enabled = await ev(A, '!document.getElementById("btn-float").disabled');
+    const enabled = await ev(A, '!document.getElementById("btn-float").disabled && document.getElementById("btn-float").getAttribute("aria-disabled") !== "true"');
     check('1', enabled, '悬浮按钮可用 (PiP supported)', `disabled=${!enabled}`);
     const openMs = await openPip(A);
     check('1', openMs !== null, '受信任点击 -> documentPictureInPicture.window 出现', `ready after ~${openMs}ms`);

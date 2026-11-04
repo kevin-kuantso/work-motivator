@@ -147,7 +147,7 @@ export function mountApp(doc, storage, clock) {
     banners.root,
     h(doc, 'main', { class: 'shell' },
       h(doc, 'div', { class: 'card-col' }, h(doc, 'div', { class: 'card-slot', id: 'card-slot' }, cardRoot, float.placeholder), float.el),
-      h(doc, 'div', { class: 'main-panel' }, tabs.root, calendarPanel, settingsPanel)),
+      h(doc, 'div', { class: 'main-panel' }, tabs.root, calendarPanel, settingsPanel, settings.autosave)),
     fileInput,
     toastEl,
     live);

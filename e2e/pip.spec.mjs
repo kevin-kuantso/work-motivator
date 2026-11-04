@@ -317,7 +317,9 @@ test('2026: no year note in the PiP card', () =>
 test('unsupported browser: float button disabled with explanatory text', () =>
   withPage(T1412, async (page) => {
     assert.equal(await page.evaluate(() => 'documentPictureInPicture' in window), false);
-    assert.equal(await floatBtn(page).isDisabled(), true);
+    // R52：aria-disabled（仍可聚焦、读得到原因），不是原生 disabled
+    assert.equal(await floatBtn(page).getAttribute('aria-disabled'), 'true');
+    assert.equal(await floatBtn(page).evaluate((b) => b.disabled), false);
     const note = page.getByText('当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）');
     assert.equal(await note.isVisible(), true);
     const id = await note.getAttribute('id');

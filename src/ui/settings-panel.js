@@ -94,7 +94,6 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
 
   const b = s.backup;
   const el = h(doc, 'div', { class: 'settings', id: 'settings' },
-    autosave,
     h(doc, 'div', { class: 'set-grid settings-cols' },
       h(doc, 'div', { class: 'set-col settings-col' },
         card('pay', 'wallet', s.sections.pay, s.payDesc,
@@ -203,5 +202,5 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
     input.focus();
   }
 
-  return { el, sync, flashSaved, focusField };
+  return { el, autosave, sync, flashSaved, focusField };
 }
