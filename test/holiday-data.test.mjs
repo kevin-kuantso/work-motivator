@@ -7,6 +7,7 @@ import {
 import {
   loadOnlineTables, saveOnlineYear, loadLastCheck, saveLastCheck, HOLIDAYS_STORAGE_KEY,
 } from '../src/holiday-store.js';
+import { STRINGS } from '../src/strings.zh-CN.js';
 import { HOLIDAYS_CN } from '../src/holidays-cn.js';
 import { dayInfo, workdaysInMonth } from '../src/calendar.js';
 import { snapshot } from '../src/calc.js';
@@ -75,6 +76,14 @@ test('rejections (no coercion, whole file)', () => {
   rej((j) => { j.days[0].name = 'x'.repeat(1e6); });
   const ok = validateHolidayYear(okFile(), 2027);
   assert.equal(ok.ok, true); // 2027-01-02 是周六
+});
+
+test('file with only make-up days (no off days) is rejected with the specific reason', () => {
+  const j = okFile();
+  j.days = [{ name: '元旦', date: '2027-01-09', isOffDay: false }]; // 周六
+  const r = validateHolidayYear(j, 2027);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, STRINGS.holidayData.noOffDays);
 });
 
 test('non-object and hostile inputs never throw', () => {

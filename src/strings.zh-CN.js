@@ -60,6 +60,7 @@ export const STRINGS = {
     dayOutOfYear: (year) => `假期数据中有日期不在 ${year} 年内`,
     dayOffFlag: '假期数据中有放假标记不正确的条目',
     makeupNotWeekend: '假期数据中有调休上班日不在周六或周日',
+    noOffDays: '文件里没有任何放假日，不像完整的年度放假安排',
     dayDuplicate: '假期数据中有重复的日期',
     notJson: '下载到的内容不是有效的 JSON 文本',
     httpFail: (status) => `服务器返回了错误（${status}）`,

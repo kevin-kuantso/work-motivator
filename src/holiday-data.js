@@ -52,6 +52,7 @@ export function validateHolidayYear(json, year) {
     seen.add(date);
     (isOffDay ? off : makeup)[date] = name;
   }
+  if (Object.keys(off).length === 0) return bad(R.noOffDays);
   return { ok: true, table: { off, makeup }, papers: [...papers] };
 }
 
