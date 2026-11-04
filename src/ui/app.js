@@ -361,7 +361,6 @@ export function mountApp(doc, storage, clock) {
     }
   }
 
-  // 计时器跑在状态卡所在的视窗：悬浮时改由 PiP 视窗的 setInterval 驱动（spec §3），收回后回到主视窗。
   // 计时（R46，tick-scheduler.js）：一般模式 100 ms；减少动态模式对齐墙上时钟整秒；任何时刻只有一个计时器。
   // 计时器跑在状态卡所在的视窗：悬浮时由小窗驱动（spec §3），收回后回到主视窗。
   const mq = win.matchMedia ? win.matchMedia('(prefers-reduced-motion: reduce)') : null;

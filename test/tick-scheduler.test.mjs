@@ -83,7 +83,7 @@ test('D1: reduce → off flips and a tick lands BEFORE the change event: the cha
   assert.equal(h.timers.size, 1);
 });
 
-test('D1: off → reduce flips and ticks run before the change event: interval keeps going; then aligned; never two timers', () => {
+test('D1 (round 2): off → reduce flips and ticks run before the change event: the interval hands over to the aligned chain at its next tick; never two timers', () => {
   const clock = { t: 50 };
   const h = fakeHost(clock);
   const at = [];
@@ -91,15 +91,45 @@ test('D1: off → reduce flips and ticks run before the change event: interval k
   const tk = createTicker({ tick: () => at.push(clock.t), reduced: () => reduced, now: () => clock.t });
   tk.start(h);
   run(clock, [h], 300);
-  reduced = true;
-  const live = [];
-  run(clock, [h], 450, (n) => live.push(n));
-  assert.ok(live.every((n) => n === 1));
-  tk.start();
+  reduced = true; // matchMedia 已翻转，change 事件被扣住
   at.length = 0;
-  run(clock, [h], 2000, (n) => live.push(n));
+  const live = [];
+  run(clock, [h], 3000, (n) => live.push(n));
   assert.ok(live.every((n) => n === 1), `one timer: ${live}`);
-  assert.ok(at.every((x) => x % 1000 === 0), `aligned after the change: ${at}`);
+  assert.equal([...h.timers.values()][0].every, null, 'now an aligned setTimeout, not the 100 ms interval');
+  assert.ok(at.slice(1).every((x) => x % 1000 === 0), `after the first (handover) tick everything is on whole seconds: ${at}`);
+  assert.ok(at.length <= 4, `no more 100 ms ticks (${at.length})`);
+  tk.start(); // change 事件终于到了
+  assert.equal(h.timers.size, 1);
+});
+
+// 世代号守卫（tick-scheduler.js 回调开头与 finally 里的 g === gen）：在 tick 里调用 stop()，之后不能再有计时器；
+// 已经派发出去的过期回调（clear 时已在事件循环里排队）也不能再 tick
+test('generation guard: stop() inside a tick ends everything; a stale callback that still fires after stop/start does nothing', () => {
+  for (const mode of [true, false]) {
+    const clock = { t: 0 };
+    const h = fakeHost(clock);
+    let n = 0;
+    let tk;
+    tk = createTicker({ tick: () => { n++; if (n === 2) tk.stop(); }, reduced: () => mode, now: () => clock.t });
+    tk.start(h);
+    const live = [];
+    run(clock, [h], 5000, (k) => live.push(k));
+    assert.equal(n, 2, `${mode ? 'aligned' : 'interval'}: no tick after stop()`);
+    assert.equal(live[1], 0, `${mode ? 'aligned' : 'interval'}: zero timers right after the tick that called stop() (${live})`);
+    assert.equal(h.timers.size, 0, `${mode ? 'aligned' : 'interval'}: no timer left after stop() inside a tick`);
+  }
+  // 过期回调：记下第一次排定的回调，stop + start 之后手动再执行它（模拟 clear 时它已排进任务队列）
+  const clock = { t: 0 };
+  const h = fakeHost(clock);
+  let n = 0;
+  const tk = createTicker({ tick: () => { n++; }, reduced: () => true, now: () => clock.t });
+  tk.start(h);
+  const stale = [...h.timers.values()][0].fn;
+  tk.start(h);
+  stale();
+  assert.equal(n, 0, 'stale callback must not tick');
+  assert.equal(h.timers.size, 1, 'stale callback must not schedule another timer');
 });
 
 test('a throwing tick never ends the aligned chain; moving the timer to another host (PiP) inside a tick leaves exactly one timer', () => {
