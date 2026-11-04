@@ -49,7 +49,10 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     const r = onCustomUrl(urlInput.value);
     setText(urlError, r.ok ? '' : r.reason);
     if (r.ok) urlInput.removeAttribute('aria-invalid');
-    else urlInput.setAttribute('aria-invalid', 'true');
+    else {
+      urlInput.setAttribute('aria-invalid', 'true');
+      urlError.scrollIntoView({ block: 'nearest' }); // 设置分页需要内部滚动时，错误也要看得到
+    }
   });
   const advBody = h(doc, 'div', { class: 'field' },
     h(doc, 'label', { for: 'f-custom-url', text: U.customUrl }),
