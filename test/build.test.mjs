@@ -134,3 +134,51 @@ test('dist: the bundled source URLs are exactly the three defaults (no extra end
   const urls = new Set(html.match(/https?:\/\/[^\s"'`<>)]*/gi) ?? []);
   for (const u of URL_ALLOWLIST.slice(0, 3)) assert.ok(urls.has(u), `bundled: ${u}`);
 });
+
+// ---- Task 14 E2：结构检查（成品里的网络 / 解码 API 与 SCHEME 用法固定不变） ----
+// 成品不得出现这些（任何一个出现都可能被用来拼出或送出隐藏的网址）
+export const FORBIDDEN_TOKENS = Object.freeze(['fromCharCode', 'atob(', 'WebSocket', 'EventSource', 'sendBeacon']);
+// 已存假期年份的 source 校验（holiday-store.js）用正则字面量写协议，成品里是转义后的 https:\/\/；只允许这一处
+const ESCAPED_SCHEME = /https?:\\\/\\\//gi;
+
+export function structuralProblems(html) {
+  const problems = [];
+  const scheme = html.match(/\bSCHEME\b/g)?.length ?? 0;
+  if (scheme !== 3) problems.push(`SCHEME identifier ${scheme} times (expected 3: declaration + two startsWith)`);
+  const starts = html.split('.startsWith(SCHEME)').length - 1;
+  if (starts !== 2) problems.push(`.startsWith(SCHEME) ${starts} times (expected 2)`);
+  if ((html.match(/\bvar SCHEME = "https:\/\/";/g)?.length ?? 0) !== 1) problems.push('SCHEME declaration missing or repeated');
+  for (const tok of FORBIDDEN_TOKENS) if (html.includes(tok)) problems.push(`forbidden: ${tok}`);
+  const esc = html.match(ESCAPED_SCHEME)?.length ?? 0;
+  if (esc !== 1) problems.push(`escaped scheme https:\\/\\/ ${esc} times (expected 1: holiday-store source check)`);
+  return problems;
+}
+
+test('dist structure: SCHEME used exactly 3 times (decl + two startsWith); no fromCharCode / atob( / WebSocket / EventSource / sendBeacon', () => {
+  execFileSync('node', ['build.mjs'], { cwd: root, stdio: 'pipe' });
+  const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');
+  assert.deepEqual(structuralProblems(html), []);
+});
+
+test('structural checker flags each violation (negative proofs)', () => {
+  const ok = [
+    'var SCHEME = "https://";',
+    'if (!s.startsWith(SCHEME)) x();',
+    'if (!u.startsWith(SCHEME)) y();',
+    'const R = /^https:\\/\\/[^/\\s]/;',
+  ].join('\n');
+  assert.deepEqual(structuralProblems(ok), [], 'the reference shape passes');
+  const bad = {
+    'a 4th SCHEME use': `${ok}\nfetch(SCHEME + host);`,
+    'a 3rd startsWith but one fewer other use': ok.replace('var SCHEME = "https://";', 'var SCHEME = "https://";\nz.startsWith(SCHEME);'),
+    'SCHEME declared with another value': ok.replace('"https://"', '"http://"'),
+    'fromCharCode': `${ok}\nString.fromCharCode(104,116)`,
+    'atob(': `${ok}\natob("aHR0cHM6Ly8=")`,
+    'WebSocket': `${ok}\nnew WebSocket(u)`,
+    'EventSource': `${ok}\nnew EventSource(u)`,
+    'sendBeacon': `${ok}\nnavigator.sendBeacon(u, d)`,
+    'second escaped scheme regex': `${ok}\nconst Q = /http:\\/\\/x/;`,
+    'escaped scheme regex removed': ok.replace('const R = /^https:\\/\\/[^/\\s]/;', ''),
+  };
+  for (const [what, html] of Object.entries(bad)) assert.ok(structuralProblems(html).length > 0, `must be flagged: ${what}`);
+});
