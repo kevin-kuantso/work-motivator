@@ -54,6 +54,7 @@ export function cardModel(snap, cfg, t) {
     payday,
     // 无内置假期表的年份：日薪按周一至周五估算，卡片上要看得出来（R15）
     yearNote: snap.tableMissing && snap.now instanceof Date ? c.yearMissing(snap.now.getFullYear()) : null,
+    yearTitle: snap.tableMissing && snap.now instanceof Date ? c.yearMissingLong(snap.now.getFullYear()) : '',
     cheer,
     srSummary: c.srSummary(t.status[s], Math.floor(Number.isFinite(snap.earned) ? snap.earned : 0)),
   };

@@ -41,3 +41,15 @@ export const HOLIDAYS_CN = {
     ],
   ),
 };
+
+// R39：《全国年节及纪念日放假办法》（2025 年修订）固定日期的法定假日；用于没有假期表的年份（2025 起）。
+// 春节 / 清明 / 端午 / 中秋、调休上班日与补假日要等年度通知，这里不猜。
+export const STATUTORY_FIXED_FROM_YEAR = 2025;
+export const STATUTORY_FIXED = {
+  '01-01': H.newYear,
+  '05-01': H.labour,
+  '05-02': H.labour,
+  '10-01': H.national,
+  '10-02': H.national,
+  '10-03': H.national,
+};

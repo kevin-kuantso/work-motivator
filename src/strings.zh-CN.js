@@ -158,7 +158,8 @@ export const STRINGS = {
     dailyFull: '今日满勤可得',
     payIn: (n) => `距离发薪日 ${n} 天`,
     payToday: '今天发薪',
-    yearMissing: (year) => `${year} 年假期未内置`,
+    yearMissing: (year) => `${year} 年仅标固定法定日`,
+    yearMissingLong: (year) => `${year} 年放假安排未公布：已标出固定日期的法定假日，其余待公布`,
     gear: '收回小窗并打开基本设置',
     srSummary: (badge, yuan) => `${badge}，今天已赚 ${yuan} 元`,
   },
@@ -255,7 +256,7 @@ export const STRINGS = {
     // 悬停 / 聚焦提示
     tip: {
       source: (label) => `来源：${label}`,
-      sources: { builtin: '内置·官方通知', online: '联网更新·官方通知', file: '导入文件', manual: '手动标记', rule: '按周末规则', default: '按默认规则' },
+      sources: { builtin: '内置·官方通知', online: '联网更新·官方通知', file: '导入文件', manual: '手动标记', rule: '按周末规则', statutory: '法定日期（《放假办法》）', default: '按默认规则' },
       pay: (yuan) => `当日计薪 ${yuan}`,
       hint: '点击修改',
       join: (parts) => parts.join('，'),
