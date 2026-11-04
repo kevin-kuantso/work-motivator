@@ -20,6 +20,10 @@ const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、�
 const TICK_MS = 100;
 const TICK_MS_REDUCED = 1000;
 const ANNOUNCE_MS = 60000;
+// R34：两次 tick 之间（performance.now，不用可注入的 clock）超过 5 秒、Page Lifecycle resume、
+// 或分页隐藏超过 5 秒后回来 = 页面被暂停过，数字会一下子跳到当前时间：不打扰地提示一次，10 分钟内最多一次。
+const PAUSE_GAP_MS = 5000;
+const PAUSE_NOTICE_EVERY_MS = 10 * 60 * 1000;
 
 function readUi(storage) {
   try {
@@ -159,14 +163,10 @@ export function mountApp(doc, storage, clock) {
 
   // ---- 行为 ----
   let toastTimer = null;
-  let pendingQuiet = null; // 不打扰的提示（例如自动获取了假期表）：撤销提示还在时排在它后面，不盖掉撤销
+  const pendingQuiet = []; // 不打扰的提示（例如自动获取了假期表）：撤销提示还在时排在它后面，不盖掉撤销
   function hideToast() {
     show(toastEl, false);
-    if (pendingQuiet !== null) {
-      const msg = pendingQuiet;
-      pendingQuiet = null;
-      toast(msg);
-    }
+    if (pendingQuiet.length) toast(pendingQuiet.shift());
   }
   function toast(msg, undo) {
     setText(toastText, msg);
@@ -176,9 +176,11 @@ export function mountApp(doc, storage, clock) {
     win.clearTimeout(toastTimer);
     toastTimer = win.setTimeout(hideToast, 5000);
   }
-  function quietToast(msg) {
-    if (!toastEl.hidden && !toastUndo.hidden) pendingQuiet = msg;
-    else toast(msg);
+  // behindAny：连普通 toast 也不盖掉（暂停提示：最不重要，排在任何正在显示的 toast 后面）
+  function quietToast(msg, behindAny = false) {
+    if (!toastEl.hidden && (behindAny || !toastUndo.hidden)) {
+      if (!pendingQuiet.includes(msg)) pendingQuiet.push(msg);
+    } else toast(msg);
   }
 
   // 假期表换了（联网 / 导入 / 其他分页）：状态卡、月历、小窗都按新表重算（缺表标签随之消失）
@@ -307,11 +309,48 @@ export function mountApp(doc, storage, clock) {
     ]);
   }
 
+  // ---- 页面暂停提示（R34）----
+  const perf = win.performance;
+  let lastTickPerf = null; // null = 还没 tick 过（第一次 tick 不提示）
+  let skipGap = false; // 小窗开 / 关搬动计时器造成的间隔不算暂停
+  let lastPauseNotice = -Infinity;
+  let pausePending = false; // 分页隐藏时发现的暂停：回到前台再提示
+  let hiddenAt = null;
+  function notePaused() {
+    if (lastTickPerf === null) return;
+    if (doc.visibilityState === 'hidden') {
+      pausePending = true;
+      return;
+    }
+    pausePending = false;
+    const p = perf.now();
+    if (p - lastPauseNotice < PAUSE_NOTICE_EVERY_MS) return;
+    lastPauseNotice = p;
+    quietToast(t.notice.paused, true);
+  }
+  function checkGap() {
+    const p = perf.now();
+    if (lastTickPerf !== null && !skipGap && p - lastTickPerf > PAUSE_GAP_MS) notePaused();
+    skipGap = false;
+    lastTickPerf = p;
+  }
+  function onVisibility() {
+    if (doc.visibilityState === 'hidden') {
+      if (hiddenAt === null) hiddenAt = perf.now();
+      return;
+    }
+    // 卡片在小窗里一直在跑（计时器在 PiP 视窗），开启者分页隐藏不代表数字停过
+    const long = hiddenAt !== null && perf.now() - hiddenAt > PAUSE_GAP_MS && timerHost === win;
+    hiddenAt = null;
+    if (long || pausePending) notePaused();
+  }
+
   // ---- 计时 ----
   let lastDay = null;
   let lastStatus = null;
   let lastAnnounce = 0;
   function tick() {
+    checkGap();
     const now = clock();
     const snap = { ...snapshot(now, state.cfg, state.marks, tables), now };
     const m = renderCard(cardRoot, snap, state.cfg, t);
@@ -340,6 +379,7 @@ export function mountApp(doc, storage, clock) {
     timer = timerHost.setInterval(tick, mq && mq.matches ? TICK_MS_REDUCED : TICK_MS);
   }
   function moveTimer(host) {
+    skipGap = true;
     timerHost.clearInterval(timer);
     timer = null;
     timerHost = host;
@@ -367,7 +407,9 @@ export function mountApp(doc, storage, clock) {
   });
 
   mq?.addEventListener?.('change', start);
+  doc.addEventListener('visibilitychange', onVisibility); // 先于 tick：同一次回来只提示一次
   doc.addEventListener('visibilitychange', tick);
+  doc.addEventListener('resume', notePaused); // Page Lifecycle：从冻结恢复
   win.addEventListener('focus', tick);
 
   mounted = true;

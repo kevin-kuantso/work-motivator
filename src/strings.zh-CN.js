@@ -22,6 +22,11 @@ export const STRINGS = {
     failed: '小窗没能打开，请再试一次',
   },
 
+  // 页面被浏览器暂停（后台节流、冻结、休眠）后恢复：数字会一下子按当前时间跳过去（R34）
+  notice: {
+    paused: '页面刚才被浏览器暂停了一段时间，数字已按当前时间校正',
+  },
+
   // 法定节假日名称（holidays-cn.js 引用）
   holidays: {
     newYear: '元旦', spring: '春节', qingming: '清明', labour: '劳动节',
