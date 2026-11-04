@@ -199,7 +199,9 @@ export const STRINGS = {
     today: '回到今天',
     todayBack: (title) => `回到今天 · ${title}`,
     monthTitle: (y, m) => `${y} 年 ${m} 月`,
-    pageKeys: { up: 'PgUp', down: 'PgDn', sep: ' / ', label: ' 切换月份' },
+    // 「上月」「下月」按钮的悬停提示：顺带说明焦点在日期格上时可按 PgUp / PgDn 切月（工具列不放键盘提示，R29）
+    prevTitle: '上月（PgUp）',
+    nextTitle: '下月（PgDn）',
     summary: (days, wage) => `本月应出勤 ${days} 天 · 日薪 ${wage}`,
     legendHint: '点日期可标记：调休 · 带薪假 · 无薪假',
     reset: '重置本月标记',
