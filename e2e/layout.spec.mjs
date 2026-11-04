@@ -1235,9 +1235,9 @@ test('A3: unsupported browser — float button is aria-disabled (not native disa
 // ---- Task 14 fix round 1 · Block B ----
 
 // B1（WCAG 2.4.11）：按下「查看导入文件的格式示例」后，获得焦点的展开钮仍在右栏的可见范围内（示例比右栏高时也一样）
-test('B1: after expanding the example the focused toggle stays inside the right column’s visible rect (1280×585, 1366×650)', () =>
+test('B1: after expanding the example the focused toggle stays inside the visible rect of every scroller around it (two-column 1280×585, 1366×650; single-column 1100×520, 1093×535, 1024×468)', () =>
   withPage(T1412, async (page) => {
-    for (const [w, ht] of [[1280, 585], [1366, 650]]) {
+    for (const [w, ht] of [[1280, 585], [1366, 650], [1100, 520], [1093, 535], [1024, 468]]) {
       await page.setViewportSize({ width: w, height: ht });
       await tab(page, '基本设置').click();
       for (const how of ['click', 'keyboard', 'help']) {
@@ -1245,9 +1245,19 @@ test('B1: after expanding the example the focused toggle stays inside the right 
         else if (how === 'keyboard') { await page.locator('#btn-example').focus(); await page.keyboard.press('Enter'); }
         else { await page.locator('#adv-toggle').click(); await page.locator('#btn-adv-example').click(); }
         const r = await page.evaluate(() => {
-          const col = document.querySelectorAll('.set-col')[1].getBoundingClientRect();
-          const t = document.getElementById('btn-example').getBoundingClientRect();
-          return { focus: document.activeElement?.id, t: [Math.round(t.top), Math.round(t.bottom)], col: [Math.round(col.top), Math.round(col.bottom)], inView: t.top >= col.top - 0.5 && t.bottom <= col.bottom + 0.5, exH: Math.round(document.getElementById('holiday-example').getBoundingClientRect().height) };
+          // 可见范围 = 视窗与所有可滚动祖先（两栏时是右栏，单栏时是 .settings）的交集
+          const btn = document.getElementById('btn-example');
+          let top = 0;
+          let bottom = innerHeight;
+          for (let e = btn.parentElement; e; e = e.parentElement) {
+            if (/(auto|scroll|hidden)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1 || /(auto|scroll)/.test(getComputedStyle(e).overflowY)) {
+              const rr = e.getBoundingClientRect();
+              top = Math.max(top, rr.top);
+              bottom = Math.min(bottom, rr.bottom);
+            }
+          }
+          const t = btn.getBoundingClientRect();
+          return { focus: document.activeElement?.id, t: [Math.round(t.top), Math.round(t.bottom)], col: [Math.round(top), Math.round(bottom)], inView: t.top >= top - 0.5 && t.bottom <= bottom + 0.5, exH: Math.round(document.getElementById('holiday-example').getBoundingClientRect().height) };
         });
         console.log(`MEASURE ${JSON.stringify({ case: 'B1 toggle in view', w, ht, how, ...r })}`);
         assert.equal(r.focus, 'btn-example', `${w} ${how}: focus on the toggle`);
@@ -1255,19 +1265,24 @@ test('B1: after expanding the example the focused toggle stays inside the right 
         // 收起，回到初始状态
         await page.locator('#btn-example').click();
         if (how === 'help') await page.locator('#adv-toggle').click();
-        await page.evaluate(() => document.querySelectorAll('.set-col').forEach((c) => { c.scrollTop = 0; }));
+        await page.evaluate(() => document.querySelectorAll('.set-col, .settings').forEach((c) => { c.scrollTop = 0; }));
       }
     }
   }));
 
-test('B minors: chip group has a readable text node; backup card documents what the backup excludes; 复制示例 re-announces on repeated copies', () =>
+test('B minors: chip group is announced once (aria-label only, no duplicate text); backup card documents what the backup excludes; 复制示例 re-announces on repeated copies', () =>
   withPage(T1412, async (page) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(server.url).origin });
     await page.setViewportSize({ width: 1280, height: 585 });
     await tab(page, '基本设置').click();
-    const st = await page.locator('#holiday-status').evaluate((e) => ({ aria: e.getAttribute('aria-label'), sr: e.querySelector('.visually-hidden')?.textContent ?? null }));
+    const st = await page.locator('#holiday-status').evaluate((e) => ({
+      aria: e.getAttribute('aria-label'), sr: e.querySelector('.visually-hidden')?.textContent ?? null,
+      exposed: [...e.childNodes].filter((n) => n.nodeType === 1 && n.getAttribute('aria-hidden') !== 'true').map((n) => n.className),
+    }));
     assert.equal(st.aria, '假期数据状态：2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03');
-    assert.equal(st.sr, '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03', 'readable text node inside the group');
+    // fix round 2：只保留一份（分组名称）；可见的胶囊对读屏隐藏，没有重复的隐藏文字
+    assert.equal(st.sr, null, 'no visually-hidden duplicate of the group name');
+    assert.deepEqual(st.exposed, [], 'chips / last-check are aria-hidden: the sentence is announced once');
     assert.equal(await text(page, '.section-backup .backup-scope'), '备份不含联网取得或导入的假期表和自定义数据网址。');
     await page.locator('#btn-example').click();
     await page.evaluate(() => {

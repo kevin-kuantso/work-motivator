@@ -11,9 +11,8 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
   // 年份胶囊 + 右侧「上次检查」。整行是一个具名分组，名称就是完整的一句（「假期数据状态：2026 年 · 内置 · …」），
   // 胶囊本身对读屏隐藏，避免相邻胶囊的文字连成一串
   const chips = h(doc, 'span', { class: 'hstatus-chips', 'aria-hidden': 'true' });
-  const statusText = h(doc, 'span', { class: 'visually-hidden' }); // 可读的文字节点（与分组名称同一句）
   const lastCheck = h(doc, 'span', { class: 'chip-note', 'aria-hidden': 'true' });
-  const line = h(doc, 'div', { class: 'hstatus', id: 'holiday-status', role: 'group', 'aria-label': U.statusLabel }, statusText, chips, lastCheck);
+  const line = h(doc, 'div', { class: 'hstatus', id: 'holiday-status', role: 'group', 'aria-label': U.statusLabel }, chips, lastCheck);
   // 检查中用 aria-disabled 而不是 disabled：按钮保留焦点（disabled 会把键盘焦点丢到 body）
   const checkBtn = h(doc, 'button', {
     type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-holiday-check', text: U.check, 'aria-describedby': 'hint-holiday-check',
@@ -69,7 +68,10 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
   // 示例比剩下的空间高时，改为把展开钮卷到栏顶，示例从它下面开始
   function bringIntoView() {
     example.scrollIntoView({ block: 'nearest' });
-    const col = disclosure.closest('.set-col') ?? disclosure.parentElement;
+    // 最近的可滚动祖先：两栏时是右栏（.set-col），单栏（分页较窄）时是整个 .settings
+    let col = disclosure.parentElement;
+    while (col && !/(auto|scroll)/.test(win.getComputedStyle(col).overflowY)) col = col.parentElement;
+    if (!col) return;
     const c = col.getBoundingClientRect();
     const b = disclosure.getBoundingClientRect();
     if (b.top < c.top || b.bottom > c.bottom) disclosure.scrollIntoView({ block: 'start' });
@@ -157,8 +159,7 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
       h(doc, 'span', { class: `chip ${c.kind === 'missing' ? 'chip-miss' : 'chip-ok'}`, 'data-kind': c.kind },
         c.kind === 'missing' ? null : icon(doc, 'check'), c.text)));
     setText(lastCheck, m.lastCheck ?? '');
-    line.setAttribute('aria-label', U.statusAria(status.line));
-    setText(statusText, status.line);
+    line.setAttribute('aria-label', U.statusAria(status.line)); // 只念这一份（胶囊与上次检查都 aria-hidden）
     show(lastCheck, Boolean(m.lastCheck));
     setText(checkBtn, checking ? U.checking : U.check);
     if (checking) checkBtn.setAttribute('aria-disabled', 'true');
