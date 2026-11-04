@@ -778,7 +778,7 @@ for (const how of ['hover', 'keyboard']) {
           assert.equal(r.clipped, false, `${month} @${w}: no line clipped`);
           assert.ok(r.lineBottoms.every((b) => b <= r.tip[3] + 0.5), 'every line inside the tooltip');
           if (r.belowTop !== null) assert.ok(r.tip[3] <= r.belowTop, `${month} @${w}: does not cover the cell below (${r.tip[3]} > ${r.belowTop})`);
-          if (how === 'hover' && (w === 1280 || w === 1920) && month === '2026-10') await shot(page, `task-14-tooltip-oct-${w}x${ht}.png`);
+          if (how === 'hover' && (w === 1280 || w === 1920)) await shot(page, `task-14-tooltip-${month === '2026-10' ? 'oct' : 'nov'}-${w}x${ht}.png`);
           await page.mouse.move(0, 0);
           await page.locator('.cal-summary-text').click();
         }
@@ -953,7 +953,12 @@ test('基本设置: no internal scroll by default; expanding 格式示例 / 高�
       const back = await cols();
       assert.deepEqual(back.cols.map((c) => c.over), [0, 0], 'collapsed again: no internal scroll');
       await tab(page, '月历').click();
-      if (w === 1920) await shot(page, 'task-14-calendar-nov-1920x950.png');
+      if (w === 1920) {
+        await shot(page, 'task-14-calendar-nov-1920x950.png');
+        await page.getByRole('button', { name: /上月/ }).click();
+        await shot(page, 'task-14-calendar-oct-1920x950.png');
+        await page.locator('.cal-today').click();
+      }
     }
     // 键盘：两个展开钮都可用 Enter / Space 操作
     await tab(page, '基本设置').click();
