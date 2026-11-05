@@ -164,7 +164,6 @@ export const STRINGS = {
     afterWork: '已下班',
     restDay: '休息日',
     holiday: '法定假日',
-    holidayName: (name) => ` · ${name}`,
     paidLeave: '带薪假',
     unpaidLeave: '无薪假',
     makeupTag: '调休上班',
@@ -193,7 +192,7 @@ export const STRINGS = {
     worked: (a, b) => `已工作 ${a} / 共 ${b}`,
     spanHM: (h, m) => (h > 0 ? `${h}小时${m}分` : `${m}分`),
     spanH: (h, m) => (m === 0 ? `${h}小时` : h > 0 ? `${h}小时${m}分` : `${m}分`),
-    workedDone: (h, m) => (m === 0 ? `今天工作满 ${h} 小时` : `今天工作满 ${h}小时${m}分`),
+    workedDone: (h, m) => `今天工作满 ${h}小时${m === 0 ? '' : `${m}分`}`,
     progressLabel: '工时进度',
     rate: '当前赚钱速度',
     rateUnit: '/秒',
@@ -206,10 +205,11 @@ export const STRINGS = {
     payToday: '今天发薪',
     // 缺假期表的标签（R41）：只在当年与之后的年份显示；措辞按该年实际标出的日子
     // lunar：2027–2035（含春节 / 清明 / 端午 / 中秋）；fixed：其他 ≥ 2025 的年份（只有六个固定日期）；none：< 2025（什么都没标）
-    yearMissing: (year) => `${year} 年调休安排未内置，只标了节日`,
+    yearMissing: (year) => `${year} 年只标了法定假日，补假和调休未标出`,
     // R49：只说 app 知道什么（未内置 / 未标出），不断言放假安排是否已公布
     yearMissingLong: (year) => `${year} 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出`,
-    yearMissingFixed: (year) => `${year} 年调休安排未内置，只标了节日`,
+    // names = 实际标出的固定日期节日名（由 holidays-cn.js 的 STATUTORY_FIXED 取得，不在这里写死）
+    yearMissingFixed: (year, names) => `${year} 年只标了${names.join('、')}`,
     yearMissingFixedLong: (year) => `${year} 年假期表未内置：只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）；其余假日和补假、调休未标出`,
     yearMissingNone: (year) => `${year} 年未标法定假日`,
     yearMissingNoneLong: (year) => `${year} 年假期表未内置，没有标出任何法定假日`,
@@ -218,6 +218,8 @@ export const STRINGS = {
   },
 
   currency: '¥',
+  // 倒数占位字串：分、秒的数字补成两位最宽（88），用来固定倒数格的宽度（card.js）
+  durationWidest: (text) => text.replace(/\d+(?=[分秒])/g, '88'),
   duration: (h, m, s) => (h > 0 ? `${h}小时${m}分${s}秒` : `${m}分${s}秒`),
   weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
 

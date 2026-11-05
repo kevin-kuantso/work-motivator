@@ -103,15 +103,15 @@ test('monthHolidays ignores manual marks and the weekends switch (pure table / s
 
 test('R41 (amended round 3) missing-table tag: every no-table year, past or future; wording follows what is actually marked', () => {
   assert.equal(missingTableTag(2026, NOW, HOLIDAYS_CN, t), null, 'has a table');
-  assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t).text, '2025 年调休安排未内置，只标了节日', 'past year: visible qualifier too (round 3)');
+  assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t).text, '2025 年只标了元旦、劳动节、国庆', 'past year: visible qualifier too (round 3)');
   assert.deepEqual(missingTableTag(2027, NOW, HOLIDAYS_CN, t), {
-    kind: 'lunar', text: '2027 年调休安排未内置，只标了节日',
+    kind: 'lunar', text: '2027 年只标了法定假日，补假和调休未标出',
     title: '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
   });
   assert.equal(missingTableTag(2027, NOW, { ...HOLIDAYS_CN, 2027: online2027 }, t), null, 'online table');
   const f = missingTableTag(2036, NOW, HOLIDAYS_CN, t);
   assert.equal(f.kind, 'fixed');
-  assert.equal(f.text, '2036 年调休安排未内置，只标了节日');
+  assert.equal(f.text, '2036 年只标了元旦、劳动节、国庆'); // 名字取自 STATUTORY_FIXED（F1：固定日期年份不说「标了法定假日」）
   assert.match(f.title, /元旦、劳动节、国庆/);
   assert.ok([...f.text].filter((c) => /\p{Script=Han}/u.test(c)).length <= 14, '≤ 14 CJK characters');
   assert.equal(missingTableTag(2035, new Date(2035, 5, 1), HOLIDAYS_CN, t).kind, 'lunar');
@@ -140,7 +140,7 @@ test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and t
     assert.match(c.title, /只标出固定日期的法定假日；其余假日和补假、调休未标出$/, `${y}-${m} title`);
     assert.equal(c.sub, null, 'basis in title for every no-table kind (round 2)');
     if (tag) {
-      assert.equal(tag.text, `${y} 年调休安排未内置，只标了节日`);
+      assert.equal(tag.text, `${y} 年只标了元旦、劳动节、国庆`);
       assert.match(tag.title, /只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）/);
     }
     all.push(c.title, c.sub ?? '', tag?.title ?? '', tag?.text ?? '');
