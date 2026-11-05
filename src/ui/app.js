@@ -4,7 +4,7 @@ import { HOLIDAYS_CN } from '../holidays-cn.js';
 import { STORAGE_KEY, loadState, saveState, exportState, importState } from '../settings.js';
 import { STRINGS } from '../strings.zh-CN.js';
 import { h, show, setText } from './dom.js';
-import { renderCard } from './card.js';
+import { renderCard, syncReferenceHeight } from './card.js';
 import { createSettingsPanel } from './settings-panel.js';
 import { createCalendar } from './calendar-view.js';
 import { createFloatControl } from './float-control.js';
@@ -337,6 +337,23 @@ export function mountApp(doc, storage, clock) {
   }
 
   // ---- 计时 ----
+  // 大卡片最小高度（= 上班中的卡高）要重量：载入、视窗尺寸改变、字体载入完成
+  let refDirty = true;
+  let lastSnap = null;
+  function syncRef() {
+    if (!lastSnap || !cardRoot.isConnected || cardRoot.dataset.size !== 'lg') return; // 悬浮中：回到主页后的第一次 tick 再量
+    refDirty = false;
+    syncReferenceHeight(cardRoot, lastSnap, state.cfg, t);
+  }
+  // 视窗改变时立刻量（不等下一次 tick：跨过 640px 断点那一刻卡高就该跟着变）
+  const markRefDirty = () => { refDirty = true; syncRef(); };
+  win.addEventListener('resize', markRefDirty);
+  try {
+    doc.fonts?.ready?.then?.(markRefDirty, () => {});
+    doc.fonts?.addEventListener?.('loadingdone', markRefDirty);
+  } catch {
+    // 不支持 FontFaceSet：只靠载入与 resize
+  }
   let lastDay = null;
   let lastStatus = null;
   let lastAnnounce = 0;
@@ -345,6 +362,8 @@ export function mountApp(doc, storage, clock) {
     const now = clock();
     const snap = { ...snapshot(now, state.cfg, state.marks, tables), now };
     const m = renderCard(cardRoot, snap, state.cfg, t);
+    lastSnap = snap;
+    if (refDirty) syncRef();
     const day = ymd(now);
     if (day !== lastDay) {
       const crossed = lastDay !== null;
