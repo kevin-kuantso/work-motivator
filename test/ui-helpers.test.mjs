@@ -40,11 +40,11 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
   assert.equal(m.daily, '¥323.81');
   assert.equal(m.hourly, '¥46.26');
   assert.equal(m.month, '¥518.10');
-  assert.equal(m.rate, '¥0.0128 /秒');
+  assert.equal(m.rate, '¥0.0128/秒');
   assert.equal(t.card.rate, '当前赚钱速度');
   assert.deepEqual(heroParts(m.amount), { head: '194.28', tail: '57' });
   assert.equal(m.secondary, '距下班 2小时48分0秒');
-  assert.equal(m.progressText, '已工作 4.20 / 7.00 小时');
+  assert.equal(m.progressText, '已工作 4小时12分 / 共 7小时');
   assert.equal(m.progressPct, 60);
   assert.equal(m.payday, null, 'payday hidden when empty');
   assert.equal(m.cheer, null);
@@ -54,7 +54,7 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
 test('card shows a year note when the holiday table is missing (R15)', () => {
   const now = at(1, 4, 10, 0, 0, 2027);
   const m = cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
-  assert.equal(m.yearNote, '2027 年仅标法定假日');
+  assert.equal(m.yearNote, '2027 年调休安排未内置，只标了节日');
   assert.equal(m.yearTitle, '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
   assert.ok([...m.yearNote.replace(/[\d\s]/g, '')].length <= 14, 'short tag stays short');
 });
@@ -62,9 +62,10 @@ test('card shows a year note when the holiday table is missing (R15)', () => {
 test('card model per status', () => {
   const lunch = cardModel(snapshot(at(11, 3, 12, 15), cfg, {}), cfg, t);
   assert.equal(lunch.secondary, '45 分钟后继续上班');
-  assert.equal(lunch.rate, '¥0.0000 /秒');
+  assert.equal(lunch.rateLabel, '午休结束');
+  assert.equal(lunch.rate, '13:00');
   const before = cardModel(snapshot(at(11, 3, 7), cfg, {}), cfg, t);
-  assert.equal(before.label, '今天还没开始');
+  assert.equal(before.label, '08:30 开始计薪');
   assert.equal(before.secondary, '距上班 1小时30分0秒');
   const after = cardModel(snapshot(at(11, 3, 18), cfg, {}), cfg, t);
   assert.equal(after.label, '今天辛苦了，收工！'); // Task 17：已下班换成收工文案（带薪假仍是「今天一共赚了」，见下方 Task 17 测试）
@@ -76,18 +77,25 @@ test('card model per status', () => {
   assert.equal(rest.secondary, '距下个工作日 2 天');
   const holiday = cardModel(snapshot(at(10, 1, 10), cfg, {}), cfg, t);
   assert.equal(holiday.label, '今天休息 · 国庆');
+  assert.equal(holiday.badge, '法定假日');
+  assert.equal(holiday.badgeName, ' · 国庆');
+  assert.equal(holiday.tone, 'holiday');
+  assert.equal(rest.badgeName, '');
+  assert.equal(rest.tone, 'rest');
   const paid = cardModel(snapshot(at(11, 3, 10), cfg, { '2026-11-03': 'paidLeave' }), cfg, t);
   assert.equal(paid.badge, '带薪假');
   assert.equal(paid.secondary, '今天按全天计薪');
   const unpaid = cardModel(snapshot(at(11, 3, 10), cfg, { '2026-11-03': 'unpaidLeave' }), cfg, t);
   assert.equal(unpaid.badge, '无薪假');
   assert.equal(unpaid.amount, 0);
+  assert.equal(unpaid.showAmount, false);
+  assert.equal(unpaid.label, '今天不计薪');
   const makeup = cardModel(snapshot(at(9, 20, 10), cfg, {}), cfg, t);
   assert.equal(makeup.badge, '上班中');
-  assert.equal(makeup.tag, '调休');
+  assert.equal(makeup.tag, '调休上班');
   const payCfg = { ...cfg, payday: 5, cheer: '加油' };
   const pay = cardModel(snapshot(at(11, 3, 10), payCfg, {}), payCfg, t);
-  assert.equal(pay.payday, '距离发薪日 2 天');
+  assert.equal(pay.payday, '距发薪日 2 天');
   assert.equal(pay.cheer, '加油');
   const payToday = { ...cfg, payday: 3 };
   assert.equal(cardModel(snapshot(at(11, 3, 10), payToday, {}), payToday, t).payday, '今天发薪');
@@ -182,27 +190,27 @@ test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other
   const working = d(11, 4, 10);
   assert.equal(working.label, '今天已经赚了');
   assert.equal(working.rateLabel, old.rateLabel);
-  assert.match(working.rate, /^¥\d+\.\d{4} \/秒$/);
+  assert.match(working.rate, /^¥\d+\.\d{4}\/秒$/);
   const lunch = d(11, 4, 12, 15);
   assert.equal(lunch.label, '今天已经赚了');
-  assert.equal(lunch.rate, '¥0.0000 /秒');
+  assert.equal(lunch.rate, '13:00'); // Task 19 H2：午休中第一格改为「午休结束 13:00」
   const before = d(11, 4, 7);
-  assert.equal(before.label, '今天还没开始');
-  assert.equal(before.rateLabel, old.rateLabel);
-  assert.equal(before.rate, '¥0.0000 /秒');
+  assert.equal(before.label, '08:30 开始计薪'); // Task 19 M1
+  assert.equal(before.rateLabel, '上班时间');
+  assert.equal(before.rate, '08:30');
   const rest = d(11, 7, 18);
   assert.equal(rest.label, '今天休息');
-  assert.equal(rest.rateLabel, old.rateLabel);
+  assert.equal(rest.rateLabel, '已赚占月薪'); // Task 19 H2：非上班日都说已赚占月薪
   const holiday = d(10, 1, 18);
   assert.equal(holiday.label, '今天休息 · 国庆');
-  assert.equal(holiday.rateLabel, old.rateLabel);
+  assert.equal(holiday.rateLabel, '已赚占月薪');
   const now = at(11, 4, 18);
   const paid = cardModel({ ...snapshot(now, cfg, { '2026-11-04': 'paidLeave' }), now }, cfg, t);
   assert.equal(paid.label, '今天一共赚了');
-  assert.equal(paid.rateLabel, old.rateLabel);
+  assert.equal(paid.rateLabel, '已赚占月薪');
   const unpaid = cardModel({ ...snapshot(now, cfg, { '2026-11-04': 'unpaidLeave' }), now }, cfg, t);
-  assert.equal(unpaid.rateLabel, old.rateLabel);
-  assert.equal(unpaid.rate, '¥0.0000 /秒');
+  assert.equal(unpaid.rateLabel, '已赚占月薪');
+  assert.match(unpaid.rate, /^\d+%$/);
   // 调休上班日（排定的工作日）收工后同样适用
   const makeup = d(9, 20, 18);
   assert.equal(makeup.status, 'afterWork');
@@ -221,4 +229,91 @@ test('Task 17: monthPercent rounds, clamps to 0–100 and guards salary 0', () =
   assert.equal(monthPercent(500, NaN), 0);
   assert.equal(monthPercent(NaN, 6800), 0);
   assert.equal(monthPercent(500, undefined), 0);
+});
+
+// ---- Task 19 Batch A ----
+const model = (now, c = cfg, marks = {}) => cardModel({ ...snapshot(now, c, marks), now }, c, t);
+
+test('Task 19 H2: the first metric cell is the speed only while working; every other status shows a meaningful value from config', () => {
+  assert.deepEqual([model(at(11, 4, 10)).rateLabel, model(at(11, 4, 10)).rate.endsWith('/秒')], ['当前赚钱速度', true]);
+  const lunch = model(at(11, 4, 12, 15));
+  assert.deepEqual([lunch.rateLabel, lunch.rate], ['午休结束', '13:00']);
+  const before = model(at(11, 4, 7));
+  assert.deepEqual([before.rateLabel, before.rate], ['上班时间', '08:30']);
+  // 取自设置，不写死
+  const custom = { ...cfg, start: '09:15', lunchStart: '12:00', lunchEnd: '13:30', end: '18:00' };
+  assert.deepEqual([model(at(11, 4, 12, 40), custom).rateLabel, model(at(11, 4, 12, 40), custom).rate], ['午休结束', '13:30']);
+  assert.deepEqual([model(at(11, 4, 8), custom).rateLabel, model(at(11, 4, 8), custom).rate], ['上班时间', '09:15']);
+  // 休息日 / 法定假日 / 带薪假 / 无薪假 / 已下班：已赚占月薪 N%（与 Task 17 同一个函数）
+  for (const m of [model(at(11, 7, 10)), model(at(10, 1, 10)), model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' }),
+    model(at(11, 4, 10), cfg, { '2026-11-04': 'unpaidLeave' }), model(at(11, 4, 18))]) {
+    assert.equal(m.rateLabel, '已赚占月薪', m.status);
+    assert.match(m.rate, /^\d{1,3}%$/, m.status);
+    assert.ok(Number.parseInt(m.rate, 10) >= 0 && Number.parseInt(m.rate, 10) <= 100);
+  }
+  // 月薪 0（无效）：夹成 0%，不是 NaN / Infinity
+  const zero = model(at(11, 7, 10), { ...cfg, salary: 0 });
+  assert.equal(zero.rate, '0%');
+  // 时间格式坏了：不猜，不显示假的时间
+  const bad = model(at(11, 4, 7), { ...cfg, start: 'abc' });
+  assert.ok(!/abc/.test(bad.rate + bad.label));
+});
+
+test('Task 19 H3: 法定假日 has its own tone, badge 「法定假日」 and the name as a separate (small-window-hideable) part', () => {
+  const h = model(at(10, 2, 10));
+  assert.equal(h.tone, 'holiday');
+  assert.equal(h.badge, '法定假日');
+  assert.equal(h.badgeName, ' · 国庆');
+  assert.equal(h.label, '今天休息 · 国庆');
+  const weekend = model(at(11, 7, 10));
+  assert.equal(weekend.tone, 'rest');
+  assert.equal(weekend.badge, '休息日');
+  assert.equal(weekend.badgeName, '');
+});
+
+test('Task 19 H8: 已下班 shows the settled amount with 2 decimals, no tail, progress text from config', () => {
+  const m = model(at(11, 4, 18));
+  assert.deepEqual(m.hero, { head: '323.81', tail: '' });
+  assert.equal(m.amountSrText, '¥ 323.81');
+  assert.equal(m.progressText, '今天工作满 7 小时');
+  assert.equal(m.label, '今天辛苦了，收工！');
+  const custom = { ...cfg, end: '18:00' }; // 午休 1.5h → 8h
+  assert.equal(model(at(11, 4, 19), custom).progressText, '今天工作满 8 小时');
+  const half = { ...cfg, end: '17:30' };
+  assert.equal(model(at(11, 4, 19), half).progressText, '今天工作满 7小时30分');
+  // 带薪假同样定格 2 位；上班中仍是 4 位
+  const paid = model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' });
+  assert.equal(paid.hero.tail, '');
+  assert.deepEqual(model(at(11, 3, 14, 12)).hero, heroParts(model(at(11, 3, 14, 12)).amount));
+  assert.equal(model(at(11, 3, 14, 12)).hero.tail, '57');
+});
+
+test('Task 19 M1: 无薪假 has no amount and the label is the conclusion; 未上班 shows ¥ 0.00 and when pay starts', () => {
+  const u = model(at(11, 4, 10), cfg, { '2026-11-04': 'unpaidLeave' });
+  assert.equal(u.showAmount, false);
+  assert.equal(u.label, '今天不计薪');
+  assert.equal(u.secondary, '', 'no duplicate sentence');
+  const b = model(at(11, 4, 7));
+  assert.equal(b.showAmount, true);
+  assert.deepEqual(b.hero, { head: '0.00', tail: '' });
+  assert.equal(b.label, '08:30 开始计薪');
+  assert.equal(model(at(11, 4, 7), { ...cfg, start: '09:00' }).label, '09:00 开始计薪');
+});
+
+test('Task 19 M2 / L10 / L11: 调休上班 tag, /秒 without a space, 距发薪日, year-missing wording', () => {
+  assert.equal(t.status.makeupTag, '调休上班');
+  assert.equal(model(at(9, 20, 10)).tag, '调休上班');
+  assert.equal(t.card.rateUnit, '/秒');
+  assert.equal(t.card.payIn(3), '距发薪日 3 天');
+  assert.equal(t.card.yearMissing(2027), '2027 年调休安排未内置，只标了节日');
+  assert.equal(t.card.yearMissingFixed(2036), '2036 年调休安排未内置，只标了节日');
+  assert.equal(t.calendar.legendHint, '点日期可标记：调休上班 · 带薪假 · 无薪假');
+});
+
+test('Task 19 M3: worked text is 已工作 H小时M分 / 共 H小时; countdown format unchanged', () => {
+  assert.equal(model(at(11, 4, 10, 30)).progressText, '已工作 2小时0分 / 共 7小时'); // 08:30 → 10:30
+  assert.equal(model(at(11, 4, 8, 55)).progressText, '已工作 25分 / 共 7小时');
+  assert.equal(model(at(11, 4, 14, 30, 59)).progressText, '已工作 4小时30分 / 共 7小时'); // 08:30→14:30:59 扣午休 1.5h，秒不进位
+  assert.equal(model(at(11, 4, 10, 30)).secondary, '距下班 6小时30分0秒');
+  assert.equal(duration(65, t), '1分5秒');
 });

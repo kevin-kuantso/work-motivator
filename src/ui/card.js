@@ -5,7 +5,7 @@
 import { h, setText, show } from './dom.js';
 import { icon } from './icons.js';
 import { cardModel } from './card-model.js';
-import { heroParts, dateLine, money } from './format.js';
+import { dateLine } from './format.js';
 import { renderDigits } from './digits.js';
 
 const built = new WeakMap();
@@ -25,6 +25,7 @@ function build(root, t) {
 
   r.badgeIcon = h(doc, 'span', { class: 'badge-icon' });
   r.badgeText = h(doc, 'span', { class: 'badge-text' });
+  r.badgeName = h(doc, 'span', { class: 'badge-name', hidden: true });
   r.gear = h(doc, 'button', { type: 'button', class: 'card-gear', 'aria-label': c.gear, title: c.gear }, icon(doc, 'gear'));
   r.fill = h(doc, 'div', { class: 'bar-fill' });
   r.bar = h(doc, 'div', { class: 'bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': c.progressLabel }, r.fill);
@@ -33,7 +34,7 @@ function build(root, t) {
     h(doc, 'div', { class: 'card-head' },
       (r.date = h(doc, 'span', { class: 'card-date' })),
       h(doc, 'span', { class: 'card-badges' },
-        (r.badge = h(doc, 'span', { class: 'card-badge' }, r.badgeIcon, r.badgeText)),
+        (r.badge = h(doc, 'span', { class: 'card-badge' }, r.badgeIcon, r.badgeText, r.badgeName)),
         (r.tag = h(doc, 'span', { class: 'card-tag', hidden: true }))),
       r.gear),
     (r.label = h(doc, 'div', { class: 'card-label' })),
@@ -44,11 +45,16 @@ function build(root, t) {
     (r.amountSr = sr()),
     (r.cheer = h(doc, 'div', { class: 'card-cheer', hidden: true })),
     (r.progress = h(doc, 'div', { class: 'card-progress' },
+      // 头一行：左「工时进度」，右倒数（M4）；没有进度条的状态，倒数 / 说明单独一行放在 countdownSlot
+      (r.progressHead = h(doc, 'div', { class: 'card-progress-head' },
+        h(doc, 'span', { class: 'card-progress-title', text: c.progressLabel }),
+        (r.headSlot = h(doc, 'span', { class: 'card-progress-aside' })))),
       r.bar,
       (r.progressText = h(doc, 'div', { class: 'card-progress-text digits', 'aria-hidden': 'true' })),
       (r.progressSr = sr()))),
-    (r.countdown = h(doc, 'div', { class: 'card-countdown digits', 'aria-hidden': 'true' })),
-    (r.countdownSr = sr()),
+    (r.countdownSlot = h(doc, 'div', { class: 'card-countdown-slot' },
+      (r.countdown = h(doc, 'div', { class: 'card-countdown digits', 'aria-hidden': 'true' })),
+      (r.countdownSr = sr()))),
     h(doc, 'div', { class: 'card-metrics' },
       metric('metric-rate', c.rate),
       metric('metric-month', c.month, '', true),
@@ -98,16 +104,17 @@ export function renderCard(root, snap, cfg, t) {
     r.iconTone = m.tone;
   }
   setText(r.badgeText, m.badge);
+  show(r.badgeName, m.badgeName !== '');
+  setText(r.badgeName, m.badgeName);
   show(r.tag, Boolean(m.tag));
   setText(r.tag, m.tag ?? '');
 
   setText(r.label, m.label);
   show(r.amount, m.showAmount);
   show(r.amountSr, m.showAmount);
-  const parts = heroParts(m.amount);
-  renderDigits(r.head, parts.head);
-  renderDigits(r.tail, parts.tail);
-  setText(r.amountSr, `${t.currency} ${money(m.amount, 4)}`);
+  renderDigits(r.head, m.hero.head);
+  renderDigits(r.tail, m.hero.tail);
+  setText(r.amountSr, m.amountSrText);
 
   show(r.cheer, Boolean(m.cheer));
   setText(r.cheer, m.cheer ?? '');
@@ -119,6 +126,10 @@ export function renderCard(root, snap, cfg, t) {
   if (r.bar.getAttribute('aria-valuenow') !== now) r.bar.setAttribute('aria-valuenow', now);
   renderDigits(r.progressText, m.progressText);
   setText(r.progressSr, m.progressText);
+  // 有进度条：倒数在头一行右侧；没有：单独一行（同一个节点搬家，数字格状态不变）
+  const home = m.showProgress ? r.headSlot : r.countdownSlot;
+  if (r.countdown.parentNode !== home) home.append(r.countdown, r.countdownSr);
+  show(r.countdownSlot, !m.showProgress && m.secondary !== '');
   show(r.countdown, m.secondary !== '');
   show(r.countdownSr, m.secondary !== '');
   renderDigits(r.countdown, m.secondary);

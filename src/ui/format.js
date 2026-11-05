@@ -35,4 +35,10 @@ export function duration(sec, t) {
 
 export const hours = (sec) => (safe(sec) / 3600).toFixed(2);
 
+// 秒 → 整小时 + 整分钟（向下取整，分钟 0–59）：工时进度文字用（已工作 2小时0分 / 共 7小时）。
+export function hourMinute(sec) {
+  const total = Math.max(0, Math.floor(safe(sec) / 60));
+  return { h: Math.floor(total / 60), m: total % 60 };
+}
+
 export const minutesCeil = (sec) => Math.max(0, Math.ceil(safe(sec) / 60));
