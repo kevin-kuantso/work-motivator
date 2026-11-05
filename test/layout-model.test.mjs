@@ -72,6 +72,27 @@ test('weekend / holiday day numbers have ≥ 4.5:1 contrast on their cell backgr
   }
 });
 
+test('H4: holiday and weekend cells are visibly different states (contrast + hue separation, no shared grey)', () => {
+  const hex = (k) => tokens[k];
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const holidayBg = rgb(hex('--cal-holiday-bg'));
+  const weekendBg = rgb(hex('--cal-weekend-bg'));
+  // 1) 周末必须是中性灰（三通道几乎相等），否则两格看起来是「两种绿」
+  assert.ok(Math.max(...weekendBg) - Math.min(...weekendBg) <= 6, `weekend stays neutral grey: ${hex('--cal-weekend-bg')}`);
+  // 2) 假日底必须是明显的绿/青：绿通道同时高于红、蓝
+  const [hr, hg, hb] = holidayBg;
+  assert.ok(hg - hr >= 60 && hg - hb >= 6, `holiday bg is clearly green/teal, not near-white grey: ${hex('--cal-holiday-bg')} (${holidayBg})`);
+  // 3) 两个底色至少在一个通道上差 ≥ 30：一眼能分出「放假」和「周末」
+  assert.ok(Math.max(...holidayBg.map((v, i) => Math.abs(v - weekendBg[i]))) >= 30, 'holiday and weekend backgrounds are far apart');
+  // 4) 格子文字仍须 ≥ 4.5:1（诚实地用新 token 重算）
+  for (const [fg, bg] of [['--cal-holiday-num', '--cal-holiday-bg'], ['--state-holiday-fg', '--cal-holiday-bg'], ['--color-text-900', '--cal-holiday-bg']]) {
+    const r = contrast(hex(fg), hex(bg));
+    assert.ok(r >= 4.5, `${fg} ${hex(fg)} on ${bg} ${hex(bg)} = ${r.toFixed(2)}`);
+  }
+  // 5) 假日格的文字色不再借「休息日」的灰（那是另一类状态）
+  assert.ok(ruleUses('.kind-holiday', 'color', '--state-holiday-fg'), '.kind-holiday text uses the holiday token');
+});
+
 test('cell tag colours (假 / 班 / 带薪 / 无薪) have ≥ 4.5:1 contrast on their backgrounds', () => {
   const pairs = [
     ['--state-rest-fg', '--state-rest-bg'],

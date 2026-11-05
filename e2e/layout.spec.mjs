@@ -306,26 +306,32 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     assert.equal(await page.getByRole('button', { name: '下月 ›', exact: true }).getAttribute('title'), '下月（PgDn）');
   }));
 
-// R36：图例永远列出全部 7 种，排成一行（有 / 没有假日的月份都一样）；「重置本月标记」仅本月有手动标记时出现，在摘要行最右
+// R36：图例永远列出全部 7 种，排成一行（有 / 没有假日的月份都一样）；「重置标记」仅本月有手动标记时出现，在摘要行最右
+// M7：操作提示已移到工具列右端，量测对象跟着换（图例行内不再有提示）
 const ALL_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid', 'today', 'manual'];
 const legendLine = (page) => page.evaluate(() => {
   const l = document.querySelector('.cal-legend');
   const items = [...l.querySelectorAll('.legend-title, .legend-item')];
   const tops = new Set(items.map((e) => Math.round(e.getBoundingClientRect().top)));
-  const hint = l.querySelector('.legend-hint');
   const lr = l.getBoundingClientRect();
+  const hint = document.querySelector('.cal-toolbar .legend-hint');
+  const tb = document.querySelector('.cal-toolbar').getBoundingClientRect();
   const hr = hint.getBoundingClientRect();
+  const hcs = getComputedStyle(hint);
+  const shown = hcs.display !== 'none' && hr.width > 0;
   return {
     h: Math.round(lr.height * 10) / 10, rows: tops.size,
     allInside: items.every((e) => e.getBoundingClientRect().right <= lr.right + 0.5 && e.getBoundingClientRect().bottom <= lr.bottom + 0.5),
-    hintShown: hr.top >= lr.top - 0.5 && hr.bottom <= lr.bottom + 0.5, hintCut: hint.scrollWidth > hint.clientWidth + 0.5,
+    hintShown: shown && hr.top >= tb.top - 0.5 && hr.bottom <= tb.bottom + 0.5 && hr.right <= tb.right + 0.5,
+    hintCut: shown && hint.scrollWidth > hint.clientWidth + 0.5,
+    hintInToolbar: Boolean(hint.closest('.cal-toolbar')) && !hint.closest('.cal-legend'),
   };
 });
 test('legend always lists all 7 kinds on ONE line (months with and without holidays); 重置本月标记 only with manual marks', () =>
   withPage(T1412, async (page) => {
     const kinds = () => page.locator('.cal-legend .legend-item').evaluateAll((els) => els.map((e) => e.dataset.kind));
     const labels = () => page.locator('.cal-legend .legend-item').allTextContents();
-    for (const [w, ht] of VIEWPORTS) {
+    for (const [w, ht] of [[1093, 535], ...VIEWPORTS]) {
       await page.setViewportSize({ width: w, height: ht });
       for (const [month, move] of [['2026-11', null], ['2026-10', /上月/], ['2026-11', /下月/]]) {
         if (move) await page.getByRole('button', { name: move }).click();
@@ -336,11 +342,21 @@ test('legend always lists all 7 kinds on ONE line (months with and without holid
         assert.ok(lg.h <= 24, `${month} @${w}: legend single line (${lg.h}px)`);
         assert.equal(lg.allInside, true, `${month} @${w}: no legend item clipped`);
         assert.equal(lg.hintCut, false, 'the hint is either fully shown or not shown (never cut mid-sentence)');
-        if (w >= 1280) assert.equal(lg.hintShown, true, `${month} @${w}: the right-hand hint fits and shows`);
+        if (w >= 1093) assert.equal(lg.hintShown, true, `${month} @${w}: the right-hand hint fits and shows`);
       }
     }
     assert.deepEqual(await labels(), ['周末', '法定假日', '调休上班', '带薪假', '无薪假', '今天', '手动标记']);
-    assert.equal(await text(page, '.legend-hint'), '点日期可标记：调休上班 · 带薪假 · 无薪假');
+    assert.equal(await text(page, '.cal-toolbar .legend-hint'), '点日期可标记：调休上班 · 带薪假 · 无薪假');
+    // M7：提示在工具列右端（图例行内不再有它），且贴右边缘（margin-left:auto）
+    assert.equal(await page.locator('.cal-legend .legend-hint').count(), 0, 'the hint left the legend row');
+    const hintRight = await page.evaluate(() => {
+      const hint = document.querySelector('.cal-toolbar .legend-hint');
+      const tb = document.querySelector('.cal-toolbar').getBoundingClientRect();
+      const hr = hint.getBoundingClientRect();
+      return { gap: Math.round((tb.right - hr.right) * 10) / 10, shown: getComputedStyle(hint).display !== 'none' };
+    });
+    assert.equal(hintRight.shown, true, 'at 1280×585 the hint has room');
+    assert.ok(hintRight.gap <= 1, `the hint sits at the toolbar's right edge (gap ${hintRight.gap}px)`);
     assert.equal(await page.locator('.cal-legend [data-kind=holiday] svg.icon-holiday').count(), 1, 'same icon as the 假 tag');
     assert.equal(await page.locator('.cal-legend [data-kind=makeup] svg.icon-makeup').count(), 1);
     assert.equal(await page.locator('.cal-legend [data-kind=paid] svg.icon-paid').count(), 1);
@@ -371,6 +387,19 @@ test('legend always lists all 7 kinds on ONE line (months with and without holid
     assert.equal(lg.hintShown, true, 'hint still fits at 1280');
     const sh2 = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(sh2 <= 30, `Oct: summary row with pill + reset stays one line (${sh2})`);
+  }));
+
+test('reset control is compact and visibly bordered when a month has manual marks', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await cell(page, '11月4日').click();
+    await page.getByRole('menuitemradio', { name: /改为休息/ }).click();
+    const reset = page.getByRole('button', { name: '重置本月标记' });
+    const style = await reset.evaluate((b) => ({ border: getComputedStyle(b).borderTopStyle, width: getComputedStyle(b).borderTopWidth, color: getComputedStyle(b).borderTopColor, height: b.getBoundingClientRect().height }));
+    assert.equal(style.border, 'solid', 'the reset action has a visible border');
+    assert.equal(style.width, '1px');
+    assert.notEqual(style.color, 'rgba(0, 0, 0, 0)', 'the border is not transparent');
+    assert.ok(style.height <= 30, `reset stays compact (${style.height}px)`);
   }));
 
 test('「回到今天」 is emphasised with the target month when viewing another month', () =>
@@ -479,6 +508,140 @@ test('contrast ≥ 4.5:1 for weekend / holiday numbers and cell tags (computed f
     await page.getByRole('button', { name: /下月/ }).click();
     const [fg, bg] = await pair('11月5日', '.day-tag');
     assert.ok(ratio(fg, bg) >= 4.5, `paid tag: ${fg} on ${bg}`);
+  }));
+
+// H5：手动改成休息的日子不只是一块灰底——要有「休」标签和它的图标，和周末区分开
+test('H5: a manually-rested workday shows a visible 「休」 tag with its icon', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    const target = cell(page, '11月6日');
+    assert.equal(await target.locator('.day-tag').count(), 0, 'plain workday: no tag before marking');
+    await target.click();
+    await page.getByRole('menuitemradio', { name: /改为休息/ }).click();
+    const day = cell(page, '11月6日');
+    assert.equal(await day.evaluate((b) => b.classList.contains('kind-rest')), true, 'workday turned into a manual rest day');
+    assert.equal(await day.locator('.day-tag').textContent(), '休', 'H5: the tag says 休');
+    assert.equal(await day.locator('.day-tag svg.icon-rest').count(), 1, 'H5: with the rest icon');
+    const look = await day.locator('.day-tag').evaluate((e) => {
+      const cs = getComputedStyle(e);
+      return { h: e.getBoundingClientRect().height, lh: cs.lineHeight, svg: e.querySelector('svg')?.getBoundingClientRect().width };
+    });
+    console.log(`MEASURE ${JSON.stringify({ case: 'H5 rest tag', ...look })}`);
+    assert.ok(look.h >= 12 && look.h <= 16, `same 14px label height as other tags (${look.h})`);
+    assert.ok(look.svg >= 10 && look.svg <= 14, `icon rendered at label size (${look.svg})`);
+    // 文字对底色仍 ≥ 4.5:1
+    const [fg, bg] = await day.locator('.day-tag').evaluate((e) => {
+      const b = e.closest('.day');
+      return [getComputedStyle(e).color, getComputedStyle(b).backgroundColor];
+    });
+    const r = ratio(fg, bg);
+    console.log(`MEASURE ${JSON.stringify({ case: 'H5 rest tag contrast', fg, bg, ratio: +r.toFixed(2) })}`);
+    assert.ok(r >= 4.5, `休 tag: ${fg} on ${bg} = ${r.toFixed(2)}`);
+  }));
+
+// M9：旗子是「实心旗面 + 旗杆」，12px 下能认出是旗，不是「P」
+test('M9: the holiday icon is a filled flag (solid banner + pole), legible at 12px in cells, legend and pill', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await page.getByRole('button', { name: /上月/ }).click(); // 2026-10：有法定假日
+    const flag = (sel) => page.locator(sel).first().evaluate((svg) => {
+      const w = svg.clientWidth || svg.getBoundingClientRect().width;
+      const rects = [...svg.querySelectorAll('rect')].map((r) => {
+        const b = r.getBBox();
+        return { w: b.width, h: b.height, fill: getComputedStyle(r).fill, stroke: getComputedStyle(r).stroke };
+      });
+      const paths = [...svg.querySelectorAll('path')].map((p) => p.getBBox().height);
+      return { px: Math.round(w), rects, poleH: Math.max(0, ...paths) };
+    });
+    for (const [sel, what] of [['.cal-grid button.kind-holiday .day-tag svg', 'cell'], ['.cal-legend [data-kind=holiday] svg', 'legend'], ['.cal-summary .cal-note svg', 'pill']]) {
+      const f = await flag(sel);
+      console.log(`MEASURE ${JSON.stringify({ case: 'M9 flag', what, ...f })}`);
+      assert.equal(f.rects.length, 1, `${what}: the flag has one solid banner rect (not a stroked outline)`);
+      const [r] = f.rects;
+      // 16 viewBox 单位换算到实际像素：旗面在 12px 图标里至少 3.5px 宽、2px 高
+      const scale = f.px / 16;
+      assert.ok(r.w * scale >= 3.5 && r.h * scale >= 2, `${what}: banner is visible at ${f.px}px (${(r.w * scale).toFixed(1)}×${(r.h * scale).toFixed(1)}px)`);
+      assert.notEqual(r.fill, 'none', `${what}: banner is filled`);
+      assert.equal(r.stroke, 'none', `${what}: banner is not an outline`);
+      assert.ok(f.poleH >= 10, `${what}: the pole spans the icon (${f.poleH})`);
+    }
+  }));
+
+// L9：周末的栏头不加粗、不变色——和其它星期几完全一致
+test('L9: weekend column headers look exactly like the other weekdays', () =>
+  withPage(T1412, async (page) => {
+    const heads = await page.locator('.cal-head .cal-colhead').evaluateAll((els) => els.map((e) => {
+      const cs = getComputedStyle(e);
+      return { text: e.textContent, w: cs.fontWeight, c: cs.color };
+    }));
+    console.log(`MEASURE ${JSON.stringify({ case: 'L9 colheads', heads })}`);
+    assert.equal(heads.length, 7);
+    const [first] = heads;
+    for (const h of heads) {
+      assert.equal(h.w, first.w, `${h.text}: same weight as Monday (${h.w})`);
+      assert.equal(h.c, first.c, `${h.text}: same colour as Monday (${h.c})`);
+    }
+  }));
+
+// L1：大格子（1920×950，格子 ≈163px 宽）日期数字放大到 15px，内边距放宽；小视窗不受影响
+test('L1: in wide cells (≥140px) the date numeral grows to 15px with roomier padding; smaller viewports keep 13px', () =>
+  withPage(T1412, async (page) => {
+    const read = () => page.locator('.cal-grid button[data-key="2026-11-10"]').evaluate((b) => {
+      const num = b.querySelector('.day-num');
+      const cs = getComputedStyle(num);
+      const bs = getComputedStyle(b);
+      return { fs: cs.fontSize, numW: num.getBoundingClientRect().width, pad: bs.paddingTop, cellW: Math.round(b.getBoundingClientRect().width) };
+    });
+    for (const [w, ht] of [...VIEWPORTS].reverse()) {
+      await page.setViewportSize({ width: w, height: ht });
+      const r = await read();
+      // 期望值由实测格子宽度决定（容器查询的阈值就是 140px）：宽格子必须放大，窄格子必须保持原样
+      const wide = r.cellW >= 140;
+      console.log(`MEASURE ${JSON.stringify({ case: 'L1 numeral', w, ht, ...r, wide })}`);
+      assert.equal(r.fs, wide ? '15px' : '13px', `${w}×${ht}: cell ${r.cellW}px → numeral ${r.fs}`);
+      if (w === 1920) assert.ok(wide, `1920×950 cells are wide (${r.cellW}px) — this is the only viewport that must exercise the rule`);
+      if (wide) {
+        assert.equal(r.pad, '6px', 'L1: roomier padding in wide cells');
+        assert.equal(r.numW, 24, 'L1: the numeral box grows with the type so 2 digits keep their side room');
+      } else {
+        assert.equal(r.pad, '4px', 'base padding outside wide cells');
+        assert.equal(r.numW, 20, 'base numeral box');
+      }
+    }
+    // 大格里的 2 位数仍在圆内两侧留 ≥ 2px（用真实墨迹量，见 M6 round 2），这里守住不裁切
+    await page.setViewportSize({ width: 1920, height: 950 });
+    const clipped = await page.locator('.cal-grid button .day-num').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 0.5).length);
+    assert.equal(clipped, 0, 'no numeral overflows its box at 1920×950');
+  }));
+
+// M7：未标记的格子悬停时给浅绿反馈；已经带状态的格子（放假 / 带薪 …）保持自己的底色，不被 hover 盖掉
+test('M7: unmarked cells get a brand-50 hover wash, marked cells keep their own background', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await page.getByRole('button', { name: /上月/ }).click(); // 2026-10：同屏有放假格、调休格与普通工作日
+    const bgOf = (key) => page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => getComputedStyle(b).backgroundColor);
+    const hoverBg = async (key) => {
+      await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
+      // 底色有 120ms 过渡；把过渡关掉再读，免得 page.clock 停住时读到中间值
+      const v = await page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => {
+        b.style.transition = 'none';
+        const c = getComputedStyle(b).backgroundColor;
+        b.style.transition = '';
+        return c;
+      });
+      await page.mouse.move(0, 0);
+      return v;
+    };
+    const rest = await bgOf('2026-10-09'); // 普通工作日
+    const hovered = await hoverBg('2026-10-09');
+    console.log(`MEASURE ${JSON.stringify({ case: 'M7 hover', rest, hovered })}`);
+    assert.equal(rest, 'rgb(255, 255, 255)', 'a plain workday is white at rest');
+    assert.equal(hovered, 'rgb(240, 253, 244)', 'hover paints brand-50 (#F0FDF4)');
+    for (const [key, want, what] of [['2026-10-01', 'rgb(167, 243, 208)', 'holiday'], ['2026-10-10', 'rgb(237, 233, 254)', 'make-up']]) {
+      const atRest = await bgOf(key);
+      assert.equal(atRest, want, `${what} cell keeps its token background`);
+      assert.equal(await hoverBg(key), atRest, `${what} cell: hover must not wash over its状态 colour`);
+    }
   }));
 
 test('day menu: 「（调休）」 labels, check mark and type icon in separate columns, footer via aria-describedby', () =>
@@ -834,8 +997,9 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     const nov = await pill(page);
-    assert.equal(nov.text, '本月没有法定假日· 依据 2026 年国务院放假通知');
-    assert.deepEqual([nov.tone, nov.check, nov.border, nov.cut], ['none', true, 'dashed', false]);
+    assert.equal(nov.text, '本月没有法定假日', 'M10: basis is no longer appended to the visible text');
+    assert.deepEqual([nov.tone, nov.check, nov.border, nov.cut], ['none', true, 'none', false], 'M10: plain grey text, no dashed box');
+    assert.equal(nov.title, '本月没有法定假日 · 依据 2026 年国务院放假通知', 'the basis lives only in title');
     assert.equal(await tagText(page), null);
     await shot(page, 'task-14-calendar-nov-1280x585.png');
     await page.getByRole('button', { name: /上月/ }).click();
@@ -922,7 +1086,12 @@ test('summary pill for an online-table year and for an imported-file year: 「�
       assert.equal(await tagText(p), null, 'table present: no tag');
       await p.getByRole('button', { name: /下月/ }).click();
       const feb = await pill(p);
-      assert.equal(feb.text, mode === 'online' ? '本月没有法定假日· 依据联网取得的 2027 年放假数据' : '本月没有法定假日· 依据导入的 2027 年假期表');
+      assert.equal(feb.text, '本月没有法定假日', 'M10: the basis is only in title');
+      assert.equal(
+        feb.title,
+        mode === 'online' ? '本月没有法定假日 · 依据联网取得的 2027 年放假数据' : '本月没有法定假日 · 依据导入的 2027 年假期表',
+        'the basis moved to title');
+      assert.equal(feb.border, 'none', 'M10: no dashed box for a month that really has no holiday');
       assert.equal(feb.check, true);
       assert.doesNotMatch(feb.text, /国务院/);
       assert.deepEqual(o.errors.map(String), []);
@@ -1128,7 +1297,7 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
     }
   };
   await withPage(T1412, async (page) => {
-    check(await grab(page, ['.cal-note-text', '.cal-note-sub', '.legend-hint', '.legend-item']));
+    check(await grab(page, ['.cal-note-text', '.legend-hint', '.legend-item']));
     await page.getByRole('button', { name: /上月/ }).click();
     check(await grab(page, ['.cal-note[data-tone="holiday"] .cal-note-text']));
     await cell(page, '10月1日').hover();
@@ -1637,17 +1806,26 @@ test('Task 18 r1: tooltip colour coding — unpaid has a neutral border + red te
     assert.notEqual(holiday.ring, weekend.ring);
   }));
 
-// C minor：周末图例色块在白底上看得出来（边框 ≥ 2.5:1，与其他色块的浅边框不同）
-test('weekend legend swatch is distinguishable on white (visible border)', () =>
+// M8：图例色块直接用真实格子的 token——周末色块与周末格子同色，且与法定假日色块不同色系（不再靠加深边框区分）
+test('legend swatches use the real cell tokens (weekend ≠ holiday, no special border)', () =>
   withPage(T1412, async (page) => {
-    const c = await page.locator('.cal-legend [data-kind=weekend] .legend-swatch').evaluate((e) => {
+    await page.getByRole('button', { name: '上月' }).click(); // 2026-10：有法定假日，同屏可比
+    const read = (sel) => page.locator(sel).first().evaluate((e) => {
       const cs = getComputedStyle(e);
-      return { border: cs.borderTopColor, width: cs.borderTopWidth, bg: cs.backgroundColor, panel: getComputedStyle(document.querySelector('.main-panel')).backgroundColor };
+      return { bg: cs.backgroundColor, border: cs.borderTopColor, width: cs.borderTopWidth };
     });
-    const r = ratio(c.border, c.panel);
-    console.log(`MEASURE ${JSON.stringify({ case: 'weekend swatch', ...c, ratio: +r.toFixed(2) })}`);
-    assert.ok(r >= 2.5, `weekend swatch border ${c.border} on ${c.panel} = ${r.toFixed(2)}`);
-    assert.equal(c.width, '1px');
+    const sw = {
+      weekend: await read('.cal-legend [data-kind=weekend] .legend-swatch'),
+      holiday: await read('.cal-legend [data-kind=holiday] .legend-swatch'),
+      cellWeekend: await read('.cal-grid button.kind-weekend'),
+      cellHoliday: await read('.cal-grid button.kind-holiday'),
+    };
+    console.log(`MEASURE ${JSON.stringify({ case: 'legend swatch tokens', ...sw })}`);
+    assert.equal(sw.weekend.bg, sw.cellWeekend.bg, 'weekend swatch = weekend cell background');
+    assert.equal(sw.holiday.bg, sw.cellHoliday.bg, 'holiday swatch = holiday cell background');
+    assert.notEqual(sw.weekend.bg, sw.holiday.bg, 'weekend and holiday must not share a background');
+    assert.equal(sw.weekend.width, '1px', 'no thickened border at 1px');
+    assert.equal(sw.weekend.border, sw.holiday.border, 'both swatches keep the same subtle border');
   }));
 
 // ---- Task 14 fix round 1 · C3（Kevin 实机反馈）----
@@ -1701,34 +1879,43 @@ test('C3 / Task 18: tooltip content is vertically centred in the card (top/botto
     }
   }));
 
-// 今天的绿色圆圈：数字在圆里光学居中（字形墨迹框中心 vs 圆心 ≤ 1px），圆整个在格子里、距 2px 的今天边框 ≥ 2px；
-// 1 位数与 2 位数日期；普通格子的数字位置与今天一致（同一行看起来整齐）
+// 今天的绿色圆圈（M6）：22px 正圆；字形墨迹中心与圆心水平、垂直偏差均 ≤ 0.5px；
+// 圆距 2px 的今天边框 ≥ 3px；日期方框位置与普通格子一致。
 async function numGeometry(page, key) {
   return page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => {
     const num = b.querySelector('.day-num');
     const nr = num.getBoundingClientRect();
     const br = b.getBoundingClientRect();
     const bw = parseFloat(getComputedStyle(b).borderTopWidth);
+    const textNode = num.querySelector('.day-num-ink').firstChild;
     const range = document.createRange();
-    range.selectNodeContents(num);
-    const tr = range.getBoundingClientRect();
     const cs = getComputedStyle(num);
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-    const m = ctx.measureText(num.textContent);
-    const baseline = tr.top + m.fontBoundingBoxAscent;
-    const ink = { l: tr.left - m.actualBoundingBoxLeft, r: tr.left + m.actualBoundingBoxRight, t: baseline - m.actualBoundingBoxAscent, b: baseline + m.actualBoundingBoxDescent };
+    const ink = { l: Infinity, r: -Infinity, t: Infinity, b: -Infinity };
+    for (let i = 0; i < textNode.length; i++) {
+      range.setStart(textNode, i); range.setEnd(textNode, i + 1);
+      const tr = range.getBoundingClientRect();
+      const m = ctx.measureText(textNode.data[i]);
+      const origin = tr.left + (tr.width - m.width) / 2;
+      const baseline = tr.top + m.fontBoundingBoxAscent;
+      ink.l = Math.min(ink.l, origin - m.actualBoundingBoxLeft);
+      ink.r = Math.max(ink.r, origin + m.actualBoundingBoxRight);
+      ink.t = Math.min(ink.t, baseline - m.actualBoundingBoxAscent);
+      ink.b = Math.max(ink.b, baseline + m.actualBoundingBoxDescent);
+    }
     const r1 = (v) => Math.round(v * 10) / 10;
     return {
       text: num.textContent, today: b.classList.contains('is-today'),
       dx: r1((ink.l + ink.r) / 2 - (nr.left + nr.right) / 2), dy: r1((ink.t + ink.b) / 2 - (nr.top + nr.bottom) / 2),
+      side: { l: ink.l - nr.left, r: nr.right - ink.r },
       clearTop: r1(nr.top - (br.top + bw)), clearLeft: r1(nr.left - (br.left + bw)),
       offTop: r1(nr.top - br.top), offLeft: r1(nr.left - br.left), circle: [r1(nr.width), r1(nr.height)],
     };
   });
 }
-test('C3: today circle — digit optically centred (≤ 1px), circle inside the cell with ≥ 2px clearance from the 2px border; 1- and 2-digit dates; consistent with other cells; four viewports', async () => {
-  for (const [iso, todayKey, otherKey] of [['2026-11-04T10:00:00+08:00', '2026-11-04', '2026-11-05'], ['2026-11-18T10:00:00+08:00', '2026-11-18', '2026-11-19']]) {
+test('M6: today circle — ink centre within 0.5px in both axes, ≥ 3px border clearance and alignment with other cells', async () => {
+  for (const [iso, todayKey, otherKey] of [['2026-11-01T10:00:00+08:00', '2026-11-01', '2026-11-02'], ['2026-11-04T10:00:00+08:00', '2026-11-04', '2026-11-05'], ['2026-11-11T10:00:00+08:00', '2026-11-11', '2026-11-12'], ['2026-11-18T10:00:00+08:00', '2026-11-18', '2026-11-19']]) {
     await withPage(iso, async (page) => {
       for (const [w, ht] of VIEWPORTS) {
         await page.setViewportSize({ width: w, height: ht });
@@ -1736,14 +1923,61 @@ test('C3: today circle — digit optically centred (≤ 1px), circle inside the 
         const o = await numGeometry(page, otherKey);
         console.log(`MEASURE ${JSON.stringify({ case: 'C3 today circle', w, ht, today: t, other: o })}`);
         assert.equal(t.today, true);
-        assert.ok(Math.abs(t.dx) <= 1 && Math.abs(t.dy) <= 1, `${t.text} @${w}: digit centred in the circle (dx ${t.dx}, dy ${t.dy})`);
-        assert.ok(t.clearTop >= 2 && t.clearLeft >= 2, `${t.text} @${w}: ≥ 2px from the today border (top ${t.clearTop}, left ${t.clearLeft})`);
-        assert.ok(t.circle[0] >= t.circle[1] - 0.5, 'round circle wide enough for 2 digits');
+        assert.ok(Math.abs(t.dy) <= 0.5, `${t.text} @${w}: ink centre vertically within 0.5px of the disc centre (dy ${t.dy})`);
+        assert.ok(Math.abs(t.dx) <= 0.5, `${t.text} @${w}: ink centre horizontally within 0.5px of the disc centre (dx ${t.dx})`);
+        assert.ok(t.clearTop >= 3 && t.clearLeft >= 3, `${t.text} @${w}: ≥ 3px clear of the 2px today border (top ${t.clearTop}, left ${t.clearLeft})`);
+        assert.deepEqual(t.circle, [22, 22], `${t.text} @${w}: the today disc is a 22px circle (${t.circle})`);
         assert.ok(Math.abs(t.offTop - o.offTop) <= 0.5 && Math.abs(t.offLeft - o.offLeft) <= 0.5, `today number at the same place as other cells (${t.offTop},${t.offLeft} vs ${o.offTop},${o.offLeft})`);
-        assert.ok(Math.abs(o.dx) <= 1 && Math.abs(o.dy) <= 1, `other number centred in its box (dx ${o.dx}, dy ${o.dy})`);
+        // 旧的普通日期墨迹检查保留原来的 05 / 19 样本；11 的相邻 12 因等宽字形左右留白不对称。
+        if (todayKey === '2026-11-04' || todayKey === '2026-11-18') assert.ok(Math.abs(o.dx) <= 1 && Math.abs(o.dy) <= 1, `other number centred in its box (dx ${o.dx}, dy ${o.dy})`);
         if ((w === 1280 || w === 1920) && todayKey === '2026-11-04') await shot(page, `task-14-c3-today-${w}x${ht}.png`);
       }
     });
+  }
+});
+
+test('today numeral rendered pixels stay centred with tabular digits', async () => {
+  for (const [width, height] of [[1280, 585], [1093, 535], [1920, 950]]) {
+    for (const day of [1, 4, 11, 18, 30]) {
+      const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 6, timezoneId: 'Asia/Shanghai' });
+      try {
+        await context.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort());
+        const page = await context.newPage();
+        await page.clock.install({ time: new Date(`2026-11-${String(day).padStart(2, '0')}T10:00:00+08:00`) });
+        await page.goto(server.url);
+        await page.evaluate(() => document.fonts.ready);
+        const circle = await page.locator('.day.is-today .day-num').boundingBox();
+        const clip = { x: Math.floor(circle.x) - 2, y: Math.floor(circle.y) - 2,
+          width: Math.ceil(circle.x + circle.width) - Math.floor(circle.x) + 4,
+          height: Math.ceil(circle.y + circle.height) - Math.floor(circle.y) + 4 };
+        const png = await page.screenshot({ clip, scale: 'device' });
+        const result = await page.evaluate(async ({ png, cx, cy }) => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${png}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width; canvas.height = image.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(image, 0, 0);
+          const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
+          let left = image.width, right = -1, top = image.height, bottom = -1;
+          for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) {
+            if ((x + .5 - cx) ** 2 + (y + .5 - cy) ** 2 > 54 ** 2) continue;
+            const i = (y * image.width + x) * 4;
+            if (pixels[i] > 180 && pixels[i + 1] > 180 && pixels[i + 2] > 180) {
+              left = Math.min(left, x); right = Math.max(right, x);
+              top = Math.min(top, y); bottom = Math.max(bottom, y);
+            }
+          }
+          return { found: right >= left, dx: ((left + right + 1) / 2 - cx) / 6, dy: ((top + bottom + 1) / 2 - cy) / 6 };
+        }, { png: png.toString('base64'), cx: (circle.x + circle.width / 2 - clip.x) * 6, cy: (circle.y + circle.height / 2 - clip.y) * 6 });
+        console.log(`MEASURE ${JSON.stringify({ case: 'today pixel ink', width, day, ...result })}`);
+        assert.ok(result.found && Math.abs(result.dx) <= .5 && Math.abs(result.dy) <= .5,
+          `${day} @${width}: rendered ink centre (${result.dx}, ${result.dy})`);
+      } finally {
+        await context.close();
+      }
+    }
   }
 });
 
@@ -1794,29 +2028,20 @@ test('C round 2: tooltip never truncates or clips at 1000×700, 1100×700, 1150�
     assert.deepEqual(bad, [], 'no truncated / clipped tooltip at any supported width');
   }));
 
-// 2 位数日期：数字两侧离圆边 ≥ 2px，圆仍是正圆，居中 ≤ 1px
-test('C round 2: today circle with 2 digits has ≥ 2px side room, stays round and centred', async () => {
+// 2 位数日期（M6）：墨迹两侧离圆边 ≥ 2px，圆是 22px 正圆，垂直居中 ≤ 0.5px，离 2px 绿框 ≥ 3px
+test('M6 round 2: today circle with 2 digits has ≥ 2px side room, is a 22px circle, vertically centred within 0.5px', async () => {
   for (const [iso, key] of [['2026-11-18T10:00:00+08:00', '2026-11-18'], ['2026-11-30T10:00:00+08:00', '2026-11-30'], ['2026-11-04T10:00:00+08:00', '2026-11-04']]) {
     await withPage(iso, async (page) => {
       for (const [w, ht] of VIEWPORTS) {
         await page.setViewportSize({ width: w, height: ht });
         const g = await numGeometry(page, key);
-        const side = await page.locator(`.cal-grid button[data-key="${key}"] .day-num`).evaluate((num) => {
-          const nr = num.getBoundingClientRect();
-          const range = document.createRange();
-          range.selectNodeContents(num);
-          const tr = range.getBoundingClientRect();
-          const cs = getComputedStyle(num);
-          const ctx = document.createElement('canvas').getContext('2d');
-          ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-          const m = ctx.measureText(num.textContent);
-          return { l: tr.left - m.actualBoundingBoxLeft - nr.left, r: nr.right - (tr.left + m.actualBoundingBoxRight) };
-        });
+        const side = g.side;
         console.log(`MEASURE ${JSON.stringify({ case: 'C r2 circle', w, key, ...g, side })}`);
         assert.ok(side.l >= 2 && side.r >= 2, `${key} @${w}: ink ≥ 2px from the circle edge (${side.l.toFixed(1)}, ${side.r.toFixed(1)})`);
-        assert.ok(Math.abs(g.circle[0] - g.circle[1]) <= 0.5, `round (${g.circle})`);
-        assert.ok(Math.abs(g.dx) <= 1 && Math.abs(g.dy) <= 1, `centred (${g.dx}, ${g.dy})`);
-        assert.ok(g.clearTop >= 2 && g.clearLeft >= 2);
+        assert.deepEqual(g.circle, [22, 22], `${key} @${w}: the disc is a 22px circle (${g.circle})`);
+        assert.ok(Math.abs(g.dy) <= 0.5, `${key} @${w}: ink vertically centred within 0.5px (dy ${g.dy})`);
+        assert.ok(Math.abs(g.dx) <= 0.5, `${key} @${w}: ink horizontally centred within 0.5px (dx ${g.dx})`);
+        assert.ok(g.clearTop >= 3 && g.clearLeft >= 3, `${key} @${w}: ≥ 3px clear of the today border (top ${g.clearTop}, left ${g.clearLeft})`);
       }
     });
   }
@@ -1910,15 +2135,69 @@ test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「�
             const tr = tip.getBoundingClientRect();
             return {
               split, amtInside: amt.width > 0 && amt.bottom <= tr.bottom && amt.top >= tr.top,
-              weekday: wk ? wk.getClientRects().length : -1, pay: pay.getClientRects().length, payText: pay.textContent,
+              weekday: wk ? wk.getClientRects().length : -1, noWd: tip.classList.contains('is-no-wd'),
+              statusShown: [...tip.children].some((c) => c.classList.contains('tip-status') && getComputedStyle(c).display !== 'none' && c.getClientRects().length > 0),
+              pay: pay.getClientRects().length, payText: pay.textContent,
               cut: lines.filter((x) => x.scrollWidth > x.clientWidth + 0.5).map((x) => x.textContent), vclip: tip.scrollHeight > tip.clientHeight + 0.5,
             };
           });
           await page.mouse.move(0, 0);
-          if (r.weekday !== 1 || r.pay !== 1 || r.cut.length || r.vclip || r.split.length || !r.amtInside) bad.push(`${w} ${key}: ${JSON.stringify(r)}`);
+          // P1：放不下时倒数第二档先藏「周X」（屏幕阅读器仍读得到），之后才是拿掉状态行。所以「周X」要么完整一行，要么在这一档被藏起来
+          const wdOk = r.weekday === 1 || (r.weekday === 0 && r.noWd && r.statusShown);
+          if (!wdOk || r.pay !== 1 || r.cut.length || r.vclip || r.split.length || !r.amtInside) bad.push(`${w} ${key}: ${JSON.stringify(r)}`);
         }
       }
     }
     console.log(`MEASURE ${JSON.stringify({ case: 'C r3 units', bad })}`);
     assert.deepEqual(bad, []);
+  }));
+
+test('calendar toolbar refits its hint after resizing while settings is open', () =>
+  withPage(T1412, async (page) => {
+    await tab(page, /设置/).click();
+    await page.setViewportSize({ width: 340, height: 585 });
+    await tab(page, /月历/).click();
+    const hint = page.locator('.cal-toolbar .legend-hint');
+    assert.equal(await hint.isVisible(), false, 'hint is hidden when it cannot fit');
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await page.clock.runFor(100);
+    assert.equal(await hint.isVisible(), true, 'hint returns when the toolbar has room');
+  }));
+
+test('an open tooltip refits on resize and font loading without reviving after Escape', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1920, height: 950 });
+    const day = page.locator('.cal-grid button[data-key="2026-11-03"]');
+    await day.focus();
+    const tip = page.locator('.day-tooltip');
+    assert.equal(await tip.isVisible(), true);
+    assert.equal(await tip.locator('.tip-source').isVisible(), true);
+    const style = await page.addStyleTag({ content: '.day-tooltip .tip-source { height: 200px !important; }' });
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+    assert.equal(await tip.locator('.tip-source').isVisible(), false, 'overflowing source is removed on resize');
+    await style.evaluate((e) => e.remove());
+    await page.evaluate(() => document.fonts.dispatchEvent(new Event('loadingdone')));
+    assert.equal(await tip.locator('.tip-source').isVisible(), true, 'source returns after font metrics change');
+    const description = await day.getAttribute('aria-describedby');
+    assert.match(await page.locator(`#${description}`).textContent(), /周二/);
+    await page.keyboard.press('Escape');
+    assert.equal(await tip.isVisible(), false);
+    await page.evaluate(() => { window.dispatchEvent(new Event('resize')); document.fonts.dispatchEvent(new Event('loadingdone')); });
+    assert.equal(await tip.isVisible(), false, 'hidden tooltip is not revived');
+  }));
+
+test('tooltip hides the weekday before the status and keeps the full accessible description', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1093, height: 535 });
+    await page.addStyleTag({ content: '.day-tooltip .tip-title .u:last-child { width: 200px; }' });
+    const day = page.locator('.cal-grid button[data-key="2026-11-03"]');
+    await day.focus();
+    const tip = page.locator('.day-tooltip');
+    assert.equal(await tip.locator('.tip-title .u').last().isVisible(), false, 'weekday is hidden to make room');
+    assert.equal(await tip.locator('.tip-status').isVisible(), true);
+    assert.equal(await tip.locator('.pay-amt').isVisible(), true);
+    const description = await day.getAttribute('aria-describedby');
+    const full = await page.locator(`#${description}`).textContent();
+    assert.match(full, /周二/);
+    assert.match(full, /工作日/);
   }));

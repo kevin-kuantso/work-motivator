@@ -9,12 +9,14 @@ const NOW = new Date(2026, 10, 4, 10); // 注入的「今天」：2026-11-04
 const ctx = (y, m, tables = HOLIDAYS_CN, today = NOW) => monthContext(y, m - 1, tables, today, t);
 const online2027 = { off: { '2027-01-01': '元旦', '2027-01-02': '元旦', '2027-01-03': '元旦' }, makeup: {}, source: 'online' };
 
-test('built-in year, month without holidays: dashed ✓ 「本月没有法定假日 · 依据 2026 年国务院放假通知」', () => {
+test('built-in year, month without holidays: ✓ 「本月没有法定假日」, basis only in title (M10)', () => {
   assert.deepEqual(ctx(2026, 11), {
-    tone: 'none', check: true, text: '本月没有法定假日', sub: '· 依据 2026 年国务院放假通知',
+    tone: 'none', check: true, text: '本月没有法定假日',
     title: '本月没有法定假日 · 依据 2026 年国务院放假通知',
   });
+  assert.equal(ctx(2026, 11).sub, undefined, 'M10: the visible text no longer carries a second fragment');
   assert.equal(ctx(2026, 3).text, '本月没有法定假日');
+  assert.equal(ctx(2026, 3).title, '本月没有法定假日 · 依据 2026 年国务院放假通知');
 });
 
 test('built-in months with holidays: off ranges grouped by name, make-up days listed (name only when it differs)', () => {
@@ -22,7 +24,7 @@ test('built-in months with holidays: off ranges grouped by name, make-up days li
   assert.equal(oct.text, '国庆 10/1–10/7 放假，10/10 调休上班');
   assert.equal(oct.tone, 'holiday');
   assert.equal(oct.check, false);
-  assert.equal(oct.sub, null, 'mock: holiday months show only the ranges');
+  assert.equal(oct.sub, undefined, 'M10: no visible basis fragment at all');
   assert.equal(oct.title, '国庆 10/1–10/7 放假，10/10 调休上班 · 依据 2026 年国务院放假通知');
   assert.equal(ctx(2026, 9).text, '国庆 9/20 调休上班；中秋 9/25–9/27 放假', 'date order; 9/20 belongs to 国庆, not 中秋');
   assert.equal(ctx(2026, 2).text, '春节 2/15–2/23 放假，2/14、2/28 调休上班');
@@ -34,21 +36,21 @@ test('built-in months with holidays: off ranges grouped by name, make-up days li
 
 test('online and imported tables: the basis says where the data came from, never 「国务院」', () => {
   const on = ctx(2027, 3, { ...HOLIDAYS_CN, 2027: online2027 });
-  assert.equal(on.sub, '· 依据联网取得的 2027 年放假数据');
+  assert.equal(on.title, '本月没有法定假日 · 依据联网取得的 2027 年放假数据', 'the source is stated in title only');
   assert.equal(on.check, true);
   assert.equal(ctx(2027, 1, { ...HOLIDAYS_CN, 2027: online2027 }).text, '元旦 1/1–1/3 放假');
   const file = ctx(2027, 3, { ...HOLIDAYS_CN, 2027: { ...online2027, source: 'file' } });
-  assert.equal(file.sub, '· 依据导入的 2027 年假期表');
+  assert.equal(file.title, '本月没有法定假日 · 依据导入的 2027 年假期表');
   assert.doesNotMatch(file.title, /国务院/);
   // 来源不明（理论上不会出现）：不写任何依据，也不打 ✓
   const odd = ctx(2027, 3, { ...HOLIDAYS_CN, 2027: { ...online2027, source: 'weird' } });
-  assert.deepEqual([odd.check, odd.sub, odd.title], [false, null, '本月没有法定假日']);
+  assert.deepEqual([odd.check, odd.sub, odd.title], [false, undefined, '本月没有法定假日']);
 });
 
 test('no-table current / future years (tag shown in the same row): ranges only, basis in title; never an official claim', () => {
   const jan = ctx(2027, 1);
   assert.equal(jan.text, '元旦 1/1 放假');
-  assert.equal(jan.sub, null, 'the missing-table tag already explains it');
+  assert.equal(jan.sub, undefined, 'the missing-table tag already explains it; nothing extra in the pill');
   assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
   assert.equal(jan.check, false);
   assert.equal(ctx(2027, 2).text, '春节 2/5–2/8 放假', 'R40 lunar days');
@@ -62,11 +64,11 @@ test('no-table current / future years (tag shown in the same row): ranges only, 
 test('no-table PAST years: no tag; the pill states what the app marked (R49: fixed-only wording for 2025, never 「待公布」)', () => {
   const oct = ctx(2025, 10);
   assert.equal(oct.text, '国庆 10/1–10/3 放假');
-  assert.equal(oct.sub, null, 'round 2: basis in title only, same as current / future years');
+  assert.equal(oct.sub, undefined, 'basis in title only, same as current / future years');
   assert.equal(oct.title, '国庆 10/1–10/3 放假 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
   const mar = ctx(2025, 3);
   assert.equal(mar.text, '本月没有已标出的法定假日');
-  assert.equal(mar.sub, null);
+  assert.equal(mar.sub, undefined);
   assert.equal(mar.title, '本月没有已标出的法定假日 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
   assert.doesNotMatch(oct.title + mar.title, /待公布|国务院/);
   // 2027 也会变成过去：今天是 2028 年时
@@ -75,7 +77,7 @@ test('no-table PAST years: no tag; the pill states what the app marked (R49: fix
 
 test('years before 2025 without a table: nothing is marked and the pill says so', () => {
   // round 3：同一行有「2024 年未标法定假日」标签，胶囊只写本月事实，长说明在 title
-  assert.deepEqual(ctx(2024, 10), { tone: 'unknown', check: false, text: '本月没有已标出的法定假日', sub: null, title: '没有 2024 年的假期数据，未标出假日' });
+  assert.deepEqual(ctx(2024, 10), { tone: 'unknown', check: false, text: '本月没有已标出的法定假日', title: '没有 2024 年的假期数据，未标出假日' });
 });
 
 test('collisions and grouping: 2028-10-03 (国庆 + 中秋) once as 国庆; same name split into two runs; several names in a month', () => {
@@ -138,12 +140,12 @@ test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and t
     assert.equal(c.text, text, `${y}-${m}`);
     assert.equal(tag?.kind ?? null, tagKind, `${y}-${m} tag`);
     assert.match(c.title, /只标出固定日期的法定假日；其余假日和补假、调休未标出$/, `${y}-${m} title`);
-    assert.equal(c.sub, null, 'basis in title for every no-table kind (round 2)');
+    assert.equal(c.sub, undefined, 'basis in title for every no-table kind');
     if (tag) {
       assert.equal(tag.text, `${y} 年只标了元旦、劳动节、国庆`);
       assert.match(tag.title, /只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）/);
     }
-    all.push(c.title, c.sub ?? '', tag?.title ?? '', tag?.text ?? '');
+    all.push(c.title, tag?.title ?? '', tag?.text ?? '');
   }
   const joined = all.join('|');
   assert.doesNotMatch(joined, /未公布|待公布|国务院|依据/);

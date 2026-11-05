@@ -1,29 +1,43 @@
 // 日期格悬停 / 聚焦提示（spec §12.2、§13；Task 18 · V1「白卡盖格」）：白底卡片直接盖在该格上（同样大小，inset:0），内容置中，
 // 永远不会盖到下面或旁边的格子；纯视觉层：aria-hidden，屏幕阅读器经由格子的 aria-describedby 读取完整文字（含来源）；
 // pointer-events: none，不拦截点击。行：日期｜状态｜来源｜计薪（金额为主角）。
-// 「来源」行不再按「6 周月份」一刀切，而是实测：依序试各档位（收紧行距 → 拿掉来源 → 窄格子计薪回到一行 → 再小一号字 → 最后手段拿掉状态行），金额永远保留。
+// 「来源」行不再按「6 周月份」一刀切，而是实测：依序试各档位（收紧行距 → 拿掉来源 → 窄格子计薪回到一行 → 再小一号字 →
+// 拿掉「周X」→ 最后手段拿掉状态行），金额永远保留。窗口 resize 与字体就绪后重选一次分级（同样的规则，不复活已隐藏的提示）。
 import { h } from './dom.js';
 
-const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-lean'];
+const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-no-wd', 'is-lean'];
 const TIERS = [
   [], ['is-tight'], ['is-compact'], ['is-compact', 'is-tight'],
   ['is-inline'], ['is-inline', 'is-tight'], ['is-inline', 'is-compact'], ['is-inline', 'is-compact', 'is-tight'],
-  ['is-inline', 'is-compact', 'is-tight', 'is-mini'], ['is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-lean'],
+  ['is-inline', 'is-compact', 'is-tight', 'is-mini'],
+  ['is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd'],
+  ['is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd', 'is-lean'],
 ];
 
 const kindOf = (btn) => ([...btn.classList].find((c) => c.startsWith('kind-')) ?? 'kind-workday').slice(5);
 
 export function createDayTooltip(doc) {
-  // 文字拆成不可再拆的「单位」：sep 给了就按它拆（日期 / 周X 之间的空格，拆开后补回空格）；没给就在每个「·」之后断开
-  const units = (text, sep) => (sep ? text.split(sep) : text.split(/(?<=·)/)).flatMap((u, i) => [i && sep ? sep : null, h(doc, 'span', { class: 'u', text: u })]);
+  // 文字拆成不可再拆的「单位」：sep 给了就按它拆（日期 / 周X 之间的空格，拆开后补回空格）；没给就在每个「·」之后断开。
+  // 标了 wd 的单位（「周X」）在倒数第二档 is-no-wd 里整个隐藏：先于「拿掉状态行」的最后手段，屏幕阅读器仍读得到（格子的 aria-describedby）
+  const units = (text, sep, weekday) => (sep ? text.split(sep) : text.split(/(?<=·)/)).flatMap((u, i) => [i && sep ? sep : null, h(doc, 'span', { class: weekday && i === 1 ? 'u u-wd' : 'u', text: u })]);
 
   const win = doc.defaultView;
   const el = h(doc, 'div', { class: 'day-tooltip', 'aria-hidden': 'true', hidden: true });
   let timer = null;
+  let last = null; // 目前显示的格子与模型：resize / 字体就绪后重选分级用
 
   function cancel() {
     if (timer !== null) win.clearTimeout(timer);
     timer = null;
+  }
+
+  // 依序试各档位，选第一个完全放得下的（高、宽都不溢出）；全都不行就停在最后一档（金额永远保留）
+  function pick() {
+    for (const tier of TIERS) {
+      el.classList.remove(...ALL);
+      el.classList.add(...tier);
+      if (!over()) return;
+    }
   }
 
   function show(btn, m) {
@@ -34,7 +48,7 @@ export function createDayTooltip(doc) {
     const amount = payRest.join(' ');
     el.replaceChildren(
       // 「11月18日」「周三」各是不可拆的单位：窄格子换行时只在单位之间换（round 3）
-      h(doc, 'span', { class: 'tip-title' }, units(m.titleShort, ' ')),
+      h(doc, 'span', { class: 'tip-title' }, units(m.titleShort, ' ', true)),
       // 状态与来源只在「·」处换行（「法定假日·」「劳动节」各是整体），名字中间不折行
       h(doc, 'span', { class: 'tip-status' }, units(m.statusShort)),
       h(doc, 'span', { class: 'tip-source' }, units(m.sourceLabel)),
@@ -44,12 +58,16 @@ export function createDayTooltip(doc) {
     el.classList.toggle('is-today', btn.classList.contains('is-today'));
     if (el.parentElement !== cell) cell.append(el);
     el.hidden = false;
-    // 依序试各档位，选第一个完全放得下的（高、宽都不溢出）；全都不行就停在最后一档（金额永远保留）
-    for (const tier of TIERS) {
-      el.classList.remove(...ALL);
-      el.classList.add(...tier);
-      if (!over()) return;
-    }
+    last = { btn, m };
+    pick();
+  }
+
+  // 窗口 resize / 字体就绪后重选分级：格子大小或字体度量变了，原本可用的档位可能不再放得下（或反过来）。
+  // 已隐藏的提示不复活；格子被重绘（render() 换掉节点）后不再重选
+  function refit() {
+    if (!last || el.hidden) return;
+    if (!last.btn.isConnected || el.parentElement !== last.btn.parentElement) return;
+    pick();
   }
 
   const over = () => el.scrollHeight > el.clientHeight + 0.5 || el.scrollWidth > el.clientWidth + 0.5
@@ -66,7 +84,16 @@ export function createDayTooltip(doc) {
   function hide() {
     cancel();
     el.hidden = true;
+    last = null;
   }
+
+  // 与 app.js 的参考宽度同步同一个套路：窗口 resize、字体就绪（fonts.ready）与字体载入完成（loadingdone）后重选分级。
+  // 同步执行、不排 rAF：e2e 用 page.clock 控制时间，rAF 可能被模拟掉
+  win.addEventListener('resize', refit);
+  try {
+    doc.fonts?.ready?.then?.(refit, () => {});
+    doc.fonts?.addEventListener?.('loadingdone', refit);
+  } catch { /* 旧的浏览器没有 FontFaceSet：忽略，show() 那一次分级仍有效 */ }
 
   return { el, show, later, hide };
 }
