@@ -73,12 +73,12 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     assert.equal(await text(page, `${card} .card-badge`), '上班中');
     assert.equal(await text(page, `${card} .card-label`), '今天已经赚了');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
-    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0128 /秒');
+    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0128/秒');
     assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥518.10');
     assert.equal(await text(page, `${card} .metric-hourly .metric-value`), '¥46.26');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥323.81');
-    assert.equal(await text(page, `${card} .card-progress-text`), '已工作 4.20 / 7.00 小时');
+    assert.equal(await text(page, `${card} .card-progress-text`), '已工作 4小时12分 / 共 7小时');
     assert.equal(await text(page, `${card} .card-countdown`), '距下班 2小时48分0秒');
     assert.equal(await page.locator(`${card} [role=progressbar]`).getAttribute('aria-valuenow'), '60');
     assert.equal(await visible(page, `${card} .card-payday`), false, 'payday row hidden when payday empty');
@@ -154,7 +154,7 @@ test('payday row appears after setting payday and persists', () =>
     assert.equal(await page.getByLabel('发薪日').isVisible(), true, 'payday visible without expanding 高级设置');
     assert.equal(await page.getByRole('switch', { name: '周末上班' }).isVisible(), true);
     await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
-    assert.equal(await text(page, `${card} .card-payday`), '距离发薪日 2 天');
+    assert.equal(await text(page, `${card} .card-payday`), '距发薪日 2 天');
     await page.getByLabel('发薪日').selectOption({ label: '每月 3 号' });
     assert.equal(await text(page, `${card} .card-payday`), '今天发薪');
     await page.reload();
@@ -201,7 +201,7 @@ test('lunch toggle hides lunch fields; lunch off counts lunch as work time', () 
     assert.equal(await page.getByLabel('午休开始时间').isVisible(), true);
     await sw.click();
     assert.equal(await page.getByLabel('午休开始时间').isVisible(), false);
-    assert.equal(await text(page, `${card} .card-progress-text`), '已工作 5.70 / 8.50 小时');
+    assert.equal(await text(page, `${card} .card-progress-text`), '已工作 5小时42分 / 共 8小时30分');
   }));
 
 test('calendar: day menu marks today as paid then unpaid leave; weekend → make-up work; undo', () =>
@@ -214,12 +214,13 @@ test('calendar: day menu marks today as paid then unpaid leave; weekend → make
     };
     await choose('11月3日', /^带薪假/);
     assert.equal(await text(page, `${card} .card-badge`), '带薪假');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.81');
     assert.equal(await text(page, `${card} .card-countdown`), '今天按全天计薪');
     assert.match(await text(page, '.toast-text'), /11\/3 已标记为带薪假/);
     await choose('11月3日', /^无薪假/);
     assert.equal(await text(page, `${card} .card-badge`), '无薪假');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 0.0000');
+    assert.equal(await visible(page, `${card} .card-amount`), false, 'Task 19 M1: no amount on unpaid leave');
+    assert.equal(await text(page, `${card} .card-label`), '今天不计薪');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥323.81');
     assert.match(await todayCell(page, '11月3日').textContent(), /无薪/);
     await page.reload();
@@ -239,22 +240,23 @@ test('calendar: day menu marks today as paid then unpaid leave; weekend → make
 
 test('calendar shows holiday names, legend, and a summary-row tag for years without a built-in table', () =>
   withPage('2026-10-01T10:00:00+08:00', async (page) => {
-    assert.equal(await text(page, `${card} .card-badge`), '休息日');
+    assert.equal(await text(page, `${card} .card-badge`), '法定假日 · 国庆'); // Task 19 H3
     assert.equal(await text(page, `${card} .card-label`), '今天休息 · 国庆');
     assert.equal(await visible(page, `${card} .card-amount`), false);
     assert.equal(await text(page, `${card} .card-countdown`), '距下个工作日 7 天');
-    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0000 /秒');
+    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '0%');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪');
     assert.equal(await todayCell(page, '10月1日').locator('.day-label').textContent(), '国庆', 'holiday cell: flag + name only, no 「假」 tag (Task 18)');
     assert.equal(await todayCell(page, '10月1日').locator('.day-label svg.icon-holiday').count(), 1);
     assert.match(await todayCell(page, '10月10日').textContent(), /班/);
     assert.match(await todayCell(page, '10月10日').getAttribute('aria-label'), /调休上班/);
     assert.match(await text(page, '.cal-legend'), /图例/);
-    assert.equal(await page.getByText('年仅标法定假日').count(), 0);
+    assert.equal(await page.getByText('年调休安排未内置，只标了节日').count(), 0);
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标法定假日');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年调休安排未内置，只标了节日');
     assertNoTraditional(await bodyText(page), 'rest day + 2027 view');
     await page.getByRole('button', { name: '回到今天' }).click();
     assert.equal(await text(page, '.cal-title'), '2026 年 10 月');
@@ -264,7 +266,7 @@ test('calendar shows holiday names, legend, and a summary-row tag for years with
 test('2027 (no built-in holiday table): the status card says so', () =>
   withPage('2027-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await visible(page, `${card} .card-year`), true);
-    assert.equal(await text(page, `${card} .card-year`), '2027 年仅标法定假日');
+    assert.equal(await text(page, `${card} .card-year`), '2027 年调休安排未内置，只标了节日');
     assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     // R39：1/1 是固定法定假日 → 1 月 20 个工作日、日薪 340.00；10:00 已赚 340 × 5400/25200 = 72.8571
     assert.equal(await text(page, `${card} .card-amount`), '¥ 72.8571');
@@ -279,23 +281,24 @@ test('lunch, before-work and after-work states', async () => {
   await withPage('2026-11-03T12:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '午休中');
     assert.equal(await text(page, `${card} .card-countdown`), '60 分钟后继续上班');
-    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0000 /秒');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '午休结束');
+    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '13:00');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 138.7755');
   });
   await withPage('2026-11-03T07:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '未上班');
-    assert.equal(await text(page, `${card} .card-label`), '今天还没开始');
+    assert.equal(await text(page, `${card} .card-label`), '08:30 开始计薪');
     assert.equal(await text(page, `${card} .card-countdown`), '距上班 1小时30分0秒');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 0.0000');
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 0.00');
   });
   await withPage('2026-11-03T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '已下班');
     assert.equal(await text(page, `${card} .card-label`), '今天辛苦了，收工！'); // Task 17
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.81');
   });
   await withPage('2026-09-20T10:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '上班中');
-    assert.equal(await text(page, `${card} .card-tag`), '调休');
+    assert.equal(await text(page, `${card} .card-tag`), '调休上班');
   });
 });
 

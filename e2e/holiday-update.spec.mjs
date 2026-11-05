@@ -159,7 +159,7 @@ test('2027-01-04 (current year missing): status card year tag disappears once th
 test('2027-01-04 offline: the card shows the missing-table tag and the plain weekday rule (control for the test above)', () =>
   withPage(JAN4, async (page, { autoUrls }) => {
     assert.equal(autoUrls.length, 3, 'three mirrors tried, all aborted');
-    assert.equal(await text(page, '#status-card .card-year'), '2027 年仅标法定假日');
+    assert.equal(await text(page, '#status-card .card-year'), '2027 年调休安排未内置，只标了节日');
     assert.equal(await text(page, '#status-card .metric-value >> nth=3'), '¥340.00', 'R39: 6800 / 20 (1/1 is a statutory rest day)');
   }));
 
@@ -175,7 +175,7 @@ test('empty upstream 2027 file → 「数据来源暂未发布」 info (not an e
     assert.equal(await page.locator('.notices .banner-error').isVisible(), false);
     await tab(page, '月历').click();
     await goMonth(page, 2);
-    assert.equal(await text(page, '.cal-year-tag'), '2027 年仅标法定假日', 'never treated as "no holidays"');
+    assert.equal(await text(page, '.cal-year-tag'), '2027 年调休安排未内置，只标了节日', 'never treated as "no holidays"');
     assert.deepEqual(await holidayRecord(page).then((r) => r.years), {}, 'nothing saved (only lastCheck)');
     // 手动检查同样是信息提示
     await checkNow(page);

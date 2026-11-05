@@ -178,7 +178,7 @@ test('copy gives the plain number; screen readers get the full text once (visual
       return {
         amount: pick(q('#status-card .card-amount')),
         month: pick(q('#status-card .metric-month')),
-        progress: pick(q('#status-card .card-progress')),
+        progress: pick(q('#status-card .card-progress-text')),
         countdown: pick(q('#status-card .card-countdown')),
         hidden: ['.card-amount', '.metric-month .metric-value', '.card-progress-text', '.card-countdown'].map((s) => q(`#status-card ${s}`).getAttribute('aria-hidden')),
         sr: [...document.querySelectorAll('#status-card .sr-text')].map((e) => e.textContent),
@@ -187,13 +187,13 @@ test('copy gives the plain number; screen readers get the full text once (visual
     });
     assert.equal(sel.amount, '¥ 194.2857');
     assert.equal(sel.month.replace(/\s+/g, ''), '本月累计¥518.10');
-    assert.equal(sel.progress.trim(), '已工作 4.20 / 7.00 小时', 'copied once (the sr copy is not selectable)');
+    assert.equal(sel.progress.trim(), '已工作 4小时12分 / 共 7小时', 'copied once (the sr copy is not selectable)');
     assert.equal(sel.countdown, '距下班 2小时48分0秒');
     assert.deepEqual(sel.hidden, ['true', 'true', 'true', 'true']);
-    assert.deepEqual(sel.sr, ['¥ 194.2857', '已工作 4.20 / 7.00 小时', '距下班 2小时48分0秒', '¥518.10']);
+    assert.deepEqual(sel.sr, ['¥ 194.2857', '距下班 2小时48分0秒', '已工作 4小时12分 / 共 7小时', '¥518.10']); // Task 19 M4: 倒数在进度头一行，先于进度文字
     assert.equal(sel.digits, 7);
     const aria = await page.locator('#status-card').ariaSnapshot();
-    for (const s of ['¥ 194.2857', '已工作 4.20 / 7.00 小时', '距下班 2小时48分0秒', '¥518.10']) {
+    for (const s of ['¥ 194.2857', '已工作 4小时12分 / 共 7小时', '距下班 2小时48分0秒', '¥518.10']) {
       assert.equal(aria.split(s).length - 1, 1, `accessible text "${s}" exactly once:\n${aria}`);
     }
     assert.ok(!/\b1 9 4\b/.test(aria), 'no digit-by-digit reading');

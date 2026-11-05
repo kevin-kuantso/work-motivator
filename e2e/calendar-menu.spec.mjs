@@ -170,14 +170,14 @@ test('weekday → 改为休息 gives 340.00; leave options keep 323.81; today le
     await item(page, /^带薪假/).click();
     assert.equal(await daily(page), '¥323.81');
     assert.equal(await text(page, `${card} .card-badge`), '带薪假');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.81');
     assert.equal(await text(page, `${card} .card-countdown`), '今天按全天计薪');
     assert.match(await text(page, '.toast-text'), /11\/3 已标记为带薪假/);
     await openMenu(page, '11月3日');
     assert.equal(await item(page, /^带薪假/).getAttribute('aria-checked'), 'true');
     await item(page, /^无薪假/).click();
     assert.equal(await text(page, `${card} .card-badge`), '无薪假');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 0.0000');
+    assert.equal(await page.locator(`${card} .card-amount`).isVisible(), false, 'Task 19 M1: no amount on unpaid leave');
     assert.equal(await daily(page), '¥323.81');
     assert.match(await cell(page, '11月3日').textContent(), /无薪/);
   }));

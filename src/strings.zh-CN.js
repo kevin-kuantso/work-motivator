@@ -163,14 +163,18 @@ export const STRINGS = {
     beforeWork: '未上班',
     afterWork: '已下班',
     restDay: '休息日',
+    holiday: '法定假日',
+    holidayName: (name) => ` · ${name}`,
     paidLeave: '带薪假',
     unpaidLeave: '无薪假',
-    makeupTag: '调休',
+    makeupTag: '调休上班',
   },
 
   card: {
     earnedNow: '今天已经赚了',
     notStarted: '今天还没开始',
+    // 未上班：金额是 0.00，标签说明几点开始计薪（时间取自设置）
+    startPay: (hhmm) => `${hhmm} 开始计薪`,
     earnedTotal: '今天一共赚了',
     // 已下班（排定的工作日收工后）的正反馈：换掉标签与「当前赚钱速度」格，不加行
     dayDone: '今天辛苦了，收工！',
@@ -183,22 +187,29 @@ export const STRINGS = {
     resumeIn: (n) => `${n} 分钟后继续上班`,
     nextWorkday: (n) => `距下个工作日 ${n} 天`,
     paidNote: '今天按全天计薪',
-    unpaidNote: '今天不计薪',
-    worked: (a, b) => `已工作 ${a} / ${b} 小时`,
+    // 无薪假：不显示金额，标签就是结论
+    unpaidLabel: '今天不计薪',
+    // 工时：已工作 2小时0分 / 共 7小时（小时、分钟由 format.js 拆出，单位写在这里）
+    worked: (a, b) => `已工作 ${a} / 共 ${b}`,
+    spanHM: (h, m) => (h > 0 ? `${h}小时${m}分` : `${m}分`),
+    spanH: (h, m) => (m === 0 ? `${h}小时` : h > 0 ? `${h}小时${m}分` : `${m}分`),
+    workedDone: (h, m) => (m === 0 ? `今天工作满 ${h} 小时` : `今天工作满 ${h}小时${m}分`),
     progressLabel: '工时进度',
     rate: '当前赚钱速度',
-    rateUnit: ' /秒',
+    rateUnit: '/秒',
+    lunchEnds: '午休结束',
+    startsAt: '上班时间',
     month: '本月累计',
     hourly: '时薪',
     dailyFull: '今日满勤可得',
-    payIn: (n) => `距离发薪日 ${n} 天`,
+    payIn: (n) => `距发薪日 ${n} 天`,
     payToday: '今天发薪',
     // 缺假期表的标签（R41）：只在当年与之后的年份显示；措辞按该年实际标出的日子
     // lunar：2027–2035（含春节 / 清明 / 端午 / 中秋）；fixed：其他 ≥ 2025 的年份（只有六个固定日期）；none：< 2025（什么都没标）
-    yearMissing: (year) => `${year} 年仅标法定假日`,
+    yearMissing: (year) => `${year} 年调休安排未内置，只标了节日`,
     // R49：只说 app 知道什么（未内置 / 未标出），不断言放假安排是否已公布
     yearMissingLong: (year) => `${year} 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出`,
-    yearMissingFixed: (year) => `${year} 年仅标固定日期的法定假日`,
+    yearMissingFixed: (year) => `${year} 年调休安排未内置，只标了节日`,
     yearMissingFixedLong: (year) => `${year} 年假期表未内置：只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）；其余假日和补假、调休未标出`,
     yearMissingNone: (year) => `${year} 年未标法定假日`,
     yearMissingNoneLong: (year) => `${year} 年假期表未内置，没有标出任何法定假日`,
@@ -270,7 +281,7 @@ export const STRINGS = {
     prevTitle: '上月（PgUp）',
     nextTitle: '下月（PgDn）',
     summary: (days, wage) => `本月应出勤 ${days} 天 · 日薪 ${wage}`,
-    legendHint: '点日期可标记：调休 · 带薪假 · 无薪假',
+    legendHint: '点日期可标记：调休上班 · 带薪假 · 无薪假',
     // 摘要行的情境胶囊（R36 / 决定 4）：放假区间与调休上班日取自该月实际使用的表；「依据」按该年数据来源如实写
     context: {
       noHoliday: '本月没有法定假日',

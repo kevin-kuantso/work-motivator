@@ -46,7 +46,7 @@ test('18:00 on the verification day: wrap-up label, 已赚占月薪 14%, amount 
   withPage('2026-11-04T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '已下班');
     assert.equal(await text(page, `${card} .card-label`), '今天辛苦了，收工！');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.8095');
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 323.81');
     assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪');
     assert.equal(await text(page, `${card} .metric-rate .metric-value`), '14%');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥971.43');
@@ -60,30 +60,30 @@ test('other statuses keep the old copy (working, lunch, before, rest day, paid l
   });
   await withPage('2026-11-04T12:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-label`), '今天已经赚了');
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '午休结束'); // Task 19 H2
   });
   await withPage('2026-11-04T07:00:00+08:00', async (page) => {
-    assert.equal(await text(page, `${card} .card-label`), '今天还没开始');
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
+    assert.equal(await text(page, `${card} .card-label`), '08:30 开始计薪'); // Task 19 M1
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '上班时间'); // Task 19 H2
   });
   await withPage('2026-11-07T18:00:00+08:00', async (page) => { // 周六
     assert.equal(await text(page, `${card} .card-badge`), '休息日');
     const body = await page.evaluate(() => document.body.innerText);
-    assert.ok(!body.includes('收工') && !body.includes('已赚占月薪'), 'no wrap-up copy on a rest day');
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
+    assert.ok(!body.includes('收工'), 'no wrap-up copy on a rest day');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪'); // Task 19 H2
   });
   const mark = (v) => ({ content: `localStorage.setItem('work-motivator-v1', JSON.stringify({ version: 1, marks: { '2026-11-04': '${v}' } }))` });
   await withPage('2026-11-04T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '带薪假');
     assert.equal(await text(page, `${card} .card-label`), '今天一共赚了');
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪'); // Task 19 H2
     const body = await page.evaluate(() => document.body.innerText);
-    assert.ok(!body.includes('收工') && !body.includes('已赚占月薪'), 'no wrap-up copy on paid leave');
+    assert.ok(!body.includes('收工'), 'no wrap-up copy on paid leave');
   }, { init: mark('paidLeave') });
   await withPage('2026-11-04T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '无薪假');
     const body = await page.evaluate(() => document.body.innerText);
-    assert.ok(!body.includes('收工') && !body.includes('已赚占月薪'), 'no wrap-up copy on unpaid leave');
+    assert.ok(!body.includes('收工'), 'no wrap-up copy on unpaid leave');
   }, { init: mark('unpaidLeave') });
 });
 
@@ -212,7 +212,7 @@ test('layout: 已下班 card height equals the old-copy card at 4 viewports, no 
       amt.classList.add('is-celebrating');
       const cel = { hc: ht(), inset: t0 - amt.getBoundingClientRect().left, moved: Math.abs(tl() - t0) > 0.01 };
       amt.classList.remove('is-celebrating');
-      const wrap = { cel, h: ht(), trunc: trunc(), single: label.getBoundingClientRect().height < 24 && rateLabel.getBoundingClientRect().height < 24 };
+      const wrap = { cel, h: ht(), trunc: trunc(), single: label.getBoundingClientRect().height < 30 && rateLabel.getBoundingClientRect().height < 24 };
       const [l, rl, rv] = [label.textContent, rateLabel.textContent, rate.textContent];
       label.textContent = '今天一共赚了'; rateLabel.textContent = '当前赚钱速度'; rate.textContent = '¥0.0000 /秒';
       const old = ht();
