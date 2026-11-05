@@ -75,9 +75,8 @@ export function cardModel(snap, cfg, t) {
   return {
     status: s,
     tone: holiday ? 'holiday' : TONE[s],
-    // 法定假日：大卡片徽章写「法定假日 · 国庆」，小窗只写「法定假日」（badgeName 由样式在小窗里隐藏）
+    // 法定假日：徽章只写「法定假日」，节日名只在标签里出现一次（「今天休息 · 国庆」）
     badge: holiday ? t.status.holiday : t.status[s],
-    badgeName: holiday ? t.status.holidayName(snap.holidayName) : '',
     tag: snap.makeupWork && timed ? t.status.makeupTag : null,
     label,
     showAmount: s !== 'restDay' && s !== 'unpaidLeave',
@@ -91,6 +90,10 @@ export function cardModel(snap, cfg, t) {
     showProgress: timed && snap.totalSec > 0,
     progressPct: Math.round(pct),
     progressText,
+    // 已下班：进度文字挪到进度头一行右侧（带 ✓），条下面那一行不再显示（避免把「满了」说两遍）
+    progressInHead: done,
+    // 今日满勤可得：休息日 / 法定假日 / 无薪假（今天不计薪）时与结论矛盾，不显示
+    showDaily: s !== 'restDay' && s !== 'unpaidLeave',
     rateLabel,
     rate,
     month: `${t.currency}${money(snap.monthTotal)}`,

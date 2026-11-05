@@ -54,9 +54,9 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
 test('card shows a year note when the holiday table is missing (R15)', () => {
   const now = at(1, 4, 10, 0, 0, 2027);
   const m = cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
-  assert.equal(m.yearNote, '2027 年调休安排未内置，只标了节日');
+  assert.equal(m.yearNote, '2027 年只标了法定假日，补假和调休未标出');
   assert.equal(m.yearTitle, '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
-  assert.ok([...m.yearNote.replace(/[\d\s]/g, '')].length <= 14, 'short tag stays short');
+  assert.ok([...m.yearNote.replace(/[\d\s]/g, '')].length <= 17, 'short tag stays short (Task 19 F1: truthful wording is longer; the one-line row is checked in e2e)');
 });
 
 test('card model per status', () => {
@@ -77,10 +77,8 @@ test('card model per status', () => {
   assert.equal(rest.secondary, '距下个工作日 2 天');
   const holiday = cardModel(snapshot(at(10, 1, 10), cfg, {}), cfg, t);
   assert.equal(holiday.label, '今天休息 · 国庆');
-  assert.equal(holiday.badge, '法定假日');
-  assert.equal(holiday.badgeName, ' · 国庆');
+  assert.equal(holiday.badge, '法定假日'); // 节日名只在标签里出现一次（V6）
   assert.equal(holiday.tone, 'holiday');
-  assert.equal(rest.badgeName, '');
   assert.equal(rest.tone, 'rest');
   const paid = cardModel(snapshot(at(11, 3, 10), cfg, { '2026-11-03': 'paidLeave' }), cfg, t);
   assert.equal(paid.badge, '带薪假');
@@ -259,26 +257,25 @@ test('Task 19 H2: the first metric cell is the speed only while working; every o
   assert.ok(!/abc/.test(bad.rate + bad.label));
 });
 
-test('Task 19 H3: 法定假日 has its own tone, badge 「法定假日」 and the name as a separate (small-window-hideable) part', () => {
+test('Task 19 H3 / V6: 法定假日 has its own tone and badge 「法定假日」; the holiday name appears once, in the label', () => {
   const h = model(at(10, 2, 10));
   assert.equal(h.tone, 'holiday');
   assert.equal(h.badge, '法定假日');
-  assert.equal(h.badgeName, ' · 国庆');
+  assert.equal('badgeName' in h, false, 'the name is not repeated in the badge');
   assert.equal(h.label, '今天休息 · 国庆');
   const weekend = model(at(11, 7, 10));
   assert.equal(weekend.tone, 'rest');
   assert.equal(weekend.badge, '休息日');
-  assert.equal(weekend.badgeName, '');
 });
 
 test('Task 19 H8: 已下班 shows the settled amount with 2 decimals, no tail, progress text from config', () => {
   const m = model(at(11, 4, 18));
   assert.deepEqual(m.hero, { head: '323.81', tail: '' });
   assert.equal(m.amountSrText, '¥ 323.81');
-  assert.equal(m.progressText, '今天工作满 7 小时');
+  assert.equal(m.progressText, '今天工作满 7小时');
   assert.equal(m.label, '今天辛苦了，收工！');
   const custom = { ...cfg, end: '18:00' }; // 午休 1.5h → 8h
-  assert.equal(model(at(11, 4, 19), custom).progressText, '今天工作满 8 小时');
+  assert.equal(model(at(11, 4, 19), custom).progressText, '今天工作满 8小时');
   const half = { ...cfg, end: '17:30' };
   assert.equal(model(at(11, 4, 19), half).progressText, '今天工作满 7小时30分');
   // 带薪假同样定格 2 位；上班中仍是 4 位
@@ -305,8 +302,8 @@ test('Task 19 M2 / L10 / L11: 调休上班 tag, /秒 without a space, 距发薪�
   assert.equal(model(at(9, 20, 10)).tag, '调休上班');
   assert.equal(t.card.rateUnit, '/秒');
   assert.equal(t.card.payIn(3), '距发薪日 3 天');
-  assert.equal(t.card.yearMissing(2027), '2027 年调休安排未内置，只标了节日');
-  assert.equal(t.card.yearMissingFixed(2036), '2036 年调休安排未内置，只标了节日');
+  assert.equal(t.card.yearMissing(2027), '2027 年只标了法定假日，补假和调休未标出');
+  assert.equal(t.card.yearMissingFixed(2036, ['元旦', '劳动节', '国庆']), '2036 年只标了元旦、劳动节、国庆');
   assert.equal(t.calendar.legendHint, '点日期可标记：调休上班 · 带薪假 · 无薪假');
 });
 
@@ -316,4 +313,36 @@ test('Task 19 M3: worked text is 已工作 H小时M分 / 共 H小时; countdown 
   assert.equal(model(at(11, 4, 14, 30, 59)).progressText, '已工作 4小时30分 / 共 7小时'); // 08:30→14:30:59 扣午休 1.5h，秒不进位
   assert.equal(model(at(11, 4, 10, 30)).secondary, '距下班 6小时30分0秒');
   assert.equal(duration(65, t), '1分5秒');
+});
+
+// ---- Task 19 fix round 1 ----
+test('Task 19 V2 / F8: 已下班 progress note sits in the head row; durations are written 7小时 / 7小时30分 everywhere', () => {
+  const m = model(at(11, 4, 18));
+  assert.equal(m.progressInHead, true);
+  assert.equal(m.progressText, '今天工作满 7小时');
+  assert.equal(model(at(11, 4, 19), { ...cfg, end: '17:30' }).progressText, '今天工作满 7小时30分');
+  assert.equal(model(at(11, 4, 10, 30)).progressInHead, false);
+  assert.equal(model(at(11, 4, 10, 30)).progressText, '已工作 2小时0分 / 共 7小时');
+});
+
+test('Task 19: 今日满勤可得 is hidden on 休息日 / 法定假日 / 无薪假 and kept everywhere else', () => {
+  const hidden = [model(at(11, 7, 10)), model(at(10, 2, 10)), model(at(11, 4, 10), cfg, { '2026-11-04': 'unpaidLeave' })];
+  for (const m of hidden) assert.equal(m.showDaily, false, m.status);
+  const shown = [model(at(11, 4, 10)), model(at(11, 4, 12, 15)), model(at(11, 4, 7)), model(at(11, 4, 18)), model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' }), model(at(9, 20, 10))];
+  for (const m of shown) assert.equal(m.showDaily, true, m.status);
+});
+
+test('Task 19 F1: no-table year wording says exactly what is marked; fixed names come from STATUTORY_FIXED', async () => {
+  const { STATUTORY_FIXED } = await import('../src/holidays-cn.js');
+  const names = [...new Set(Object.values(STATUTORY_FIXED))];
+  assert.deepEqual(names, ['元旦', '劳动节', '国庆']);
+  assert.equal(t.card.yearMissingFixed(2036, names), '2036 年只标了元旦、劳动节、国庆');
+  assert.equal(t.card.yearMissing(2027), '2027 年只标了法定假日，补假和调休未标出');
+  assert.ok(!/节日|调休安排未内置/.test(t.card.yearMissingFixed(2036, names)), 'never implies all festivals are marked');
+});
+
+test('Task 19 V3: the countdown ghost pads minutes and seconds to the widest form and leaves everything else alone', () => {
+  assert.equal(t.durationWidest('距下班 6小时30分0秒'), '距下班 6小时88分88秒');
+  assert.equal(t.durationWidest('距下班 0分9秒'), '距下班 88分88秒');
+  assert.equal(t.durationWidest('距下个工作日 2 天'), '距下个工作日 2 天');
 });

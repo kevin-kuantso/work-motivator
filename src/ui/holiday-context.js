@@ -2,7 +2,7 @@
 // 胶囊的放假区间、调休上班日取自 dayInfo（= 该月实际使用的表，或无表年份按《放假办法》标出的法定假日），
 // 「依据」按该年的数据来源如实写：内置 / 联网 / 导入文件 / 无表（不声称任何官方来源）。
 import { dayInfo } from '../calendar.js';
-import { STATUTORY_FIXED_FROM_YEAR } from '../holidays-cn.js';
+import { STATUTORY_FIXED_FROM_YEAR, STATUTORY_FIXED } from '../holidays-cn.js';
 import { STATUTORY_LUNAR } from '../statutory-dates.js';
 
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
@@ -23,7 +23,7 @@ export function missingTableTag(year, today, tables, t) {
   const c = t.card;
   switch (noTableKind(year)) {
     case 'lunar': return { kind: 'lunar', text: c.yearMissing(year), title: c.yearMissingLong(year) };
-    case 'fixed': return { kind: 'fixed', text: c.yearMissingFixed(year), title: c.yearMissingFixedLong(year) };
+    case 'fixed': return { kind: 'fixed', text: c.yearMissingFixed(year, [...new Set(Object.values(STATUTORY_FIXED))]), title: c.yearMissingFixedLong(year) };
     default: return { kind: 'none', text: c.yearMissingNone(year), title: c.yearMissingNoneLong(year) };
   }
 }
