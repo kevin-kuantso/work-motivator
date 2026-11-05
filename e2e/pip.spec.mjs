@@ -296,7 +296,7 @@ test('2027: year note shows in the PiP card and the window is not clipped', () =
     await setCheerAndPayday(page);
     await floatFits(page);
     assert.equal(await pip(page).locator('.card-year').isVisible(), true);
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年调休安排未内置，只标了节日');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年只标了法定假日，补假和调休未标出');
   }, { init: stub() }));
 
 test('2027-02 春节: PiP card shows the shortened year note and the window is not clipped', () =>
@@ -304,7 +304,7 @@ test('2027-02 春节: PiP card shows the shortened year note and the window is n
     await setCheerAndPayday(page);
     await floatFits(page);
     assert.equal(await pip(page).locator('.card-badge').innerText(), '法定假日', 'Task 19 H3: float badge never shows the holiday name (innerText: the hidden part is not rendered)');
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年调休安排未内置，只标了节日');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年只标了法定假日，补假和调休未标出');
     assert.equal(await txt(pip(page).locator('.card-label')), '今天休息 · 春节');
   }, { init: stub() }));
 
