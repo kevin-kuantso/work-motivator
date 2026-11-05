@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { STRINGS as t } from '../src/strings.zh-CN.js';
-import { money, heroParts, duration, hours, minutesCeil, dateLine, ymd } from '../src/ui/format.js';
+import { money, heroParts, duration, hours, minutesCeil, dateLine, ymd, lunarText } from '../src/ui/format.js';
 import { cardModel, monthPercent } from '../src/ui/card-model.js';
 import { cellKind, monthGrid } from '../src/ui/calendar-model.js';
 import { importReport } from '../src/ui/import-model.js';
@@ -32,6 +32,12 @@ test('duration rounds up to whole seconds; hours and minutes', () => {
   assert.equal(minutesCeil(3540.2), 60);
   assert.equal(dateLine(at(11, 3), t), '2026/11/03 周二');
   assert.equal(ymd(at(1, 5)), '2026-01-05');
+});
+
+test('lunar display uses month names on new moons and Chinese day names elsewhere', () => {
+  assert.deepEqual(lunarText(at(5, 23, 0, 0, 0, 2020), t), { full: '农历闰四月初一', short: '闰四月' });
+  assert.deepEqual(lunarText(at(10, 29, 0, 0, 0, 2026), t), { full: '农历九月二十', short: '二十' });
+  assert.equal(lunarText(at(9, 28, 0, 0, 0, 2057), t), null);
 });
 
 test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)', () => {
@@ -146,6 +152,16 @@ test('import report counts applied items and lists dropped + unknown with curren
   assert.equal(byLabel.foo.reason, '无法识别的字段，已忽略');
   const bad = importState('{"marks":[]}', current);
   assert.equal(importReport({ marks: [] }, bad, t).rows[0].label, '月历标记');
+});
+
+test('import report counts and labels the lunar setting accurately', () => {
+  const current = { cfg: { ...cfg }, marks: {} };
+  const good = { version: 2, showLunar: false };
+  assert.equal(importReport(good, importState(JSON.stringify(good), current), t).applied, 1);
+  const bad = { showLunar: 'false' };
+  const report = importReport(bad, importState(JSON.stringify(bad), current), t);
+  assert.equal(report.applied, 0);
+  assert.equal(report.rows[0].label, '显示农历');
 });
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');

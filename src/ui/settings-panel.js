@@ -75,22 +75,31 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
   const sep = () => h(doc, 'div', { class: 'group-sep', 'aria-hidden': 'true' });
 
   // 高级设置（折叠，APG 手风琴：标题里放按钮）：卡头整个是按钮，右侧摘要「自定义数据网址：未设置 / 主机名」
-  const advBody = h(doc, 'div', { class: 'scard-body adv-body', id: 'adv-body', hidden: true }, holiday ? holiday.advBody : null);
+  // 农历开关与来源说明也放在这里：默认折叠不占版面，避免两栏在矮视窗里溢出
+  const advBody = h(doc, 'div', { class: 'scard-body adv-body', id: 'adv-body', hidden: true },
+    holiday ? holiday.advBody : null,
+    holiday ? sep() : null,
+    switchRow('showLunar', s.showLunar),
+    h(doc, 'p', { class: 'para adv-source', text: s.lunarSource }));
   const advChev = h(doc, 'span', { class: 'chev', 'aria-hidden': 'true', text: s.chevronClosed });
   const advCard = h(doc, 'section', { class: 'scard section-adv', 'aria-labelledby': 'adv-title' });
   const advToggle = h(doc, 'button', {
     type: 'button', class: 'adv-toggle adv-head', id: 'adv-toggle', 'aria-expanded': 'false', 'aria-controls': 'adv-body',
     onclick: () => {
       const open = advBody.hidden;
-      advBody.hidden = !open;
-      advToggle.setAttribute('aria-expanded', String(open));
-      advCard.classList.toggle('is-open', open);
-      setText(advChev, open ? s.chevronOpen : s.chevronClosed);
+      setAdvOpen(open);
       if (open) advBody.scrollIntoView({ block: 'nearest' }); // 右栏需要内部滚动时，把展开的内容带进视野
     },
   }, advChev, h(doc, 'span', { class: 'adv-title', id: 'adv-title', text: s.sections.advanced }),
   h(doc, 'span', { class: 'adv-sub', text: s.advancedSub }), holiday ? holiday.advSummary : null);
   advCard.append(h(doc, 'h2', { class: 'adv-heading' }, advToggle), advBody);
+
+  function setAdvOpen(open) {
+    advBody.hidden = !open;
+    advToggle.setAttribute('aria-expanded', String(open));
+    advCard.classList.toggle('is-open', open);
+    setText(advChev, open ? s.chevronOpen : s.chevronClosed);
+  }
 
   const b = s.backup;
   const el = h(doc, 'div', { class: 'settings', id: 'settings' },
@@ -132,7 +141,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
     salary: (i) => parseSalary(i.value),
     start: (i) => i.value, end: (i) => i.value, lunchStart: (i) => i.value, lunchEnd: (i) => i.value,
     cheer: (i) => i.value,
-    lunchOn: (i) => i.checked, weekends: (i) => i.checked,
+    lunchOn: (i) => i.checked, weekends: (i) => i.checked, showLunar: (i) => i.checked,
     payday: (i) => (i.value === '' ? null : Number(i.value)),
   };
 
@@ -144,7 +153,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
 
   function decorate(cfg) {
     lunchTimes.hidden = !cfg.lunchOn;
-    for (const f of ['lunchOn', 'weekends']) setText(inputs[f].stateText, inputs[f].checked ? s.on : s.off);
+    for (const f of ['lunchOn', 'weekends', 'showLunar']) setText(inputs[f].stateText, inputs[f].checked ? s.on : s.off);
     setText(cheerCount, s.cheerCount([...inputs.cheer.value].length, CHEER_MAX));
   }
 
@@ -193,6 +202,7 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
     for (const f of ['start', 'end', 'lunchStart', 'lunchEnd', 'cheer']) inputs[f].value = cfg[f];
     inputs.lunchOn.checked = cfg.lunchOn;
     inputs.weekends.checked = cfg.weekends;
+    inputs.showLunar.checked = cfg.showLunar;
     inputs.payday.value = cfg.payday === null ? '' : String(cfg.payday);
     for (const f of Object.keys(errors)) setError(f, '');
     decorate(cfg);
@@ -201,6 +211,8 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
   function focusField(field) {
     const input = inputs[field];
     if (!input) return;
+    // 农历开关在折叠的高级设置里：先把容器展开，否则 focus 落在不可见元素上
+    if (advBody.contains(input)) setAdvOpen(true);
     input.focus();
   }
 

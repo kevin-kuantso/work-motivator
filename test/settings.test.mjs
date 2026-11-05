@@ -11,7 +11,7 @@ const cur = () => ({ cfg: { ...DEFAULTS }, marks: {} });
 test('DEFAULTS pinned', () => {
   assert.deepEqual(DEFAULTS, {
     salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30',
-    lunchEnd: '13:00', weekends: false, payday: null, cheer: '',
+    lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true,
   });
 });
 
@@ -61,9 +61,9 @@ test('setItem throws -> {ok:false}', () => {
   assert.deepEqual(saveState(st, cur()), { ok: false });
 });
 
-test('exportState contains version 1, cfg fields, marks', () => {
+test('exportState contains version 2, cfg fields, marks', () => {
   const o = JSON.parse(exportState({ cfg: { ...DEFAULTS }, marks: { '2026-05-04': 'work' } }));
-  assert.equal(o.version, 1);
+  assert.equal(o.version, 2);
   assert.equal(o.salary, 6800);
   assert.deepEqual(o.marks, { '2026-05-04': 'work' });
 });
@@ -72,6 +72,20 @@ test('export -> import round trip', () => {
   const state = { cfg: { ...DEFAULTS, salary: 12345.5, weekends: true, payday: 31 }, marks: { '2026-05-04': 'paidLeave' } };
   const r = importState(exportState(state), cur());
   assert.deepEqual(r, { state, dropped: [], unknown: [] });
+});
+
+test('lunar preference survives backups and older backups keep the current setting', () => {
+  const current = { cfg: { ...DEFAULTS, showLunar: false }, marks: {} };
+  const backup = JSON.parse(exportState(current));
+  assert.equal(backup.version, 2);
+  assert.equal(backup.showLunar, false);
+  assert.equal(importState(JSON.stringify(backup), cur()).state.cfg.showLunar, false);
+  assert.equal(importState('{"version":1,"salary":9000}', current).state.cfg.showLunar, false);
+  const invalid = importState('{"showLunar":"false"}', current);
+  assert.equal(invalid.state.cfg.showLunar, false);
+  assert.equal(invalid.dropped[0].field, 'showLunar');
+  const old = loadState(fakeStorage({ 'work-motivator-v1': '{"version":1,"salary":9000}' }));
+  assert.equal(old.state.cfg.showLunar, true);
 });
 
 test('import: non-JSON / array / null / scalar -> error', () => {

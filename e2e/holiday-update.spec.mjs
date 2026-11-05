@@ -514,11 +514,21 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     await goMonth(page, 2);
     const desc = await page.locator('#day-desc-2027-01-01').textContent();
     assert.match(desc, /来源：导入文件/);
+    assert.match(desc, /1月1日 周五，农历冬月廿四，法定假日（元旦），来源：导入文件，/, 'lunar date is in the accessible description');
     assert.doesNotMatch(desc, /联网更新|官方通知/, 'no claim of origin for a file');
     await page.locator('.cal-grid button[data-key="2027-01-01"]').hover();
     await page.clock.runFor(500); // 悬停 0.4 秒后出现提示
     // 盖在格子上的提示用短写（2027-01 是 5 周月份，放得下 4 行）：第 3 行是来源
-    assert.deepEqual(await tipVisibleLines(page), ['1月1日 周五', '法定假日·元旦', '导入文件', '计薪 ¥0.00']);
+    // 农历行插在日期之后；格子放不下时整行不显示（aria-describedby 仍有，见上）
+    const lines = await tipVisibleLines(page);
+    const base = lines.filter((l) => !l.startsWith('农历'));
+    const lunar = lines.find((l) => l.startsWith('农历'));
+    assert.deepEqual([base[0], base[1], base.at(-1)], ['1月1日 周五', '法定假日·元旦', '计薪 ¥0.00'], `date / status / pay lines: ${JSON.stringify(lines)}`);
+    assert.ok(base.length === 3 || (base.length === 4 && base[2] === '导入文件'), `source line only when it fits: ${JSON.stringify(lines)}`);
+    if (lunar !== undefined) {
+      assert.equal(lunar, '农历冬月廿四');
+      assert.equal(lines[1], lunar, 'lunar line right under the date');
+    }
     // 联网有不同的 2027：不覆盖导入的文件，页面级提示
     const changed = JSON.parse(synth2027());
     changed.days = changed.days.filter((d) => d.date !== '2027-01-03');

@@ -372,7 +372,8 @@ test('export downloads a backup that round-trips', () =>
     assert.match(dl.suggestedFilename(), /^work-motivator-backup-2026-11-03\.json$/);
     const body = JSON.parse(readFileSync(await dl.path(), 'utf8'));
     assert.equal(body.salary, 7100);
-    assert.equal(body.version, 1);
+    assert.equal(body.version, 2);
+    assert.equal(body.showLunar, true);
     assert.match(await text(page, '.toast-text'), /已导出/);
   }));
 

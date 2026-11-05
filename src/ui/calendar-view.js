@@ -8,7 +8,7 @@ import { monthWage } from '../calc.js';
 import { applyOption, menuModel, dayTooltipModel, tooltipText } from './day-options.js';
 import { createDayMenu } from './day-menu.js';
 import { createDayTooltip } from './day-tooltip.js';
-import { money } from './format.js';
+import { money, lunarText } from './format.js';
 import { monthContext, missingTableTag } from './holiday-context.js';
 
 const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid', rest: 'rest' };
@@ -235,6 +235,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
         week.map((cell) => {
           if (!cell) return h(doc, 'span', { class: 'cal-cell is-empty', role: 'gridcell' });
           const tip = dayTooltipModel(cell.date, cfg, marks, tables, today);
+          const lunar = cfg.showLunar ? lunarText(cell.date, t) : null;
           const descId = `day-desc-${cell.key}`;
           const btn = h(doc, 'button', {
             type: 'button',
@@ -259,7 +260,9 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
             },
             onblur: () => tooltip.hide(),
           },
-          h(doc, 'span', { class: 'day-num' }, h(doc, 'span', { class: 'day-num-ink', text: String(cell.day) })),
+          h(doc, 'span', { class: 'day-date' },
+            h(doc, 'span', { class: 'day-num' }, h(doc, 'span', { class: 'day-num-ink', text: String(cell.day) })),
+            lunar ? h(doc, 'span', { class: 'day-lunar', 'aria-hidden': 'true', text: lunar.short }) : null),
           cell.kind in TAG_ICON || cell.holidayName
             ? h(doc, 'span', { class: 'day-label' }, tag(cell.kind), cell.holidayName ? h(doc, 'span', { class: 'day-name', text: cell.holidayName }) : null)
             : null,

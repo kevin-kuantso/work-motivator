@@ -49,6 +49,8 @@ async function withPage(iso, fn, opts) {
 }
 
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
+// 提示新增的「农历」可见行（日期之后、状态之前）；格子放不下时整行不显示，完整农历始终在 aria-describedby
+const LUNAR_LINE = /^农历/;
 const cell = (page, label) => page.locator(`.cal-grid button[aria-label^="${label} "]`);
 const tab = (page, name) => page.getByRole('tab', { name });
 const focused = (page) => page.evaluate(() => ({ id: document.activeElement?.id ?? null, key: document.activeElement?.dataset?.key ?? null }));
@@ -919,6 +921,11 @@ async function tipCheck(page, label, lines, how) {
       gridcell: [cr.left, cr.top, cr.right, cr.bottom].map((v) => Math.round(v * 10) / 10),
       belowTop: below ? Math.round(below.top * 10) / 10 : null,
       lines: shown.map((x) => x.textContent),
+      // 农历行（新）：单独取出，其余行仍按原文比对；格子放不下时整行不显示
+      byClass: Object.fromEntries(['tip-title', 'tip-lunar', 'tip-status', 'tip-source', 'tip-pay'].map((c) => {
+        const e = tip.querySelector(`.${c}`);
+        return [c, e && getComputedStyle(e).display !== 'none' && e.getClientRects().length ? e.textContent : null];
+      })),
       clipped: tip.scrollHeight > tip.clientHeight + 0.5,
       lineBottoms: shown.map((x) => x.getBoundingClientRect().bottom),
       align: getComputedStyle(tip).textAlign,
@@ -935,21 +942,29 @@ for (const how of ['hover', 'keyboard']) {
     withPage(T1412, async (page) => {
       for (const [w, ht] of ALL_VP) {
         await page.setViewportSize({ width: w, height: ht });
-        for (const [month, label, lines] of [
-          ['2026-11', '11月18日', ['11月18日 周三', '工作日', '按默认规则', '计薪 ¥323.81']],
-          ['2026-10', '10月1日', ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00']],
+        for (const [month, label, lines, lunarText] of [
+          ['2026-11', '11月18日', ['11月18日 周三', '工作日', '按默认规则', '计薪 ¥323.81'], '农历十月初十'],
+          ['2026-10', '10月1日', ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00'], '农历八月廿一'],
         ]) {
           await page.locator('.cal-today').click();
           if (month === '2026-10') await page.getByRole('button', { name: /上月/ }).click();
           const r = await tipCheck(page, label, lines, how);
-          console.log(`MEASURE ${JSON.stringify({ case: `tooltip ${how}`, month, w, ht, tip: r.tip, cell: r.cell, lines: r.lines.length, clipped: r.clipped, belowTop: r.belowTop })}`);
+          console.log(`MEASURE ${JSON.stringify({ case: `tooltip ${how}`, month, w, ht, tip: r.tip, cell: r.cell, lines: r.lines.length, lunar: r.byClass['tip-lunar'], clipped: r.clipped, belowTop: r.belowTop })}`);
           assert.equal(r.hidden, false, `${month} @${w}: shown`);
           assert.equal(r.inCell, true, 'rendered inside the cell');
           for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2, `${month} @${w}: tooltip edge ${i} ${r.tip[i]} within ±2px of the cell ${r.cell[i]}`);
-          assert.deepEqual([r.lines[0], r.lines[1], r.lines.at(-1)], [lines[0], lines[1], lines[3]], `${month} @${w}: date / status / pay lines`);
-          if (r.lines.length === 4) assert.equal(r.lines[2], lines[2], `${month} @${w}: source line text`);
-          assert.ok(r.lines.length >= 3 && r.lines.length <= 4, `${month} @${w}: ${r.lines.length} lines`);
-          if (month === '2026-10' && w >= 1366) assert.equal(r.lines.length, 4, `${month} @${w}: 5-week month at ≥ 1366 has room for the source line`);
+          // 新增的农历行（.tip-lunar）在日期之后；放不下时整行不显示 → 原样的三 / 四行断言仍逐字成立
+          const base = r.lines.filter((l) => !LUNAR_LINE.test(l));
+          const lunarShown = r.lines.length > base.length;
+          assert.ok(!lunarShown || (r.lines.length === base.length + 1 && r.lines[1] === r.byClass['tip-lunar']), `${month} @${w}: one lunar line, right under the date (${JSON.stringify(r.lines)})`);
+          if (lunarShown) assert.equal(r.byClass['tip-lunar'], lunarText, `${month} @${w}: lunar line text`);
+          assert.deepEqual([base[0], base[1], base.at(-1)], [lines[0], lines[1], lines[3]], `${month} @${w}: date / status / pay lines`);
+          if (base.length === 4) assert.equal(r.byClass['tip-source'], lines[2], `${month} @${w}: source line text`);
+          assert.ok(base.length >= 3 && base.length <= 4, `${month} @${w}: ${base.length} lines (excluding lunar)`);
+          // 5 周月份在 ≥ 1366 放得下第 4 行；那一行现在可能是来源，也可能是农历（来源先让位）
+          if (month === '2026-10' && w >= 1366) assert.ok(r.lines.length >= 4, `${month} @${w}: 5-week month at ≥ 1366 has room for a 4th line: ${JSON.stringify(r.lines)}`);
+          assert.equal(r.byClass['tip-title'], lines[0], `${month} @${w}: the date line is always shown`);
+          assert.equal(r.byClass['tip-pay'], lines[3], `${month} @${w}: the pay line is always shown`);
           assert.equal(r.align, 'center');
           assert.equal(r.border.width, '2px');
           assert.equal(r.border.color, r.expectBorder, `${month} @${w}: border uses the status colour`);
@@ -977,10 +992,12 @@ test('tooltip with error + info banners at 1280×585: the 5-week cell is shorter
     await tab(page, '月历').click();
     await page.getByRole('button', { name: /上月/ }).click();
     const r = await tipCheck(page, '10月1日', null, 'hover');
-    console.log(`MEASURE ${JSON.stringify({ case: 'tooltip error+info', tip: r.tip, cell: r.cell, lines: r.lines, clipped: r.clipped })}`);
+    console.log(`MEASURE ${JSON.stringify({ case: 'tooltip error+info', tip: r.tip, cell: r.cell, lines: r.lines, lunar: r.byClass['tip-lunar'], clipped: r.clipped })}`);
     assert.equal(r.clipped, false);
-    assert.ok(r.lines.length === 3 || r.lines.length === 4, `${r.lines.length} lines`);
-    assert.equal(r.lines.at(-1), '计薪 ¥0.00', 'the pay line is never dropped');
+    const base = r.lines.filter((l) => !LUNAR_LINE.test(l));
+    assert.ok(base.length === 3 || base.length === 4, `${base.length} lines (excluding lunar)`);
+    assert.equal(base.at(-1), '计薪 ¥0.00', 'the pay line is never dropped');
+    if (r.byClass['tip-lunar']) assert.equal(r.byClass['tip-lunar'], '农历八月廿一', 'lunar line text');
     for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2);
   }, corruptThenQuota));
 
@@ -1212,6 +1229,14 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     assert.equal(await page.getByRole('textbox', { name: '自定义数据网址' }).getAttribute('aria-describedby'), 'explain-custom-url hint-custom-url err-custom-url');
     assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。');
     assert.equal(await text(page, '#explain-custom-url'), '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空则使用默认来源。');
+    // 「显示农历」开关与农历数据来源说明都在高级设置里（不在工资卡、也不在假期数据卡本体）
+    assert.equal(await page.locator('.section-pay').getByRole('switch', { name: '显示农历' }).count(), 0, 'not in the pay card');
+    assert.equal(await page.locator('.section-holiday .scard-body').getByRole('switch', { name: '显示农历' }).count(), 0, 'not in the holiday card body');
+    const lunarSwitch = page.locator('#adv-body').getByRole('switch', { name: '显示农历' });
+    assert.equal(await lunarSwitch.count(), 1, 'the switch lives in the advanced body');
+    assert.equal(await lunarSwitch.getAttribute('aria-describedby'), 'err-showLunar');
+    assert.equal(await text(page, '#adv-body .adv-source'), '农历数据来源：香港天文台《公历与农历日期对照表》（2020–2060）。2057 年部分日期因历法边界不确定而不显示。');
+    assert.equal(await page.locator('#adv-body').evaluate((b) => b.lastElementChild.className.includes('adv-source')), true, 'the source note is the last line of the advanced body');
   }));
 
 // R47「复制示例」：clipboard.writeText 成功 → 「已复制」（剪贴板里就是示例全文）；被拒绝（CDP 把 clipboard-write 设为 denied）
@@ -1302,7 +1327,7 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
     check(await grab(page, ['.cal-note[data-tone="holiday"] .cal-note-text']));
     await cell(page, '10月1日').hover();
     await page.clock.runFor(450);
-    check(await grab(page, ['.day-tooltip .tip-title', '.day-tooltip .tip-status', '.day-tooltip .tip-source', '.day-tooltip .pay-label', '.day-tooltip .pay-amt']));
+    check(await grab(page, ['.day-tooltip .tip-title', '.day-tooltip .tip-lunar', '.day-tooltip .tip-status', '.day-tooltip .tip-source', '.day-tooltip .pay-label', '.day-tooltip .pay-amt']));
     await page.locator('.cal-today').click();
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
@@ -1521,8 +1546,11 @@ async function tipLines(page, key) {
       const q = rg.getBoundingClientRect();
       return Math.abs((q.left + q.right) / 2 - (tr.left + tr.right) / 2);
     });
+    const el = tip.querySelector('.tip-lunar');
+    const lunarEl = el && getComputedStyle(el).display !== 'none' && el.getClientRects().length ? el.textContent : null;
+    const descLunar = (desc.match(/，农历[^，]+，/) ?? [null])[0]?.replace(/^，|，$/g, '') ?? null;
     return {
-      hidden: tip.hidden, desc,
+      hidden: tip.hidden, desc, lunar: lunarEl, descLunar,
       vclip: tip.scrollHeight > tip.clientHeight + 0.5, hclip: tip.scrollWidth > tip.clientWidth + 0.5,
       padDiff: Math.abs((first.top - tr.top) - (tr.bottom - last.bottom)), maxOff: Math.max(...off),
       lines: vis.map((x) => ({ text: x.textContent, cut: x.scrollWidth > x.clientWidth || [...x.querySelectorAll('*')].some((c) => c.scrollWidth > c.clientWidth) })),
@@ -1578,23 +1606,50 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
           maxOff = Math.max(maxOff, r.maxOff);
           // 完整文字（含来源与「点击修改」）在 aria-describedby
           assert.match(r.desc, /来源：.+，当日计薪 .+，点击修改$/, `${key}: full text in aria-describedby`);
+          // 农历始终在 aria-describedby；可见时与它逐字一致，且紧跟日期行
+          assert.ok(r.descLunar, `${key} @${w}: lunar date in aria-describedby (${r.desc})`);
+          if (r.lunar !== null) {
+            assert.equal(r.lunar, r.descLunar, `${key} @${w}: visible lunar matches the accessible one`);
+            assert.equal(r.lines[1].text, r.lunar, `${key} @${w}: lunar right under the date line`);
+          }
         }
       }
     }
     console.log(`MEASURE ${JSON.stringify({ case: 'R50 tooltip widths', checked, cuts, geo, worstPadDiff: minPadDiff, worstOffCentre: maxOff })}`);
     assert.deepEqual(cuts, [], 'no truncated or clipped tooltip line');
     assert.deepEqual(geo, [], 'content centred: top / bottom padding differ ≤ 1px, every line centred ≤ 1px');
-    // 状态行的短写
+    // 状态行的短写（农历行单独取出后逐字比对；农历行出现时必须在日期之后，文字固定）
+    const r50 = async (key) => {
+      const r = await tipLines(page, key);
+      const base = r.lines.map((l) => l.text).filter((t) => !LUNAR_LINE.test(t));
+      const lunar = r.lines.map((l) => l.text).filter((t) => LUNAR_LINE.test(t));
+      assert.ok(lunar.length <= 1, `${key}: at most one lunar line (${JSON.stringify(r.lines.map((l) => l.text))})`);
+      if (lunar.length) assert.equal(r.lines[1].text, lunar[0], `${key}: lunar right under the date line`);
+      return { base, lunar };
+    };
     await page.setViewportSize({ width: 1280, height: 585 });
     await go('2026-05');
-    assert.deepEqual((await tipLines(page, '2026-05-01')).lines.map((l) => l.text), ['5月1日 周五', '法定假日·劳动节', '计薪 ¥0.00']); // 2026-05 是 6 周月份、1280×585：没有放来源的地方（aria-describedby 仍有，上面已断言）
-    assert.equal((await tipLines(page, '2026-05-09')).lines[1].text, '调休上班·劳动节');
+    const may1 = await r50('2026-05-01');
+    // 2026-05 是 6 周月份、1280×585：日期 / 状态 / 计薪 必须都在；第 4 行若出现只能是来源（农历行已单独取出）
+    assert.deepEqual([may1.base[0], may1.base[1], may1.base.at(-1)], ['5月1日 周五', '法定假日·劳动节', '计薪 ¥0.00'], `lines: ${JSON.stringify(may1.base)}`);
+    assert.ok(may1.base.length === 3 || (may1.base.length === 4 && may1.base[2] === '内置·官方通知'), `lines: ${JSON.stringify(may1.base)}`);
+    if (may1.lunar.length) assert.equal(may1.lunar[0], '农历三月十五', 'lunar line text');
+    const may9 = await r50('2026-05-09');
+    assert.equal(may9.base[1], '调休上班·劳动节');
+    if (may9.lunar.length) assert.equal(may9.lunar[0], '农历三月廿三', 'lunar line text');
     await page.setViewportSize({ width: 1366, height: 650 });
     await go('2026-10');
-    assert.deepEqual((await tipLines(page, '2026-10-01')).lines.map((l) => l.text), ['10月1日 周四', '法定假日·国庆', '内置·官方通知', '计薪 ¥0.00']); // 5 周月份、1366×650：放得下来源
+    const oct1 = await r50('2026-10-01');
+    // 5 周月份、1366×650：放得下第 4 行（来源，或先让位给农历）
+    assert.deepEqual([oct1.base[0], oct1.base[1], oct1.base.at(-1)], ['10月1日 周四', '法定假日·国庆', '计薪 ¥0.00'], `lines: ${JSON.stringify(oct1.base)}`);
+    assert.ok(oct1.base.length === 3 || (oct1.base.length === 4 && oct1.base[2] === '内置·官方通知'), `lines: ${JSON.stringify(oct1.base)}`);
+    assert.ok(oct1.base.length + oct1.lunar.length >= 4, `5-week month has a 4th line at 1366×650: ${JSON.stringify(oct1.base)}`);
+    if (oct1.lunar.length) assert.equal(oct1.lunar[0], '农历八月廿一', 'lunar line text');
     await page.setViewportSize({ width: 1280, height: 585 });
     await go('2026-11');
-    assert.deepEqual((await tipLines(page, '2026-11-03')).lines.map((l) => l.text).slice(0, 2), ['11月3日 周二', '工作日·今天']);
+    const nov3 = await tipLines(page, '2026-11-03');
+    assert.deepEqual(nov3.lines.map((l) => l.text).filter((t) => !LUNAR_LINE.test(t)).slice(0, 2), ['11月3日 周二', '工作日·今天']);
+    if (nov3.lines.some((l) => LUNAR_LINE.test(l.text))) assert.equal(nov3.lines[1].text, '农历九月廿五', 'lunar line text');
   }));
 
 // Task 18：每一种提示（工作日 / 今天 / 周末 / 休息 / 法定假日 / 调休上班 / 带薪 / 无薪 / 手动标记 / 计薪为 0）的每个文字对白底 ≥ 4.5:1（由渲染后的颜色实算），
@@ -1620,7 +1675,7 @@ test('Task 18: tooltip text contrast ≥ 4.5:1 on its white card for every varia
         const rows = await page.evaluate(() => {
           const tip = document.querySelector('.day-tooltip');
           const bg = getComputedStyle(tip).backgroundColor;
-          return [...tip.querySelectorAll('.tip-title, .tip-status, .tip-source, .pay-label, .pay-amt')]
+          return [...tip.querySelectorAll('.tip-title, .tip-lunar, .tip-status, .tip-source, .pay-label, .pay-amt')]
             .filter((e) => e.getClientRects().length)
             .map((e) => [e.className, getComputedStyle(e).color, bg]);
         });
@@ -1783,7 +1838,7 @@ test('Task 18 r1: tooltip colour coding — unpaid has a neutral border + red te
       const r = await page.evaluate(() => {
         const tip = document.querySelector('.day-tooltip');
         const cs = getComputedStyle(tip);
-        return { ring: cs.borderTopColor, bg: cs.backgroundColor, status: getComputedStyle(tip.querySelector('.tip-status')).color, texts: [...tip.querySelectorAll('.tip-title, .tip-status, .tip-source, .pay-label, .pay-amt')].filter((e) => e.getClientRects().length).map((e) => getComputedStyle(e).color) };
+        return { ring: cs.borderTopColor, bg: cs.backgroundColor, status: getComputedStyle(tip.querySelector('.tip-status')).color, texts: [...tip.querySelectorAll('.tip-title, .tip-lunar, .tip-status, .tip-source, .pay-label, .pay-amt')].filter((e) => e.getClientRects().length).map((e) => getComputedStyle(e).color) };
       });
       await page.mouse.move(0, 0);
       for (const c of r.texts) assert.ok(ratio(c, r.bg) >= 4.5, `${key}: ${c} on ${r.bg}`);
@@ -1842,8 +1897,9 @@ async function tipBalance(page, key) {
     const first = lines[0].getBoundingClientRect();
     const last = lines.at(-1).getBoundingClientRect();
     const amt = tip.querySelector('.pay-amt');
+    const status = tip.querySelector('.tip-status');
     const fs = [parseFloat(getComputedStyle(lines[0]).fontSize), parseFloat(getComputedStyle(amt).fontSize)];
-    const fw = [getComputedStyle(lines[0]).fontWeight, getComputedStyle(lines[1]).fontWeight, getComputedStyle(amt).fontWeight];
+    const fw = [getComputedStyle(lines[0]).fontWeight, getComputedStyle(status).fontWeight, getComputedStyle(amt).fontWeight];
     return {
       top: Math.round((first.top - tr.top) * 10) / 10, bottom: Math.round((tr.bottom - last.bottom) * 10) / 10, h: Math.round(tr.height * 10) / 10,
       n: lines.length, fs, fw, cut: lines.some((x) => x.scrollWidth > x.clientWidth), payColor: getComputedStyle(amt).color, align: getComputedStyle(tip).textAlign,

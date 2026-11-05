@@ -7,7 +7,7 @@ export const STORAGE_KEY = 'work-motivator-v1';
 
 export const DEFAULTS = Object.freeze({
   salary: 6800, start: '08:30', end: '17:00', lunchOn: true,
-  lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '',
+  lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true,
 });
 
 const MARKS = ['work', 'rest', 'paidLeave', 'unpaidLeave'];
@@ -26,6 +26,7 @@ const CFG_RULES = {
   lunchEnd: timeRule(R.labels.lunchEnd),
   lunchOn: boolRule(R.labels.lunchOn),
   weekends: boolRule(R.labels.weekends),
+  showLunar: boolRule(R.labels.showLunar),
   payday: (v) => (v === null || (Number.isInteger(v) && v >= 1 && v <= 31) ? null : R.payday),
   cheer: (v) => {
     if (typeof v !== 'string') return R.cheerType;
@@ -110,7 +111,7 @@ function parseObject(text) {
 const defaultState = () => ({ cfg: { ...DEFAULTS }, marks: {} });
 
 export function exportState(state) {
-  return JSON.stringify({ version: 1, ...state.cfg, marks: state.marks }, null, 2);
+  return JSON.stringify({ version: 2, ...state.cfg, marks: state.marks }, null, 2);
 }
 
 export function importState(text, current) {

@@ -138,6 +138,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   const tip = (date, marks = {}, tables = HOLIDAYS_CN, c = cfg) => dayTooltipModel(date, c, marks, tables, at(11, 3));
   const wd = tip(at(11, 4));
   assert.deepEqual(wd, {
+    lunar: '农历九月廿六',
     title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改',
     sourceLabel: '按默认规则', payShort: '计薪 ¥323.81', titleShort: '11月4日 周三', statusShort: '工作日',
   });
@@ -194,7 +195,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
 
 test('tooltipText joins the same lines used by the visual tooltip', () => {
   const m = dayTooltipModel(at(11, 7), cfg, {}, HOLIDAYS_CN, at(11, 3));
-  assert.equal(tooltipText(m), '11月7日 周六，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
+  assert.equal(tooltipText(m), '11月7日 周六，农历九月廿九，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
 });
 
 // R50（fix round 1 · C2）：盖在格子上的提示用不带括号的短状态，「今天」放在状态行里而不是日期行

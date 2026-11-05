@@ -5,7 +5,7 @@
 import { h, setText, show } from './dom.js';
 import { icon } from './icons.js';
 import { cardModel } from './card-model.js';
-import { dateLine } from './format.js';
+import { dateLine, lunarText } from './format.js';
 import { renderDigits } from './digits.js';
 
 const built = new WeakMap();
@@ -31,7 +31,9 @@ function build(root, t) {
   root.replaceChildren(
     h(doc, 'div', { class: 'card-band', 'aria-hidden': 'true' }),
     h(doc, 'div', { class: 'card-head' },
-      (r.date = h(doc, 'span', { class: 'card-date' })),
+      h(doc, 'span', { class: 'card-date-group' },
+        (r.date = h(doc, 'span', { class: 'card-date' })),
+        (r.lunar = h(doc, 'span', { class: 'card-lunar' }))),
       h(doc, 'span', { class: 'card-badges' },
         (r.badge = h(doc, 'span', { class: 'card-badge' }, r.badgeIcon, r.badgeText)),
         (r.tag = h(doc, 'span', { class: 'card-tag', hidden: true }))),
@@ -104,6 +106,9 @@ export function renderCard(root, snap, cfg, t) {
 
   show(r.date, snap.now instanceof Date);
   if (snap.now instanceof Date) setText(r.date, dateLine(snap.now, t));
+  const lunar = cfg.showLunar && snap.now instanceof Date ? lunarText(snap.now, t) : null;
+  show(r.lunar, Boolean(lunar));
+  setText(r.lunar, lunar?.full ?? '');
   if (r.iconTone !== m.tone) {
     r.badgeIcon.replaceChildren(icon(doc, m.tone));
     r.iconTone = m.tone;
