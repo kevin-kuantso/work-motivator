@@ -10,6 +10,8 @@
   --state-before-bg:#E0F2FE;  --state-before-fg:#075985;
   --state-after-bg:#CCFBF1;   --state-after-fg:#115E59;
   --state-rest-bg:#F3F4F6;    --state-rest-fg:#4B5563;
+  --state-holiday-bg:#CCFBF1; --state-holiday-fg:#115E59; /* 法定假日：与月历提示的假日同色系（不用上班），不再和普通休息日同灰 */
+  --state-lunch-fill:#D97706; /* 午休进度条填色（比 #92400E 亮、不发脏）；对白卡片 3.2:1 */
   --state-paid-bg:#DBEAFE;    --state-paid-fg:#1E40AF;
   --state-unpaid-bg:#FFE4E6;  --state-unpaid-fg:#9F1239;
   --state-makeup-bg:#EDE9FE;  --state-makeup-fg:#5B21B6;
@@ -136,15 +138,19 @@ button, input, select { font: inherit; color: inherit; }
   display: grid; gap: var(--space-3);
 }
 .status-card[data-size="sm"] { padding: var(--space-4); box-shadow: none; border-radius: 0; }
+/* 大卡片高度固定为「上班中」的高度（M11）：切换状态时「悬浮成小窗」按钮不上下跳，左栏重心稳定；内容少的状态从顶部排起。
+   数值 = 实测上班中卡高（默认 355.1px；矮视窗 ≤ 640px 的收紧版 335.1px）；内容更多（鼓励语、发薪日、缺表标签）时照常长高 */
+.status-card[data-size="lg"] { min-height: 355.1px; align-content: start; }
 /* 矮视窗（≤ 640px，例如 1280×585）：左栏还要放「悬浮成小窗」按钮（R38）。主分页的大卡片收紧一点垂直间距，
    最高的常见卡片（鼓励语 + 发薪日）+ 两条提示条时左栏仍放得下；小窗（sm）不受影响 */
 @media (max-height: 640px) {
-  .status-card[data-size="lg"] { padding-block: 18px; gap: 10px; }
+  .status-card[data-size="lg"] { padding-block: 18px; gap: 10px; min-height: 335.1px; }
 }
 .status-card[data-tone="lunch"] { --tone-bg: var(--state-lunch-bg); --tone-fg: var(--state-lunch-fg); }
 .status-card[data-tone="before"] { --tone-bg: var(--state-before-bg); --tone-fg: var(--state-before-fg); }
 .status-card[data-tone="after"] { --tone-bg: var(--state-after-bg); --tone-fg: var(--state-after-fg); }
 .status-card[data-tone="rest"] { --tone-bg: var(--state-rest-bg); --tone-fg: var(--state-rest-fg); }
+.status-card[data-tone="holiday"] { --tone-bg: var(--state-holiday-bg); --tone-fg: var(--state-holiday-fg); }
 .status-card[data-tone="paid"] { --tone-bg: var(--state-paid-bg); --tone-fg: var(--state-paid-fg); }
 .status-card[data-tone="unpaid"] { --tone-bg: var(--state-unpaid-bg); --tone-fg: var(--state-unpaid-fg); }
 .card-band { position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--tone-fg); transition: background-color var(--dur-base) var(--ease); }
@@ -167,7 +173,8 @@ button, input, select { font: inherit; color: inherit; }
 }
 .status-card[data-size="sm"] .card-gear { display: inline-flex; }
 .status-card[data-size="sm"] .lg-only { display: none; }
-.card-label { font: 500 var(--fs-label)/1.4 var(--font-sans); color: var(--color-text-600); }
+/* 最小高 24px = 20px 强调标签（已下班 / 休息日 / 无薪假）的行高：12px 的小标签与强调标签同高，状态切换时卡高不变；小字贴近下方金额 */
+.card-label { display: flex; align-items: flex-end; min-height: 24px; font: 500 var(--fs-label)/1.4 var(--font-sans); color: var(--color-text-600); }
 .card-amount {
   font-weight: 700; line-height: 1.1; white-space: nowrap; color: var(--color-text-900);
   font-size: clamp(32px, 12.5cqi, var(--fs-hero-lg));
@@ -181,8 +188,15 @@ button, input, select { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { .card-amount.is-celebrating { animation: none; } }
 .card-cheer { color: var(--color-text-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-progress { display: grid; gap: var(--space-1); }
-.bar { height: 8px; border-radius: var(--radius-full); background: var(--state-rest-bg); overflow: hidden; border: 1px solid var(--color-border-control); }
-.bar-fill { height: 100%; background: var(--tone-fg); }
+/* 头一行（M4）：左「工时进度」，右倒数（14px、深色）；没有进度条的状态倒数另起一行（.card-countdown-slot） */
+.card-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); min-height: 21px; }
+.card-progress-title { font: 500 var(--fs-label)/1.4 var(--font-sans); color: var(--color-text-600); white-space: nowrap; }
+.card-progress-aside { min-width: 0; text-align: right; white-space: nowrap; }
+.card-progress-aside .card-countdown { display: inline; font-size: var(--fs-body); line-height: 1.4; color: var(--color-text-900); }
+/* 进度条（M5）：无描边、8px、淡轨道；填色圆角跟随轨道 */
+.bar { height: 8px; border-radius: var(--radius-full); background: var(--color-border-subtle); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: inherit; background: var(--tone-fg); }
+.status-card[data-tone="lunch"] .bar-fill { background: var(--state-lunch-fill); }
 .card-progress-text, .card-countdown, .card-payday { font-size: var(--fs-caption); color: var(--color-text-600); font-variant-numeric: tabular-nums; }
 .card-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); border-top: 1px solid var(--color-border-subtle); padding-top: var(--space-3); }
 .metric-label { font: 500 var(--fs-label)/1.4 var(--font-sans); color: var(--color-text-600); }
@@ -535,7 +549,11 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--color-text-900); color: #fff; border-radius: var(--radius-md); box-shadow: var(--shadow-card);
 }
 .toast-action { border: 0; background: none; color: #BBF7D0; font-weight: 600; cursor: pointer; text-decoration: underline; min-height: 24px; }
-.status-card[data-tone="rest"] .card-label { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); color: var(--color-text-900); }
+.status-card[data-tone="rest"] .card-label, .status-card[data-tone="holiday"] .card-label, .status-card[data-tone="unpaid"] .card-label,
+.status-card[data-tone="after"] .card-label { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); color: var(--color-text-900); }
+.status-card[data-tone="after"] .card-label { color: var(--tone-fg); } /* 已下班：一天最该被鼓励的一句，用状态色 */
+.badge-name { white-space: nowrap; }
+.status-card[data-size="sm"] .badge-name { display: none; } /* 小窗只写「法定假日」，不挤到齿轮 */
 
 /* 无内置假期表的年份提示（文字本身就是信息，不只靠颜色） */
 .card-year {

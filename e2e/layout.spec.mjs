@@ -340,7 +340,7 @@ test('legend always lists all 7 kinds on ONE line (months with and without holid
       }
     }
     assert.deepEqual(await labels(), ['周末', '法定假日', '调休上班', '带薪假', '无薪假', '今天', '手动标记']);
-    assert.equal(await text(page, '.legend-hint'), '点日期可标记：调休 · 带薪假 · 无薪假');
+    assert.equal(await text(page, '.legend-hint'), '点日期可标记：调休上班 · 带薪假 · 无薪假');
     assert.equal(await page.locator('.cal-legend [data-kind=holiday] svg.icon-holiday').count(), 1, 'same icon as the 假 tag');
     assert.equal(await page.locator('.cal-legend [data-kind=makeup] svg.icon-makeup').count(), 1);
     assert.equal(await page.locator('.cal-legend [data-kind=paid] svg.icon-paid').count(), 1);
@@ -403,7 +403,7 @@ test('summary row: workdays and daily wage live; missing-table tag in the summar
   });
   await withPage('2027-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 20 天 · 日薪 ¥340.00');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标法定假日');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年调休安排未内置，只标了节日');
     assert.equal(await page.locator('.cal-toolbar .cal-year-tag').count(), 0, 'not in the toolbar');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
@@ -429,9 +429,9 @@ test('2027-02 (no table): 春节 2/5-2/8 marked, summary 18 days, tag text, fits
     }
     assert.match(await cell(page, '2月9日').getAttribute('aria-label'), /^2月9日 周二，工作日/, 'no invented compensation day');
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年仅标法定假日');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年调休安排未内置，只标了节日');
     assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
-    assert.ok((await text(page, '.cal-summary .cal-year-tag')).length <= 14, 'tag <= 14 chars');
+    assert.ok((await text(page, '.cal-summary .cal-year-tag')).length <= 20, 'tag <= 20 chars (Task 19 L11: longer plain-language wording, row still one line below)');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
     const m = await measure(page);
@@ -709,8 +709,8 @@ for (const [state, init, act] of floatStates) {
       } else if (state === 'floating') {
         assert.deepEqual(notes, ['请保持本页开启：关闭本页，小窗也会一起关闭']);
         assert.deepEqual(btn, { text: '收回小窗', disabled: false, desc: 'float-keep' });
-        assert.equal(await page.locator('.pip-placeholder').isVisible(), true, 'dashed placeholder in place of the card');
-        assert.equal(await page.locator('.pip-placeholder').evaluate((e) => getComputedStyle(e).borderTopStyle), 'dashed');
+        assert.equal(await page.locator('.pip-placeholder').isVisible(), true, 'placeholder in place of the card');
+        assert.equal(await page.locator('.pip-placeholder').evaluate((e) => getComputedStyle(e).borderTopStyle), 'solid'); // Task 19 L5: solid, not dashed
         assert.equal(await text(page, '.pip-placeholder-note'), '状态卡正显示在悬浮小窗里');
       } else {
         assert.deepEqual(notes, ['当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）']);
@@ -855,7 +855,7 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
     assert.equal(past.cut, false, 'fits at 1280');
     assert.doesNotMatch(past.text + past.title, /国务院|待公布|依据/);
     assert.equal(past.check, false);
-    assert.equal(await tagText(page), '2025 年仅标固定日期的法定假日', 'round 3 (R41 amended): past no-table years show the visible qualifier too');
+    assert.equal(await tagText(page), '2025 年调休安排未内置，只标了节日', 'round 3 (R41 amended): past no-table years show the visible qualifier too');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /上月/ }).click();
     assert.equal((await pill(page)).text, '本月没有已标出的法定假日');
@@ -873,11 +873,11 @@ test('summary pill + tag: 2027-01 (fixed day) and 2027-02 (lunar days) with the 
     assert.equal(jan.text, '元旦 1/1 放假');
     assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     assert.equal(jan.check, false);
-    assert.equal(await tagText(page), '2027 年仅标法定假日');
+    assert.equal(await tagText(page), '2027 年调休安排未内置，只标了节日');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal((await pill(page)).text, '春节 2/5–2/8 放假');
-    assert.equal(await tagText(page), '2027 年仅标法定假日');
+    assert.equal(await tagText(page), '2027 年调休安排未内置，只标了节日');
     await page.getByRole('button', { name: /下月/ }).click();
     const mar = await pill(page);
     assert.deepEqual([mar.text, mar.tone, mar.check, mar.border], ['本月没有已标出的法定假日', 'unknown', false, 'dashed']);
@@ -886,9 +886,9 @@ test('summary pill + tag: 2027-01 (fixed day) and 2027-02 (lunar days) with the 
   await withPage('2036-01-07T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     assert.equal((await pill(page)).text, '元旦 1/1 放假');
-    assert.equal(await tagText(page), '2036 年仅标固定日期的法定假日');
+    assert.equal(await tagText(page), '2036 年调休安排未内置，只标了节日');
     assert.match(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), /只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）/);
-    assert.equal(await text(page, '#status-card .card-year'), '2036 年仅标固定日期的法定假日', 'status card uses the same wording');
+    assert.equal(await text(page, '#status-card .card-year'), '2036 年调休安排未内置，只标了节日', 'status card uses the same wording');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal((await pill(page)).text, '本月没有已标出的法定假日', 'no lunar data for 2036: nothing claimed');
@@ -1850,8 +1850,8 @@ test('A round 2: while floating, the placeholder follows the live card when its 
 test('C round 3: every no-table year (2024 / 2025 / 2027 / 2036) shows a visible qualifier tag in the summary row; nothing truncated at 1000×700 and the four viewports', () =>
   withPage(T1412, async (page) => {
     const cases = [
-      ['2025-10', '2025 年仅标固定日期的法定假日'], ['2025-11', '2025 年仅标固定日期的法定假日'],
-      ['2027-05', '2027 年仅标法定假日'], ['2036-10', '2036 年仅标固定日期的法定假日'], ['2024-05', '2024 年未标法定假日'],
+      ['2025-10', '2025 年调休安排未内置，只标了节日'], ['2025-11', '2025 年调休安排未内置，只标了节日'],
+      ['2027-05', '2027 年调休安排未内置，只标了节日'], ['2036-10', '2036 年调休安排未内置，只标了节日'], ['2024-05', '2024 年未标法定假日'],
     ];
     const rows = [];
     for (const [w, ht] of [[1000, 700], ...VIEWPORTS]) {
