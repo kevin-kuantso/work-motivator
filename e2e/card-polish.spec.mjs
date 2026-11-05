@@ -162,8 +162,8 @@ test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, 32px her
     const c = page.locator('#status-card');
     assert.equal(await c.locator('.card-amount').textContent(), '¥ 0.00');
     assert.equal(await c.locator('.card-label').textContent(), '08:30 开始计薪');
-    assert.equal(await c.locator('.metric-rate .metric-label').textContent(), '上班时间');
-    assert.equal(await c.locator('.metric-rate .metric-value').textContent(), '08:30');
+    assert.equal(await c.locator('.metric-rate .metric-label').textContent(), '已赚占月薪');
+    assert.match(await c.locator('.metric-rate .metric-value').textContent(), /^\d+%$/);
   });
   await withState('unpaid', async (page) => {
     const c = page.locator('#status-card');
@@ -174,7 +174,7 @@ test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, 32px her
   // 值取自设置，不写死
   await withState('before', async (page) => {
     assert.equal(await page.locator('#status-card .card-label').textContent(), '09:15 开始计薪');
-    assert.equal(await page.locator('#status-card .metric-rate .metric-value').textContent(), '09:15');
+    assert.ok(!(await page.locator('#status-card').innerText()).includes('08:30'), 'the old default time appears nowhere');
   }, { extra: { start: '09:15' } });
   await withState('lunch', async (page) => {
     assert.equal(await page.locator('#status-card .metric-rate .metric-value').textContent(), '13:30');

@@ -194,8 +194,8 @@ test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other
   assert.equal(lunch.rate, '13:00'); // Task 19 H2：午休中第一格改为「午休结束 13:00」
   const before = d(11, 4, 7);
   assert.equal(before.label, '08:30 开始计薪'); // Task 19 M1
-  assert.equal(before.rateLabel, '上班时间');
-  assert.equal(before.rate, '08:30');
+  assert.equal(before.rateLabel, '已赚占月薪'); // Task 19 mini round: 08:30 only in the label (F6)
+  assert.match(before.rate, /^\d+%$/);
   const rest = d(11, 7, 18);
   assert.equal(rest.label, '今天休息');
   assert.equal(rest.rateLabel, '已赚占月薪'); // Task 19 H2：非上班日都说已赚占月薪
@@ -237,11 +237,12 @@ test('Task 19 H2: the first metric cell is the speed only while working; every o
   const lunch = model(at(11, 4, 12, 15));
   assert.deepEqual([lunch.rateLabel, lunch.rate], ['午休结束', '13:00']);
   const before = model(at(11, 4, 7));
-  assert.deepEqual([before.rateLabel, before.rate], ['上班时间', '08:30']);
+  assert.equal(before.rateLabel, '已赚占月薪');
+  assert.ok(!before.rate.includes('08:30'));
   // 取自设置，不写死
   const custom = { ...cfg, start: '09:15', lunchStart: '12:00', lunchEnd: '13:30', end: '18:00' };
   assert.deepEqual([model(at(11, 4, 12, 40), custom).rateLabel, model(at(11, 4, 12, 40), custom).rate], ['午休结束', '13:30']);
-  assert.deepEqual([model(at(11, 4, 8), custom).rateLabel, model(at(11, 4, 8), custom).rate], ['上班时间', '09:15']);
+  assert.equal(model(at(11, 4, 8), custom).label, '09:15 开始计薪');
   // 休息日 / 法定假日 / 带薪假 / 无薪假 / 已下班：已赚占月薪 N%（与 Task 17 同一个函数）
   for (const m of [model(at(11, 7, 10)), model(at(10, 1, 10)), model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' }),
     model(at(11, 4, 10), cfg, { '2026-11-04': 'unpaidLeave' }), model(at(11, 4, 18))]) {
@@ -345,4 +346,9 @@ test('Task 19 V3: the countdown ghost pads minutes and seconds to the widest for
   assert.equal(t.durationWidest('距下班 6小时30分0秒'), '距下班 6小时88分88秒');
   assert.equal(t.durationWidest('距下班 0分9秒'), '距下班 88分88秒');
   assert.equal(t.durationWidest('距下个工作日 2 天'), '距下个工作日 2 天');
+});
+
+test('Task 19 mini round: 时薪 is hidden together with 今日满勤可得 on 休息日 / 法定假日 / 无薪假 (two cells, no orphan); other states show it', () => {
+  for (const m of [model(at(11, 7, 10)), model(at(10, 2, 10)), model(at(11, 4, 10), cfg, { '2026-11-04': 'unpaidLeave' })]) assert.equal(m.showHourly, false, m.status);
+  for (const m of [model(at(11, 4, 10)), model(at(11, 4, 7)), model(at(11, 4, 18)), model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' })]) assert.equal(m.showHourly, true, m.status);
 });

@@ -43,13 +43,13 @@ test('V1: float button and metrics grid sit at the same y in all 9 states at fou
         ys[name] = await page.evaluate(() => {
           const top = (s) => Math.round(document.querySelector(s).getBoundingClientRect().top * 10) / 10;
           const lab = document.querySelector('#status-card .card-label');
-          return { button: top('#btn-float'), metrics: top('#status-card .card-metrics'), labelSize: getComputedStyle(lab).fontSize, labelClipped: lab.scrollWidth > lab.clientWidth + 0.5 };
+          return { button: top('#btn-float'), metrics: Math.round(document.querySelector('#status-card .card-metrics').getBoundingClientRect().bottom * 10) / 10, labelSize: getComputedStyle(lab).fontSize, labelClipped: lab.scrollWidth > lab.clientWidth + 0.5 };
         });
       }, { viewport: { width: w, height: h } });
     }
     console.log(`MEASURE ${JSON.stringify({ case: 'V1 y', vp: `${w}x${h}`, ys })}`);
     assert.equal(new Set(Object.values(ys).map((v) => v.button)).size, 1, `float button y @${w}x${h}: ${JSON.stringify(ys)}`);
-    assert.equal(new Set(Object.values(ys).map((v) => v.metrics)).size, 1, `metrics grid y @${w}x${h}`);
+    assert.equal(new Set(Object.values(ys).map((v) => v.metrics)).size, 1, `metrics grid bottom @${w}x${h} (the two-cell grids are shorter, so compare the pinned bottom edge)`);
     for (const n of ['rest', 'holiday', 'unpaid']) {
       assert.equal(ys[n].labelSize, '32px', `${n} label is the hero`);
       assert.equal(ys[n].labelClipped, false);
@@ -142,9 +142,10 @@ test('今日满勤可得 is hidden on 休息日 / 法定假日 / 无薪假 and s
   for (const [name, shown] of Object.entries({ working: true, lunch: true, before: true, after: true, rest: false, holiday: false, paid: true, unpaid: false, makeup: true })) {
     await withState(name, async (page) => {
       assert.equal(await page.locator('#status-card .metric-daily').isVisible(), shown, name);
-      assert.equal(await page.locator('#status-card .metric-hourly').isVisible(), true, `${name}: 时薪 stays`);
+      assert.equal(await page.locator('#status-card .metric-hourly').isVisible(), shown, `${name}: 时薪 goes with 满勤 (two cells, one row)`);
       const cols = await page.evaluate(() => [...document.querySelectorAll('#status-card .card-metrics > .metric')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().left)));
       assert.ok(cols.every((x) => x === cols[0] || x === cols.find((y) => y !== cols[0])), `${name}: two columns only`);
+      if (!shown) assert.equal(cols.length, 2, `${name}: exactly two cells, no orphan`);
     });
   }
 });

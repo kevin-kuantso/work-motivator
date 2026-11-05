@@ -52,9 +52,6 @@ export function cardModel(snap, cfg, t) {
   } else if (s === 'lunch' && lunchEnd) {
     rateLabel = c.lunchEnds;
     rate = lunchEnd;
-  } else if (s === 'beforeWork' && start) {
-    rateLabel = c.startsAt;
-    rate = start;
   }
 
   // 进度文字：上班中 / 午休 / 未上班「已工作 2小时0分 / 共 7小时」；已下班「今天工作满 7 小时」（时长取自设置）
@@ -94,6 +91,8 @@ export function cardModel(snap, cfg, t) {
     progressInHead: done,
     // 今日满勤可得：休息日 / 法定假日 / 无薪假（今天不计薪）时与结论矛盾，不显示
     showDaily: s !== 'restDay' && s !== 'unpaidLeave',
+    // 时薪也一起隐藏：这三种状态指标格只剩「已赚占月薪 + 本月累计」两格，排成一行，没有落单的格子
+    showHourly: s !== 'restDay' && s !== 'unpaidLeave',
     rateLabel,
     rate,
     month: `${t.currency}${money(snap.monthTotal)}`,

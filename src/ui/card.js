@@ -149,6 +149,7 @@ export function renderCard(root, snap, cfg, t) {
   setText(r['metric-hourly'], m.hourly);
   setText(r['metric-daily'], m.daily);
   show(r['metric-daily-box'], m.showDaily);
+  show(r['metric-hourly-box'], m.showHourly);
 
   show(r.payday, m.payday !== null);
   setText(r.payday, m.payday ?? '');
