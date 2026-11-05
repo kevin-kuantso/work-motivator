@@ -130,7 +130,7 @@ export function mountApp(doc, storage, clock) {
       { id: 'settings', label: t.tabs.settings, panel: settingsPanel },
     ],
     initial: 'calendar',
-    onChange: (id) => { if (id !== 'calendar') calendar.hideOverlays(); },
+    onChange: (id) => { if (id === 'calendar') calendar.refreshLayout(); else calendar.hideOverlays(); },
   });
   const openSettings = () => tabs.select('settings', { focus: true });
 

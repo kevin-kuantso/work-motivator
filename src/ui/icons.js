@@ -10,7 +10,8 @@ const PATHS = {
   paid: [['circle', { cx: 8, cy: 8, r: 5.5 }], ['path', { d: 'M6 5l2 2.6L10 5M8 7.6V11.5M6.2 8.6h3.6' }]],
   unpaid: [['circle', { cx: 8, cy: 8, r: 5.5 }], ['path', { d: 'M4.2 11.8l7.6-7.6' }]],
   makeup: [['rect', { x: 2.5, y: 5, width: 11, height: 8, rx: 1.5 }], ['path', { d: 'M6 5V3.5h4V5M2.5 8.5h11' }]],
-  holiday: [['path', { d: 'M4 14V2.5' }], ['path', { d: 'M4 3h7.5l-1.8 2.5 1.8 2.5H4' }]],
+  // M9：12px 的描边旗子在小尺寸下像字母「P」；改成实心小旗（旗面填色、更宽），小尺寸仍读得出一面旗
+  holiday: [['path', { d: 'M4 14V2.6' }], ['rect', { x: 5.1, y: 3.1, width: 7.4, height: 5.1, rx: 0.7, fill: 'currentColor', stroke: 'none' }]],
   check: [['path', { d: 'M3.5 8.5l3 3 6-7' }]],
   reset: [['path', { d: 'M3.2 8a4.8 4.8 0 1 0 1.4-3.4' }], ['path', { d: 'M4.2 2.2v2.6h2.6' }]],
   pip: [['rect', { x: 2, y: 3, width: 12, height: 10, rx: 1.5 }], ['rect', { x: 8, y: 8, width: 4.5, height: 3.5, rx: 0.8, fill: 'currentColor', stroke: 'none' }]],

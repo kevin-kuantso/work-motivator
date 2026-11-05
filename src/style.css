@@ -17,10 +17,12 @@
   --state-makeup-bg:#EDE9FE;  --state-makeup-fg:#5B21B6;
   --state-unpaid-stripe:#FFF1F2;
 
-  /* 月历格子：弱化的日期数字仍须 ≥ 4.5:1（spec §13.3；test/layout-model.test.mjs 实算） */
-  --cal-weekend-bg:#F8FAFB;  --cal-weekend-num:#4B5563;
-  --cal-holiday-bg:#F3F4F6;  --cal-holiday-num:#4B5563;
-  --cal-rest-bg:#F8FAFB;
+  /* 月历格子：弱化的日期数字仍须 ≥ 4.5:1（spec §13.3；test/layout-model.test.mjs 实算）
+     H4：法定假日格用看得出的浅绿（#A7F3D0 + #065F46，数字 5.99:1；对周末的中性灰 #F3F4F6 是两套色系，不是同一片灰），
+     周末数字 #4B5563 对 #F3F4F6 6.87:1 */
+  --cal-weekend-bg:#F3F4F6;  --cal-weekend-num:#4B5563;
+  --cal-holiday-bg:#A7F3D0;  --cal-holiday-num:#065F46;
+  --cal-rest-bg:#F3F4F6;
 
   --font-sans:'Microsoft YaHei UI','Microsoft YaHei','PingFang SC','Noto Sans SC',system-ui,sans-serif;
   /* 会跳动的数字：只用系统字体；拉丁 / 数字取 Segoe UI（Windows）或系统 UI 字体（Mac），中文落到雅黑 / 苹方 */
@@ -358,55 +360,59 @@ button, input, select { font: inherit; color: inherit; }
 /* 较窄的视窗（< 1280px）：摘要行放不下时换行，不截断胶囊或缺表标签（round 3） */
 @media (max-width: 1279px) { .cal-summary { flex-wrap: wrap; row-gap: 2px; } .cal-note { flex: none; } }
 .cal-summary-text { font-weight: 500; font-variant-numeric: tabular-nums; flex: none; }
-/* 情境胶囊（R36 / 决定 4）：有放假 = 实线灰底 + 旗子；有表且本月真的没有 = 虚线 + ✓；无表且没标出 = 虚线、不打 ✓。放不下时省略号，全文在 title */
+/* 情境胶囊（R36 / 决定 4）：有放假 = 实线灰底 + 旗子；有表且本月真的没有 = 纯灰字、无框（M10）；无表且没标出 = 虚线、不打 ✓。放不下时省略号，全文在 title */
 .cal-note {
   display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--radius-full);
   font-size: 12px; white-space: nowrap; font-family: var(--font-num); min-width: 0; overflow: hidden; flex: 0 1 auto;
 }
 .cal-note[data-tone="holiday"] { background: var(--cal-holiday-bg); color: var(--color-text-900); border: 1px solid #D1D5DB; }
-.cal-note[data-tone="none"], .cal-note[data-tone="unknown"] { background: var(--color-surface); color: var(--color-text-600); border: 1px dashed var(--color-border-control); }
+/* M10：本月确实没有法定假日——只是说明，不是状态，不给框、不给底；依据只放在 title 里 */
+.cal-note[data-tone="none"] { background: none; border: 0; padding: 0; color: var(--color-text-600); }
+/* 没有假期表、也还没标出假日：虚线框提醒「这里可以补」 */
+.cal-note[data-tone="unknown"] { background: var(--color-surface); color: var(--color-text-600); border: 1px dashed var(--color-border-control); }
 .cal-note-icon { display: inline-flex; flex: none; }
 .cal-note .icon { width: 12px; height: 12px; }
-.cal-note-text, .cal-note-sub { overflow: hidden; text-overflow: ellipsis; }
-.cal-note-text { flex: 0 1 auto; }
-.cal-note-sub { color: var(--color-text-600); flex: 0 1 auto; min-width: 0; }
+.cal-note-text { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .cal-year-tag { flex: none; }
 .cal-year-tag {
   padding: 0 var(--space-2); border-radius: var(--radius-full); font: 500 var(--fs-caption)/20px var(--font-sans);
   background: var(--state-lunch-bg); color: var(--state-lunch-fg);
 }
 .cal-reset { margin-left: auto; }
-/* 图例：固定 7 项排成一行；右侧提示只在放得下时出现——放不下就换到被裁掉的第二行（不截断成半句） */
+/* 图例：固定 7 项排成一行（右端的操作提示已移到工具栏，见 .legend-hint） */
 .cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; height: 22px; margin-bottom: 6px; flex: none; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); color: var(--color-text-600); }
 .legend-title { font-weight: 600; flex: none; }
 .legend-items { display: flex; gap: 10px; align-items: center; flex: none; }
 .legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
-.legend-hint { margin-left: auto; flex: none; line-height: 22px; }
+/* M7：操作提示贴工具栏右端；空间不够时量测改短文案，再不够才隐藏（render / resize / 字体就绪都重算）。 */
+.legend-hint { margin-left: auto; flex: none; line-height: 22px; font-size: var(--fs-caption); color: var(--color-text-600); }
 .legend-swatch {
   display: inline-flex; align-items: center; justify-content: center; position: relative;
   min-width: 24px; height: 18px; padding: 0 var(--space-1); border-radius: 4px;
   border: 1px solid var(--color-border-subtle); background: var(--color-surface);
 }
 .legend-swatch.is-today { border: 2px solid var(--color-brand-600); }
-/* 周末格的底色（#F8FAFB）在白底上几乎看不出：图例色块加一道看得见的边框（#9CA3AF，对白底 2.54:1） */
-.legend-swatch.kind-weekend { border-color: #9CA3AF; }
+/* M8：色块直接用真实格子的 token（后面的 .kind-* 底色规则盖掉这里的白底），不再单独给周末加边框 */
 .legend-swatch .day-dot { position: static; }
 .legend-swatch .icon { width: 12px; height: 12px; }
 .cal-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto; grid-auto-rows: minmax(40px, 1fr); gap: var(--space-1); }
 @media (max-width: 999px) { .cal-grid { grid-auto-rows: minmax(48px, auto); } }
 .cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); min-height: 0; }
 .cal-colhead { text-align: center; font: 500 var(--fs-label)/18px var(--font-sans); color: var(--color-text-600); }
-.cal-colhead.is-weekend { color: var(--color-text-900); font-weight: 700; }
 .cal-cell { display: block; position: relative; min-width: 0; min-height: 0; container-type: inline-size; }
 .day {
-  position: relative; width: 100%; height: 100%; min-height: 0; padding: 3px 6px 2px; text-align: left; cursor: pointer; overflow: hidden;
+  position: relative; width: 100%; height: 100%; min-height: 0; padding: 4px 6px 1px; text-align: left; cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
   border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm); background: var(--color-surface);
   transition: background-color var(--dur-fast) var(--ease);
 }
 .day:hover { border-color: var(--color-border-control); }
+/* 只有「没被标记」的格子加 hover 底色：周末/休息日格本来就是灰底，工作日的白底给一点浅绿反馈；
+   有标记的格子（法定假日/带薪假/无薪假/调休上班/手动改休息）已经有自己的底色，不去盖掉它 */
+.day.kind-workday:hover, .day.kind-weekend:hover { background: var(--color-brand-50); }
 .day:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
-.day-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; }
+/* 日期数字：固定在 20px 的方框里（今天 22px 的圆），用 grid 居中；今天的数字另按实际墨迹对齐。 */
+.day-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; height: 20px; line-height: 1; display: grid; place-items: center; border-radius: 50%; }
 .day-label { display: flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); line-height: 14px; }
 .day.is-manual .day-label { padding-right: 8px; }
 .day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 1px; flex: none; font-size: var(--fs-caption); line-height: 14px; }
@@ -420,7 +426,7 @@ button, input, select { font: inherit; color: inherit; }
 .kind-weekend { background: var(--cal-weekend-bg); }
 .kind-weekend .day-num, .kind-rest .day-num { color: var(--cal-weekend-num); font-weight: 500; }
 .kind-holiday .day-num { color: var(--cal-holiday-num); font-weight: 500; }
-.kind-holiday { background: var(--cal-holiday-bg); color: var(--state-rest-fg); }
+.kind-holiday { background: var(--cal-holiday-bg); color: var(--state-holiday-fg); }
 .kind-makeup { background: var(--state-makeup-bg); color: var(--state-makeup-fg); }
 .kind-paid { background: var(--state-paid-bg); color: var(--state-paid-fg); }
 .kind-unpaid {
@@ -428,9 +434,18 @@ button, input, select { font: inherit; color: inherit; }
   background: repeating-linear-gradient(135deg, var(--state-unpaid-bg) 0 6px, var(--state-unpaid-stripe) 6px 12px);
 }
 .kind-rest { background: var(--cal-rest-bg); }
-.day.is-today { border: 2px solid var(--color-brand-600); padding: 2px 5px 1px; }
-/* 今天的数字圆（C3）：与普通格子的数字在同一位置（距格子外缘 4px / 7px），离 2px 的绿色边框 ≥ 2px；数字在圆里居中 */
-.day.is-today .day-num { background: var(--color-brand-600); color: #fff; }
+.day.is-today { border: 2px solid var(--color-brand-600); padding: 3px 5px 1px; }
+/* 今天的数字圆（C3）：22px 正圆，与普通格子的数字起点对齐，离 2px 的绿色边框 ≥ 3px。 */
+.day.is-today .day-num { width: 22px; height: 22px; background: var(--color-brand-600); color: #fff; }
+/* 大格子（≥ 140px 宽，1536×730 和 1920×950 的格子分别约 154px / 163px）：日期数字放大到 15px、内边距放宽，
+   免得整张月历像空表格。数字方框放大到 24px（2 位数墨迹两侧仍有 ≥ 3px）；今天的圆维持 22px 不变（M6 裁定），
+   只把内边距改成 5/7px，让圆与普通格子的数字起点仍然对齐（外缘 7px / 9px）。 */
+@container (min-width: 140px) {
+  .day { padding: 6px 8px 2px; }
+  .day.is-today { padding: 5px 7px 1px; }
+  .day-num { width: 24px; height: 24px; font-size: 15px; }
+  .day.is-today .day-num { width: 22px; height: 22px; }
+}
 
 /* Day menu（菜单）与提示：浮在月历之上；状态以文字 + 图示表达，不只靠颜色 */
 .day-menu {
@@ -458,7 +473,7 @@ button, input, select { font: inherit; color: inherit; }
 /* 日期提示（Task 18 · V1「白卡盖格」）：白底卡片原样盖在被悬停 / 聚焦的格子上（inset:0，不溢出到旁边或下面的格子），内容水平置中、
    上下留白相等；2px 边框用状态色（工作日绿 / 调休紫 / 带薪蓝 / 法定假日青绿 / 周末休息中性灰 / 今天 brand-600；无薪假边框中性灰、只有状态文字是红）；
    日期粗体、状态用状态色、计薪金额是主角。由 day-tooltip.js 实测、依序试这些档位，选第一个放得下的：
-   is-tight（收紧行距）→ is-compact（拿掉来源）→ is-inline（窄格子：「计薪 ¥…」回到一行）→ is-mini（再小一号字）→ is-lean（最后手段：拿掉状态行；金额永远保留）。
+   is-tight（收紧行距）→ is-compact（拿掉来源）→ is-inline（窄格子：「计薪 ¥…」回到一行）→ is-mini（再小一号字）→ is-no-wd（藏星期）→ is-lean（最后手段：拿掉状态行；金额永远保留）。
    完整文字始终在 aria-describedby。 */
 .day-tooltip {
   position: absolute; inset: 0; z-index: 15; pointer-events: none; overflow: hidden;
@@ -488,6 +503,7 @@ button, input, select { font: inherit; color: inherit; }
 .day-tooltip .tip-pay { font-size: 18px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
 .day-tooltip .tip-pay.is-zero .pay-amt { color: var(--color-text-600); }
 .day-tooltip.is-compact .tip-source { display: none; }
+.day-tooltip.is-no-wd .u-wd { display: none; } /* 倒数第二档：先藏「周X」（屏幕阅读器仍从 aria-describedby 读到），之后才是拿掉状态行 */
 .day-tooltip.is-lean .tip-status { display: none; }
 .day-tooltip.is-tight { font-size: 11px; line-height: 12px; }
 .day-tooltip.is-tight .tip-source { font-size: 10.5px; line-height: 12px; }

@@ -283,6 +283,7 @@ export const STRINGS = {
     nextTitle: '下月（PgDn）',
     summary: (days, wage) => `本月应出勤 ${days} 天 · 日薪 ${wage}`,
     legendHint: '点日期可标记：调休上班 · 带薪假 · 无薪假',
+    legendHintShort: '点日期可标记',
     // 摘要行的情境胶囊（R36 / 决定 4）：放假区间与调休上班日取自该月实际使用的表；「依据」按该年数据来源如实写
     context: {
       noHoliday: '本月没有法定假日',
@@ -321,7 +322,7 @@ export const STRINGS = {
     manual: '手动标记',
     manualTitle: '已手动标记',
     // 法定假日格不再有文字标签（只有旗子图示 + 节日名，Task 18）
-    tags: { makeup: '班', paid: '带薪', unpaid: '无薪' },
+    tags: { makeup: '班', paid: '带薪', unpaid: '无薪', rest: '休' },
     cellAria: ({ month, day, weekday, kind, holidayName, manual, today }) =>
       `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车打开菜单`,
     marked: (md, label) => `${md} 已标记为${label}`,

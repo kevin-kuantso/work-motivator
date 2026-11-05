@@ -11,7 +11,7 @@ import { createDayTooltip } from './day-tooltip.js';
 import { money } from './format.js';
 import { monthContext, missingTableTag } from './holiday-context.js';
 
-const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid' };
+const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid', rest: 'rest' };
 const MARK_KIND = { paidLeave: 'paid', unpaidLeave: 'unpaid', work: 'makeup', rest: 'rest' };
 // 图例：永远列出全部类型（R36），顺序固定；「工作日」是普通格子，不列入
 const LEGEND_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid'];
@@ -36,12 +36,18 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
   const summaryText = h(doc, 'span', { class: 'cal-summary-text' });
   const noteIcon = h(doc, 'span', { class: 'cal-note-icon' });
   const noteText = h(doc, 'span', { class: 'cal-note-text' });
-  const noteSub = h(doc, 'span', { class: 'cal-note-sub' });
-  const note = h(doc, 'span', { class: 'cal-note' }, noteIcon, noteText, noteSub);
+  const note = h(doc, 'span', { class: 'cal-note' }, noteIcon, noteText);
   const yearTag = h(doc, 'span', { class: 'cal-year-tag', hidden: true });
-  const reset = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-ghost cal-reset', hidden: true, text: c.reset, onclick: resetMonth });
+  const reset = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-reset', hidden: true, text: c.reset, onclick: resetMonth });
   const legendItems = h(doc, 'span', { class: 'legend-items' });
   const grid = h(doc, 'div', { class: 'cal-grid', role: 'grid', 'aria-labelledby': 'cal-title' });
+  const hint = h(doc, 'span', { class: 'legend-hint', text: c.legendHint });
+  const toolbar = h(doc, 'div', { class: 'cal-toolbar' },
+    h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, title: c.prevTitle, onclick: () => move(-1) }),
+    title,
+    h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, title: c.nextTitle, onclick: () => move(1) }),
+    todayBtn,
+    hint);
 
   // 图例色块只放图示（文字标签已说明类型），省宽度以保持单行
   const legendItem = (kind, label) =>
@@ -49,16 +55,11 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
       h(doc, 'span', { class: `legend-swatch kind-${kind}` }, TAG_ICON[kind] ? icon(doc, TAG_ICON[kind]) : null), label);
 
   const el = h(doc, 'section', { class: 'calendar', 'aria-label': c.title },
-    h(doc, 'div', { class: 'cal-toolbar' },
-      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, title: c.prevTitle, onclick: () => move(-1) }),
-      title,
-      h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, title: c.nextTitle, onclick: () => move(1) }),
-      todayBtn),
+    toolbar,
     h(doc, 'div', { class: 'cal-summary' }, summaryText, note, yearTag, reset),
     h(doc, 'div', { class: 'cal-legend' },
       h(doc, 'span', { class: 'legend-title', text: c.legend }),
-      legendItems,
-      h(doc, 'span', { class: 'legend-hint', text: c.legendHint })),
+      legendItems),
     grid);
   const menu = createDayMenu(doc, el, { onChoose: apply, refocus: (btn) => focusQuietly(btn) });
   const tooltip = createDayTooltip(doc);
@@ -170,9 +171,24 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     noteIcon.replaceChildren(m.check ? icon(doc, 'check') : m.tone === 'holiday' ? icon(doc, 'holiday') : '');
     show(noteIcon, m.check || m.tone === 'holiday');
     setText(noteText, m.text);
-    setText(noteSub, m.sub ?? '');
-    show(noteSub, Boolean(m.sub));
     if (note.title !== m.title) note.title = m.title;
+  }
+
+  // 优先完整提示；空间不够时改短提示，再放不下才隐藏。切月、resize 与字体就绪都重算。
+  function fitHint() {
+    hint.hidden = false;
+    setText(hint, c.legendHint);
+    const t = toolbar.getBoundingClientRect();
+    if (!t.width) return; // 隐藏的分页（display:none）里无从量测
+    const last = todayBtn.getBoundingClientRect();
+    const fits = () => {
+      const r = hint.getBoundingClientRect();
+      return r.width && r.right <= t.right + 0.5 && r.left >= last.right + 8 - 0.5;
+    };
+    if (!fits()) {
+      setText(hint, c.legendHintShort);
+      if (!fits()) hint.hidden = true;
+    }
   }
 
   function render() {
@@ -209,7 +225,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     show(reset, model.hasMarks);
 
     const head = h(doc, 'div', { class: 'cal-row cal-head', role: 'row' },
-      c.weekHeads.map((w, i) => h(doc, 'span', { class: `cal-colhead${i >= 5 ? ' is-weekend' : ''}`, role: 'columnheader', text: w })));
+      c.weekHeads.map((w) => h(doc, 'span', { class: 'cal-colhead', role: 'columnheader', text: w })));
     const cells = model.weeks.flat().filter(Boolean);
     const inMonth = (k) => (k && cells.some((x) => x.key === k) ? k : null);
     const tabKey = inMonth(refocus) ?? inMonth(menu.key()) ?? inMonth(rovingKey) ?? cells.find((x) => x.today)?.key ?? cells[0].key;
@@ -243,7 +259,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
             },
             onblur: () => tooltip.hide(),
           },
-          h(doc, 'span', { class: 'day-num', text: String(cell.day) }),
+          h(doc, 'span', { class: 'day-num' }, h(doc, 'span', { class: 'day-num-ink', text: String(cell.day) })),
           cell.kind in TAG_ICON || cell.holidayName
             ? h(doc, 'span', { class: 'day-label' }, tag(cell.kind), cell.holidayName ? h(doc, 'span', { class: 'day-name', text: cell.holidayName }) : null)
             : null,
@@ -267,6 +283,8 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
         if (menuHadFocus) focusQuietly(grid.querySelector('button[tabindex="0"]'));
       }
     }
+    fitHint();
+    centerTodayInk();
   }
 
   // 切换分页时收起菜单与提示（两者都浮在月历上）
@@ -275,5 +293,47 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     menu.close(false);
   }
 
-  return { el, render, hideOverlays };
+  // 把当天数字的实际墨迹中心对齐圆心；保留等宽数字，字体变化时重新量。
+  function centerTodayInk() {
+    const num = grid.querySelector('.day.is-today .day-num');
+    const ink = num?.querySelector('.day-num-ink');
+    if (!ink || !num.getClientRects().length) return;
+    ink.style.removeProperty('transform');
+    const circle = num.getBoundingClientRect();
+    const cs = doc.defaultView.getComputedStyle(ink);
+    const ctx = doc.createElement('canvas').getContext('2d');
+    if (!ctx) return;
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    ctx.fontKerning = cs.fontKerning;
+    // Canvas does not inherit tabular-nums. Measure each glyph and place it in
+    // its actual DOM advance; measuring the whole proportional string drifts.
+    const node = ink.firstChild;
+    const range = doc.createRange();
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+    for (let i = 0; i < node.length; i++) {
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      const rect = range.getBoundingClientRect();
+      const m = ctx.measureText(node.data[i]);
+      if (![m.actualBoundingBoxLeft, m.actualBoundingBoxRight, m.actualBoundingBoxAscent, m.actualBoundingBoxDescent, m.fontBoundingBoxAscent].every(Number.isFinite)) return;
+      const origin = rect.left + (rect.width - m.width) / 2;
+      const baseline = rect.top + m.fontBoundingBoxAscent;
+      left = Math.min(left, origin - m.actualBoundingBoxLeft);
+      right = Math.max(right, origin + m.actualBoundingBoxRight);
+      top = Math.min(top, baseline - m.actualBoundingBoxAscent);
+      bottom = Math.max(bottom, baseline + m.actualBoundingBoxDescent);
+    }
+    if (left <= right && top <= bottom) ink.style.transform = `translate(${(circle.left + circle.right - left - right) / 2}px, ${(circle.top + circle.bottom - top - bottom) / 2}px)`;
+  }
+
+  // 提示的「放得下吗」随视窗宽度与字体度量变化：挂一次监听，量测同步执行（不靠 rAF，测试里的假时钟不会吞掉）
+  try {
+    doc.defaultView?.addEventListener?.('resize', () => { fitHint(); centerTodayInk(); });
+    doc.fonts?.ready?.then?.(() => { fitHint(); centerTodayInk(); }, () => {});
+    doc.fonts?.addEventListener?.('loadingdone', () => { fitHint(); centerTodayInk(); });
+  } catch {
+    // 没有 FontFaceSet：只靠 resize 与 render
+  }
+
+  return { el, render, hideOverlays, refreshLayout: () => { fitHint(); centerTodayInk(); } };
 }

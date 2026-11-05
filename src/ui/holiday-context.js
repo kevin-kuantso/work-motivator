@@ -89,18 +89,14 @@ export function monthContext(year, monthIndex, tables, today, t) {
   
   if (!table && noTableKind(year) === 'none') {
     // 同一行已有「{年} 年未标法定假日」标签：胶囊只写本月的事实，长说明放 title（round 3，窄视窗不截断）
-    return { tone: 'unknown', check: false, text: C.noneMarked, sub: null, title: C.noData(year) };
+    return { tone: 'unknown', check: false, text: C.noneMarked, title: C.noData(year) };
   }
   const text = marked ? C.join(parts) : table ? C.noHoliday : C.noneMarked;
-  // 有表的放假月份：照设计稿只写区间（「依据」放 title）；其余情况把「依据」写出来，缺表标签已显示时改放 title
-  // 「依据」只在有表且本月真的没有假日时写进胶囊（「本月没有法定假日 · 依据 …」）；其余情况（有放假的月份、所有无表年份）
-  // 一律放在 title（round 2：无表年份不再分「过去 / 当年以后」两种写法；当年以后同一行另有缺表标签）
-  const showSub = basis !== null && Boolean(table) && !marked;
+  // 「依据」只放 title（M10）：本月没有假日的胶囊是纯说明文字，不再在后面接一段小字
   return {
     tone: marked ? 'holiday' : table ? 'none' : 'unknown',
     check: Boolean(table) && !marked && basis !== null,
     text,
-    sub: showSub ? C.sub(basis) : null,
     title: basis === null ? text : `${text} ${C.sub(basis)}`,
   };
 }
