@@ -64,7 +64,7 @@ test('other statuses keep the old copy (working, lunch, before, rest day, paid l
   });
   await withPage('2026-11-04T07:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-label`), '08:30 开始计薪'); // Task 19 M1
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '上班时间'); // Task 19 H2
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪'); // Task 19 mini round (F6)
   });
   await withPage('2026-11-07T18:00:00+08:00', async (page) => { // 周六
     assert.equal(await text(page, `${card} .card-badge`), '休息日');

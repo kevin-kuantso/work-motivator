@@ -142,7 +142,9 @@ button, input, select { font: inherit; color: inherit; }
    最小高度 = 「上班中」卡高，由 app.js 在运行时量（见 card.js measureReferenceHeight：载入、窗口改变、字体载入后）写成 --card-ref-h，
    所以 Windows 字体下也跟着变，不依赖在 macOS 量到的像素。内容更多（鼓励语、发薪日、缺表标签）时照常长高 */
 .status-card[data-size="lg"] { display: flex; flex-direction: column; min-height: var(--card-ref-h, 0px); }
-.status-card[data-size="lg"] .card-metrics { margin-top: auto; }
+.status-card[data-size="lg"] { justify-content: space-between; } /* 多出来的高度均分到各块之间；最后一块（指标格）始终贴底，所以它与按钮的 y 不变 */
+.status-card[data-size="lg"][data-tone="rest"] .card-metrics, .status-card[data-size="lg"][data-tone="holiday"] .card-metrics,
+.status-card[data-size="lg"][data-tone="unpaid"] .card-metrics { margin-top: auto; }
 /* 矮视窗（≤ 640px，例如 1280×585）：左栏还要放「悬浮成小窗」按钮（R38）。主分页的大卡片收紧一点垂直间距，
    最高的常见卡片（鼓励语 + 发薪日）+ 两条提示条时左栏仍放得下；小窗（sm）不受影响 */
 @media (max-height: 640px) {

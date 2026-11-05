@@ -197,7 +197,6 @@ export const STRINGS = {
     rate: '当前赚钱速度',
     rateUnit: '/秒',
     lunchEnds: '午休结束',
-    startsAt: '上班时间',
     month: '本月累计',
     hourly: '时薪',
     dailyFull: '今日满勤可得',
