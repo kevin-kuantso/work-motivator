@@ -102,7 +102,7 @@ test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown rig
     assert.equal(r.standaloneVisible, false, 'no second countdown line while the bar is shown');
   });
   await withState('lunch', async (page) => {
-    assert.equal(await page.locator('#status-card .bar-fill').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(217, 119, 6)');
+    assert.equal(await page.locator('#status-card .bar-fill').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(180, 83, 9)');
     assert.equal(await page.locator('#status-card .card-countdown').textContent(), '45 分钟后继续上班');
   });
   // 没有进度条的状态：倒数 / 说明是单独一行，进度头不出现
@@ -113,7 +113,7 @@ test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown rig
   });
 });
 
-test('M5: bar fill keeps ≥ 3:1 against the white card, and ≥ 2.5:1 against the track, for every tone that shows a bar', async () => {
+test('M5 / V4: bar fill keeps ≥ 4.5:1 against the white card, and ≥ 3:1 against the track (the real requirement), for every tone that shows a bar', async () => {
   const out = {};
   for (const name of ['working', 'lunch', 'before', 'after']) {
     await withState(name, async (page) => {
@@ -123,23 +123,23 @@ test('M5: bar fill keeps ≥ 3:1 against the white card, and ≥ 2.5:1 against t
         return { fill, track };
       });
       out[name] = { vsWhite: ratio(c.fill, 'rgb(255, 255, 255)'), vsTrack: ratio(c.fill, c.track) };
-      assert.ok(out[name].vsWhite >= 3, `${name} fill vs white card ${out[name].vsWhite}`);
-      assert.ok(out[name].vsTrack >= 2.5, `${name} fill vs track ${out[name].vsTrack}`);
+      assert.ok(out[name].vsWhite >= 4.5, `${name} fill vs white card ${out[name].vsWhite}`);
+      assert.ok(out[name].vsTrack >= 3, `${name} fill vs track ${out[name].vsTrack}`);
     });
   }
   console.log(`MEASURE ${JSON.stringify({ case: 'bar contrast', out })}`);
 });
 
-test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, strong 20px label, amount, first metric cell)', async () => {
+test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, 32px hero labels / 20px 收工 label, amount, first metric cell)', async () => {
   await withState('holiday', async (page) => {
     const c = page.locator('#status-card');
     assert.equal(await c.getAttribute('data-tone'), 'holiday');
-    assert.equal((await c.locator('.card-badge').textContent()).trim(), '法定假日 · 国庆');
+    assert.equal((await c.locator('.card-badge').textContent()).trim(), '法定假日');
     assert.equal(await c.locator('.card-badge .icon-holiday').count(), 1, 'flag icon, not the moon');
     const k = await c.locator('.card-badge').evaluate((e) => { const s = getComputedStyle(e); return { fg: s.color, bg: s.backgroundColor }; });
     assert.notEqual(k.bg, 'rgb(243, 244, 246)', 'not the plain-weekend grey');
     assert.ok(ratio(k.fg, k.bg) >= 4.5, `holiday badge contrast ${ratio(k.fg, k.bg)}`);
-    assert.equal(await c.locator('.card-label').evaluate((e) => getComputedStyle(e).fontSize), '20px');
+    assert.equal(await c.locator('.card-label').evaluate((e) => getComputedStyle(e).fontSize), '32px');
     assert.equal(await c.locator('.metric-rate .metric-label').textContent(), '已赚占月薪');
   });
   await withState('rest', async (page) => {
@@ -155,7 +155,7 @@ test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, strong 2
     assert.ok(Number(l.weight) >= 600);
     assert.equal(await c.locator('.card-amount').textContent(), '¥ 323.81');
     assert.equal(await c.locator('.amount-tail').textContent(), '');
-    assert.equal(await c.locator('.card-progress-text').textContent(), '今天工作满 7 小时');
+    assert.equal(await c.locator('.card-done').textContent(), '今天工作满 7小时');
     assert.equal(await c.locator('.metric-rate .metric-label').textContent(), '已赚占月薪');
   });
   await withState('before', async (page) => {
@@ -169,7 +169,7 @@ test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, strong 2
     const c = page.locator('#status-card');
     assert.equal(await c.locator('.card-amount').isVisible(), false);
     assert.equal(await c.locator('.card-label').textContent(), '今天不计薪');
-    assert.equal(await c.locator('.card-label').evaluate((e) => getComputedStyle(e).fontSize), '20px');
+    assert.equal(await c.locator('.card-label').evaluate((e) => getComputedStyle(e).fontSize), '32px');
   });
   // 值取自设置，不写死
   await withState('before', async (page) => {
