@@ -218,7 +218,7 @@ export const STRINGS = {
   },
 
   currency: '¥',
-  // 倒数占位字串：分、秒的数字补成两位最宽（88），用来固定倒数格的宽度（card.js）
+  // 倒数占位文本：分、秒的数字补成两位最宽（88），用来固定倒数格的宽度（card.js）
   durationWidest: (text) => text.replace(/\d+(?=[分秒])/g, '88'),
   duration: (h, m, s) => (h > 0 ? `${h}小时${m}分${s}秒` : `${m}分${s}秒`),
   weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
