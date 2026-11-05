@@ -68,21 +68,21 @@ test('click opens a menu with header, options and footer; keyboard moves; Esc re
     assert.equal(await page.getByRole('menu').getAttribute('aria-labelledby'), await page.locator('.day-menu-header').getAttribute('id'));
     const items = page.getByRole('menuitemradio');
     assert.equal(await items.count(), 2);
-    assert.match(await items.nth(0).textContent(), /恢复默认.*当前/);
+    assert.match(await items.nth(0).textContent(), /恢复为休息日/);
     assert.equal(await items.nth(0).getAttribute('aria-checked'), 'true');
     assert.match(await items.nth(1).textContent(), /改为上班.*日薪 ¥323\.81 → ¥309\.09/);
     assert.equal(await items.nth(1).getAttribute('aria-checked'), 'false');
-    assert.equal(await text(page, '.day-menu-footer'), '多一个上班日，日薪会变低；多一个休息日，日薪会变高（固定月薪 ÷ 当月应出勤天数）');
+    assert.equal(await text(page, '.day-menu-footer'), '月薪固定，按当月上班天数平分');
     // 焦点在当前选中项；方向键 / Home / End
-    assert.match((await focused(page)).text, /^恢复默认/);
+    assert.match((await focused(page)).text, /^恢复为休息日/);
     await page.keyboard.press('ArrowDown');
     assert.match((await focused(page)).text, /^改为上班/);
     await page.keyboard.press('ArrowDown');
-    assert.match((await focused(page)).text, /^恢复默认/, 'wraps');
+    assert.match((await focused(page)).text, /^恢复为休息日/, 'wraps');
     await page.keyboard.press('ArrowUp');
     assert.match((await focused(page)).text, /^改为上班/);
     await page.keyboard.press('Home');
-    assert.match((await focused(page)).text, /^恢复默认/);
+    assert.match((await focused(page)).text, /^恢复为休息日/);
     await page.keyboard.press('End');
     assert.match((await focused(page)).text, /^改为上班/);
     await page.keyboard.press('Escape');
@@ -145,9 +145,9 @@ test('Saturday 11/7 → 改为上班: daily wage 309.09, manual dot, undo, survi
     await openMenu(page, '11月7日');
     assert.equal(await text(page, '.day-menu-header'), '11月7日 周六 · 调休上班');
     assert.equal(await item(page, /改为上班/).getAttribute('aria-checked'), 'true');
-    assert.match(await item(page, /改为上班/).textContent(), /当前/);
-    assert.match(await item(page, /恢复默认/).textContent(), /日薪 ¥309\.09 → ¥323\.81/);
-    await item(page, /恢复默认/).click();
+    assert.doesNotMatch(await item(page, /改为上班/).textContent(), /当前/);
+    assert.match(await item(page, /恢复为休息日/).textContent(), /日薪 ¥309\.09 → ¥323\.81/);
+    await item(page, /恢复为休息日/).click();
     assert.equal(await daily(page), '¥323.81');
     assert.match(await text(page, '.toast-text'), /11\/7 已恢复默认/);
     assert.equal(await page.getByRole('button', { name: '重置本月标记' }).isVisible(), false);
@@ -156,9 +156,9 @@ test('Saturday 11/7 → 改为上班: daily wage 309.09, manual dot, undo, survi
 test('weekday → 改为休息 gives 340.00; leave options keep 323.81; today leave updates the card', () =>
   withPage(T1412, async (page) => {
     await openMenu(page, '11月4日');
-    assert.match(await item(page, /改为休息/).textContent(), /日薪 ¥323\.81 → ¥340\.00/);
-    assert.match(await item(page, /^带薪假/).textContent(), /日薪不变/);
-    assert.match(await item(page, /^无薪假/).textContent(), /日薪不变/);
+    assert.match(await item(page, /改为休息/).textContent(), /月薪不变，每天 ¥323\.81 → ¥340\.00/);
+    assert.match(await item(page, /^带薪假/).textContent(), /照常计薪/);
+    assert.match(await item(page, /^无薪假/).textContent(), /这天不计薪（本月少 ¥323\.81）/);
     await item(page, /改为休息/).click();
     assert.equal(await daily(page), '¥340.00');
     assert.match(await cell(page, '11月4日').getAttribute('aria-label'), /休息日.*已手动标记/);
@@ -188,9 +188,10 @@ test('a day with an existing mark shows the options of its DEFAULT type (weekday
     await item(page, /改为休息/).click();
     await openMenu(page, '11月5日');
     const items = page.getByRole('menuitemradio');
-    assert.deepEqual((await items.allTextContents()).map((s) => s.match(/^(恢复默认|改为休息|带薪假|无薪假)/)?.[1]), ['恢复默认', '改为休息', '带薪假', '无薪假']);
+    assert.deepEqual((await items.allTextContents()).map((s) => s.match(/^(恢复为工作日|改为休息|带薪假|无薪假)/)?.[1]), ['恢复为工作日', '改为休息', '带薪假', '无薪假']);
     assert.equal(await item(page, /改为休息/).getAttribute('aria-checked'), 'true');
-    assert.match(await item(page, /^带薪假/).textContent(), /日薪 ¥340\.00 → ¥323\.81/);
+    assert.match(await item(page, /^带薪假/).textContent(), /照常计薪/);
+    assert.match(await item(page, /^无薪假/).textContent(), /这天不计薪（本月少 ¥323\.81）/);
   }));
 
 test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby, hidden while menu open', () =>

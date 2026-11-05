@@ -82,8 +82,6 @@ button, input, select { font: inherit; color: inherit; }
 .btn-ghost { color: var(--color-text-600); }
 .btn-s { min-height: 28px; padding: 0 var(--space-3); font-size: 13px; border-radius: var(--radius-sm); }
 .btn-xs { min-height: 24px; padding: 0 var(--space-2); font-size: 12px; border-radius: var(--radius-sm); }
-.btn-link { border: 0; background: none; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-.btn-link:hover { background: rgb(0 0 0 / .06); }
 
 /* Header：只有标题（「悬浮成小窗」在左栏，R38） */
 .app-header { display: flex; align-items: center; min-height: 28px; margin-bottom: var(--space-2); flex: none; }
@@ -96,11 +94,14 @@ button, input, select { font: inherit; color: inherit; }
   margin: 0; min-height: 28px; padding: 0 var(--space-1) 0 var(--space-3); border-radius: var(--radius-sm);
   display: flex; align-items: center; gap: var(--space-2); font-size: 13px; line-height: 20px;
 }
-.banner-text { flex: 1 1 auto; min-width: 0; padding: var(--space-1) 0; }
+.banner-text { flex: 0 1 auto; min-width: 0; padding: var(--space-1) 0; }
 .banner-info { background: var(--state-before-bg); color: var(--state-before-fg); }
-.banner-error { background: var(--state-unpaid-bg); color: var(--state-unpaid-fg); font-weight: 600; }
-.banner-actions { display: flex; gap: var(--space-1); align-items: center; flex: none; }
+/* M13：错误条靠底色、12px 图示与 500 字重区分，高度仍是 28px（两条横幅时页面预算才够） */
+.banner-error { background: var(--state-unpaid-bg); color: var(--state-unpaid-fg); font-weight: 500; }
+.banner-icon { width: 12px; height: 12px; flex: none; }
+.banner-actions { display: flex; gap: var(--space-1); align-items: center; flex: none; margin-left: var(--space-1); }
 .banner-close {
+  margin-left: auto; flex: none;
   min-width: 28px; min-height: 28px; border: 0; background: none; cursor: pointer;
   font-size: 18px; line-height: 1; border-radius: var(--radius-sm); color: inherit;
 }
@@ -129,7 +130,7 @@ button, input, select { font: inherit; color: inherit; }
 .tab:hover { color: var(--color-text-900); }
 .tab[aria-selected="true"] { color: var(--color-brand-700); border-bottom-color: var(--color-brand-600); font-weight: 600; }
 .tabpanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.tabpanel-settings { container-type: inline-size; }
+.tabpanel-settings { container-type: inline-size; position: relative; }
 
 /* StatusCard */
 .card-slot { container-type: inline-size; position: relative; }
@@ -232,6 +233,13 @@ button, input, select { font: inherit; color: inherit; }
   .set-grid { grid-template-columns: minmax(0, 1fr); height: auto; }
   .set-col { overflow: visible; }
 }
+/* M16：单栏模式下设置内容在分页内滚动，mac 没有常驻滚动条——没到底时底部渐隐，提示下面还有内容；
+   滚到底（.is-cut 被去掉）即消失。覆在内容上，不占高度、不挡点击。
+   注意：容器查询只能命中容器的后代，这条规则必须写在查询外（.is-cut 只在单栏模式下才会被加上）。 */
+.tabpanel-settings:has(> .settings.is-cut)::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; pointer-events: none;
+  background: linear-gradient(rgb(255 255 255 / 0), var(--color-surface));
+}
 @media (max-width: 999px) {
   .tabpanel-settings, .settings { overflow: visible; }
   .settings, .set-grid { height: auto; }
@@ -247,7 +255,7 @@ button, input, select { font: inherit; color: inherit; }
 .row { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 12px; align-items: center; min-height: 32px; }
 .row-label { font-size: 14px; font-weight: 500; color: var(--color-text-600); }
 .row-ctrl { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.row-hint, .row-msg { grid-column: 2; margin: 1px 0 0; font-size: 12px; line-height: 16px; color: var(--color-text-600); }
+.row-hint, .row-msg { grid-column: 2; margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--color-text-600); }
 .group-sep { height: 1px; background: var(--color-border-subtle); margin: 2px 0; }
 .inp, .sel {
   height: 32px; padding: 0 10px; border: 1px solid var(--color-border-control); border-radius: var(--radius-sm);
@@ -258,6 +266,8 @@ button, input, select { font: inherit; color: inherit; }
 .inp-wide { flex: 1 1 auto; width: 100%; }
 .sel { width: 132px; }
 .inp[aria-invalid="true"], .sel[aria-invalid="true"] { border-color: var(--state-unpaid-fg); border-width: 2px; }
+/* 焦点框贴合控件外缘；说明文字留出描边空间。 */
+.inp:focus-visible, .sel:focus-visible { outline-offset: 0; }
 .input-prefix-sign { flex: none; font-weight: 600; color: var(--color-text-600); }
 .unit, .to { flex: none; font-size: 14px; color: var(--color-text-600); }
 .field-error { margin: 0; font-size: var(--fs-caption); color: var(--state-unpaid-fg); }
@@ -303,13 +313,12 @@ button, input, select { font: inherit; color: inherit; }
   .scard-head { padding-block: 4px; }
   .scard-body { padding-block: 6px 7px; gap: 4px; }
   .row { min-height: 30px; }
-  .row-hint { margin-top: 0; }
   .para { line-height: 17px; }
   .hstatus { min-height: 24px; }
   .adv-head { padding-block: 6px; min-height: 32px; }
 }
 
-/* 基本设置 › 假期数据：年份胶囊 + 上次检查、两颗按钮各带常驻说明、单一结果区（tone：success 绿 / muted 灰 / info 蓝 / warn 黄）、格式示例 */
+/* 基本设置 › 假期数据：年份胶囊 + 上次检查、两颗按钮各带常驻说明、单一结果区（tone：success 绿 / info 蓝 / warn 黄；「已是最新」用 success）、格式示例 */
 .holiday-body { display: grid; gap: 6px; min-width: 0; }
 @media (max-height: 640px) { .holiday-body { gap: 4px; } }
 .hstatus { display: flex; align-items: center; gap: 6px; min-height: 26px; }
@@ -330,6 +339,8 @@ button, input, select { font: inherit; color: inherit; }
 .holiday-result[data-tone="success"] { background: var(--state-working-bg); color: var(--state-working-fg); }
 .holiday-result[data-tone="info"] { background: var(--state-before-bg); color: var(--state-before-fg); }
 .holiday-result[data-tone="warn"] { background: var(--state-lunch-bg); color: var(--state-lunch-fg); }
+/* L7：结果行里的 ✓ 与胶囊 / 月历标记里的图示同尺寸 */
+.holiday-result-text .icon { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
 .holiday-result-detail { font-size: var(--fs-caption); }
 .holiday-result-detail:empty { display: none; }
 .disclosure { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; border: 0; background: none; padding: 2px 0; font-size: 13px; font-weight: 500; color: var(--color-brand-700); cursor: pointer; justify-self: start; }
@@ -558,8 +569,9 @@ button, input, select { font: inherit; color: inherit; }
   .day-tooltip.is-tight .tip-pay { font-size: 20px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
 }
 
-/* Import report */
-.import-report { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); }
+/* Import report（H6 放到备份卡顶部；M19：不再是一层嵌套框，只用一条分隔线与卡片其余内容分开） */
+.import-report { display: grid; gap: var(--space-2); padding: 0 0 var(--space-2); border: 0; border-bottom: 1px solid var(--color-border-subtle); }
+.import-report p { margin: 0; }
 .import-report h3 { margin: 0; font-size: var(--fs-body); font-weight: 600; }
 .import-report h3[tabindex="-1"]:focus { outline: none; }
 .import-report table { border-collapse: collapse; width: 100%; font-size: var(--fs-caption); }
@@ -597,7 +609,7 @@ button, input, select { font: inherit; color: inherit; }
 .float-control { display: grid; gap: 6px; }
 .float-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
 .float-btn .icon { flex: none; }
-.float-note { margin: 0; text-wrap: balance; font-size: var(--fs-caption); line-height: 1.45; color: var(--color-text-600); }
+.float-note { margin: 0; text-wrap: pretty; font-size: var(--fs-caption); line-height: 1.45; color: var(--color-text-600); }
 .float-note.is-warn { color: var(--state-lunch-fg); }
 .pip-placeholder {
   display: flex; flex-direction: column; gap: var(--space-2); align-items: center; justify-content: center; width: 100%; min-height: 160px;

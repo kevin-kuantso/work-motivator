@@ -1,7 +1,7 @@
 // 主分页：组装顶栏 / 提示条 / 状态卡 / 分页（月历、基本设置），负责储存、计时与导入导出。
 import { snapshot } from '../calc.js';
 import { HOLIDAYS_CN } from '../holidays-cn.js';
-import { STORAGE_KEY, loadState, saveState, exportState, importState } from '../settings.js';
+import { STORAGE_KEY, DEFAULTS, loadState, saveState, exportState, importState } from '../settings.js';
 import { STRINGS } from '../strings.zh-CN.js';
 import { h, show, setText } from './dom.js';
 import { renderCard, syncReferenceHeight } from './card.js';
@@ -11,7 +11,7 @@ import { createFloatControl } from './float-control.js';
 import { createTabs } from './tabs.js';
 import { createBanners } from './banners.js';
 import { importReport, fieldLabel } from './import-model.js';
-import { ymd } from './format.js';
+import { ymd, money } from './format.js';
 import { HOLIDAYS_STORAGE_KEY } from '../holiday-store.js';
 import { startHolidayUpdate } from './holiday-update.js';
 import { createHolidayPanel } from './holiday-panel.js';
@@ -130,7 +130,7 @@ export function mountApp(doc, storage, clock) {
       { id: 'settings', label: t.tabs.settings, panel: settingsPanel },
     ],
     initial: 'calendar',
-    onChange: (id) => { if (id === 'calendar') calendar.refreshLayout(); else calendar.hideOverlays(); },
+    onChange: (id) => { if (id === 'calendar') calendar.refreshLayout(); else { calendar.hideOverlays(); settings.refreshFade(); } },
   });
   const openSettings = () => tabs.select('settings', { focus: true });
 
@@ -152,8 +152,9 @@ export function mountApp(doc, storage, clock) {
 
   if (firstRun && !ui.hintDismissed) {
     hintShown = true;
-    banners.queueInfo('firstRun', t.banner.firstRun, {
-      actions: [{ key: 'goFix', label: t.banner.goFix, link: true, onClick: openSettings }],
+    // H1：文案里的数字取自当前（默认）设置，不写死
+    banners.queueInfo('firstRun', t.banner.firstRun(`${t.currency}${money(state.cfg.salary, 0)}`, state.cfg.start, state.cfg.end), {
+      actions: [{ key: 'goFix', label: t.banner.goFix, onClick: openSettings }],
       onDismiss: dismissHint,
     });
   }
@@ -259,13 +260,18 @@ export function mountApp(doc, storage, clock) {
     reportPanel.replaceChildren();
   }
 
-  // 导入报告放在「基本设置 › 数据与备份」组内：先切到该分页再聚焦标题
+  // 导入报告放在「基本设置 › 数据与备份」卡头下方（H6）：先切到该分页，再把报告带进视野，最后聚焦标题
   function showReport(titleText, body, actions) {
     const title = h(doc, 'h3', { tabindex: '-1', text: titleText });
-    reportPanel.replaceChildren(title, ...body, h(doc, 'div', { class: 'report-actions' }, actions));
+    // 按钮紧跟标题、在明细表之前：报告比可滚区域高时，标题与按钮仍在视野内（H6）
+    reportPanel.replaceChildren(title, h(doc, 'div', { class: 'report-actions' }, actions), ...body);
     show(reportPanel, true);
     tabs.select('settings');
-    title.focus();
+    // 先聚焦（不滚动），再把报告的起始端带进视野：长报告不会把标题和按钮推出画面
+    title.focus({ preventScroll: true });
+    reportPanel.scrollIntoView({ block: 'nearest' });
+    // 报告改变了内容高度：分页没切换时不会自动重算底部渐隐（M16）
+    settings.refreshFade();
   }
 
   async function onFile() {
@@ -279,10 +285,11 @@ export function mountApp(doc, storage, clock) {
       text = '';
     }
     const res = importState(text, state);
-    const okBtn = h(doc, 'button', { type: 'button', class: 'btn btn-secondary', text: t.importer.ok, onclick: closeReport });
+    // M19：报告里的按钮与其他卡片按钮同一尺寸（28px），主次仍分开
+    const okBtn = h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', text: t.importer.ok, onclick: closeReport });
     if (res.error) {
       showReport(t.importer.fail, [h(doc, 'p', { text: t.importer.failReason(res.error) })], [
-        h(doc, 'button', { type: 'button', class: 'btn btn-primary', text: t.importer.retry, onclick: () => fileInput.click() }),
+        h(doc, 'button', { type: 'button', class: 'btn btn-primary btn-s', text: t.importer.retry, onclick: () => fileInput.click() }),
         okBtn,
       ]);
       return;
@@ -303,7 +310,7 @@ export function mountApp(doc, storage, clock) {
     const firstField = report.rows.find((r) => r.field && !r.field.startsWith('marks'))?.field;
     showReport(report.title, [table], [
       okBtn,
-      firstField ? h(doc, 'button', { type: 'button', class: 'btn btn-ghost', text: t.importer.goFix, onclick: () => { closeReport(); tabs.select('settings'); settings.focusField(firstField); } }) : null,
+      firstField ? h(doc, 'button', { type: 'button', class: 'btn btn-ghost btn-s', text: t.importer.goFix, onclick: () => { closeReport(); tabs.select('settings'); settings.focusField(firstField); } }) : null,
     ]);
   }
 
@@ -400,6 +407,11 @@ export function mountApp(doc, storage, clock) {
     // 新的问题照常显示；与开页时相同、且已被关闭的问题不再弹出
     setLoadIssue(issue && (issue !== loadIssue || loadShown !== null) ? issue : null);
     settings.sync(state.cfg);
+    // H1：别的分页把设置改成非默认值后，「现在按默认…计算」就不成立了：撤掉这条提示（不记为「已关闭」）
+    if (hintShown && Object.keys(DEFAULTS).some((k) => state.cfg[k] !== DEFAULTS[k])) {
+      hintShown = false;
+      banners.dismissInfo('firstRun');
+    }
     calendar.render();
     tick();
   }

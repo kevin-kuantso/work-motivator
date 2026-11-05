@@ -176,12 +176,13 @@ test('pickResult + resultView: one result; non-built-in years first; priorities'
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }, { year: 2027, protected: false, outcome: 'unpublished' }]),
     { tone: 'info', text: '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: null });
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'network', reason: 'r1' }, { year: 2027, protected: false, outcome: 'network', reason: 'r2' }]),
-    { tone: 'warn', text: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」', detail: '原因：r2' });
-  assert.deepEqual(v([{ year: 2027, protected: false, outcome: 'invalid', reason: 'bad' }]), { tone: 'warn', text: '来源数据不完整，已拒绝，未采用', detail: '原因：bad', formatHelp: false });
+    { tone: 'warn', text: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」', detail: null });
+  assert.deepEqual(v([{ year: 2027, protected: false, outcome: 'invalid', reason: '所有数据源都获取失败：bad' }]), { tone: 'warn', text: '来源数据不完整，已拒绝，未采用', detail: '原因：bad', formatHelp: false });
   // R47：格式 / 内容不合格（validateHolidayYear）才附「查看格式示例」
   assert.equal(v([{ year: 2027, protected: false, outcome: 'invalid', reason: 'bad', format: true }]).formatHelp, true);
-  assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }]), { tone: 'muted', text: '已是最新 · 刚刚检查过', detail: null });
-  assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'diff', n: 3 }]), { tone: 'muted', text: '已是最新 · 刚刚检查过', detail: null }, 'built-in diff never applied; notice is page-level');
+  // L7：「已是最新」是成功的结果（绿）并在前面加 ✓，不是停用的灰
+  assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }]), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: null, check: true });
+  assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'diff', n: 3 }]), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: null, check: true }, 'built-in diff never applied; notice is page-level');
   assert.equal(pickResult([]), null);
   assert.equal(resultView(null, t), null);
   // invalid 胜过 network、network 胜过 unpublished（同为非内置年份）
@@ -314,7 +315,7 @@ test('manual check: built-in diff -> page-level info notice with N, not applied'
   changed.days.push({ name: '国庆节', date: '2026-10-11', isOffDay: false }); // 多一个调休（周日）
   const h = harness({ now: new Date(2026, 5, 1, 9), fetchImpl: byHost({ '2026.json': resp(changed) }) });
   await h.api.checkNow();
-  assert.deepEqual(h.notes, [['info', '联网数据与内置表有 2 处不同，未采用']]);
+  assert.deepEqual(h.notes, [['info', '网上的放假安排与本机内置的有 2 天不同，暂按内置的计算']]);
   assert.equal(h.tables()[2026], HOLIDAYS_CN[2026]);
   assert.equal(h.last().result.text, '已是最新 · 刚刚检查过');
   assert.equal(h.tablesSeen.length, 0, 'tables never replaced');
@@ -324,8 +325,7 @@ test('manual check: failure shows the specific message; invalid file rejected; e
   const f = harness({ fetchImpl: async () => { throw new TypeError('offline'); } });
   await f.api.checkNow();
   assert.equal(f.last().result.text, '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」');
-  assert.match(f.last().result.detail, /连接数据源失败/);
-  assert.doesNotMatch(f.last().result.detail, /网络连接失败|网络不通/);
+  assert.equal(f.last().result.detail, null);
   assert.doesNotMatch(f.last().result.text, /网络不通/);
 
   const bad = file2027();
@@ -449,7 +449,7 @@ test('R30: online data never overwrites an imported (file) year; differing data 
   assert.equal(cur[2027], before, 'file year untouched');
   assert.equal(cur[2027].source, 'file');
   assert.equal(loadOnlineTables(storage).meta[2027].source, 'file', 'storage untouched too');
-  assert.deepEqual(notes, [['info', '联网数据与导入的表有 1 处不同，未采用', 'file']]);
+  assert.deepEqual(notes, [['info', '网上的放假安排与你导入的文件有 1 天不同，暂按导入的文件计算', 'file']]);
   // 相同的数据：不提示
   notes.length = 0;
   const api2 = startHolidayUpdate({
@@ -548,7 +548,7 @@ test('R32: wall-clock backstop: a fetch that ignores the signal still ends as �
   for (let i = 0; i < 3; i++) { await Promise.resolve(); t.mock.timers.tick(5000); await new Promise((res) => setImmediate(res)); }
   await c1;
   assert.equal(h.last().checking, false);
-  assert.match(h.last().result.detail, /连接超时/);
+  assert.equal(h.last().result.detail, null);
 });
 
 test('R32: bodies over 256 KB rejected before JSON.parse; a redirect to non-https rejected', async () => {

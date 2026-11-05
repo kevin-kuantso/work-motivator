@@ -49,7 +49,8 @@ export const STRINGS = {
     markDate: '日期格式不正确',
     markNotReal: '不是真实存在的日期',
     markValue: '标记类型无法识别',
-    notJson: '不是有效的 JSON 文本',
+    // 导入备份（M19）：说人话，不出现文件格式名
+    notJson: '这不是本工具导出的备份文件',
     notObject: '文件内容的结构不正确',
     labels: {
       start: '上班时间', end: '下班时间', lunchStart: '午休开始时间', lunchEnd: '午休结束时间',
@@ -125,14 +126,15 @@ export const STRINGS = {
     network: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」',
     invalid: '来源数据不完整，已拒绝，未采用',
     detail: (reason) => `原因：${reason}`,
-    diff: (n) => `联网数据与内置表有 ${n} 处不同，未采用`,
-    diffFile: (n) => `联网数据与导入的表有 ${n} 处不同，未采用`,
+    // M15：说清楚差别在哪、现在按什么算；不写「内置表」「未采用」这类内部说法，也不说「按国务院通知」（联网数据同样是通知，见 R49）
+    diff: (n) => `网上的放假安排与本机内置的有 ${n} 天不同，暂按内置的计算`,
+    diffFile: (n) => `网上的放假安排与你导入的文件有 ${n} 天不同，暂按导入的文件计算`,
     fetched: (years) => `已获取 ${years.join('、')} 年假期表`,
     importDone: (y, off, makeup) => `已导入 ${y} 年假期表（放假 ${off} 天，调休上班 ${makeup} 天）`,
     importNoYear: '文件里没有可用的年份和放假数据，未导入',
     importBuiltin: (y) => `${y} 年假期已内置，未采用导入的数据`,
     customUrl: '自定义数据网址',
-    customUrlExplain: '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空 = 使用默认来源。',
+    customUrlExplain: '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空则使用默认来源。',
     customUrlPlaceholder: 'https://example.com/{year}.json',
     customUrlHint: '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。',
     customUrlSummary: (host) => `自定义数据网址：${host ?? '未设置'}`,
@@ -144,7 +146,8 @@ export const STRINGS = {
   },
 
   banner: {
-    firstRun: '这是默认值，可在设置里修改',
+    // 首次打开（H1）：说清楚现在用的是哪些默认值（数字取自真实默认设置，不写死）
+    firstRun: (salary, start, end) => `现在按默认月薪 ${salary}、${start}–${end} 计算，请改成你自己的`,
     goFix: '去修改',
     sep: ' · ',
     dismiss: '关闭提示',
@@ -228,7 +231,8 @@ export const STRINGS = {
       pay: '工资与上班时间', holiday: '假期数据', backup: '数据与备份', advanced: '高级设置',
     },
     payDesc: '用来计算每天、每秒赚多少，修改后自动保存',
-    holidayDesc: (years) => `法定节假日与调休。内置 ${years.join('、')} 年；之后的年份可联网更新，或导入文件。`,
+    // M12：只说卡里有什么，一行放得下（联网更新 / 导入的说明已写在按钮下方）
+    holidayDesc: (years) => `法定节假日与调休安排，已内置 ${years.join('、')} 年`,
     backupDesc: '设置只保存在这个浏览器里，不会上传。',
     advancedSub: '一般不用改',
     // 展开 / 收起的小三角（与 banner.closeGlyph 一样放在文案里）
@@ -253,7 +257,7 @@ export const STRINGS = {
     cheerHint: '会显示在左侧状态卡上',
     cheerCount: (n, max) => `${n}/${max}`,
     weekends: '周末上班',
-    weekendsHint: '开 = 周六、周日也是常规工作日；个别日子调休上班请在月历上标记',
+    weekendsHint: '打开后，周六、周日也算工作日；个别调休上班日请在月历上标记',
     payday: '发薪日',
     paydayNone: '未设置',
     paydayHint: '设置后，状态卡会显示「距离发薪日 N 天」',
@@ -343,11 +347,19 @@ export const STRINGS = {
     // 点日期弹出的小菜单
     menu: {
       header: (title, status) => `${title} · ${status}`,
-      options: { default: '恢复默认', work: '改为上班（调休）', rest: '改为休息（调休）', paidLeave: '带薪假', unpaidLeave: '无薪假' },
-      current: '当前',
+      options: { work: '改为上班（调休）', rest: '改为休息（调休）', paidLeave: '带薪假', unpaidLeave: '无薪假' },
+      // 「恢复默认」说清楚默认是哪一种（M18）：按这一天的默认类型给出三种之一
+      defaultWork: '恢复为工作日',
+      defaultRest: '恢复为休息日',
+      defaultHoliday: '恢复为法定假日',
       preview: (from, to) => `日薪 ${from} → ${to}`,
       unchanged: '日薪不变',
-      footer: '多一个上班日，日薪会变低；多一个休息日，日薪会变高（固定月薪 ÷ 当月应出勤天数）',
+      // 各项的说明（H7）：说结论，不用「日薪」这种内部说法
+      paidNote: '照常计薪',
+      unpaidNote: (yuan) => `这天不计薪（本月少 ${yuan}）`,
+      restPreview: (before, after) => `月薪不变，每天 ${before} → ${after}`,
+      noWorkdays: '本月没有上班日，不计薪',
+      footer: '月薪固定，按当月上班天数平分',
     },
     // 悬停 / 聚焦提示
     tip: {

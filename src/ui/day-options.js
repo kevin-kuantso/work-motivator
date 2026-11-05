@@ -71,12 +71,20 @@ export function menuModel(date, cfg, marks, tables) {
   const plain = dayInfo(date, cfg, {}, tables);
   const before = monthDailyWage(date, cfg, marks, tables);
   const items = dayOptions(plain, marks[ymd(date)]).map((o) => {
-    const after = previewDailyWage(date, cfg, marks, tables, o.id);
+    const result = monthWage(date.getFullYear(), date.getMonth(), cfg, applyOption(marks, date, o.id), tables);
+    const after = result.dailyWage;
     let note;
-    if (o.checked) note = C.menu.current;
+    if (o.id === 'paidLeave') note = C.menu.paidNote;
+    else if (o.id === 'unpaidLeave') note = C.menu.unpaidNote(yuan(after));
+    else if (!result.workdays && (o.id === 'rest' || !o.checked)) note = C.menu.noWorkdays;
+    else if (o.checked) note = '';
+    else if (o.id === 'rest') note = C.menu.restPreview(yuan(before), yuan(after));
     else if (cents(after) === cents(before)) note = C.menu.unchanged;
     else note = C.menu.preview(yuan(before), yuan(after));
-    return { ...o, label: C.menu.options[o.labelKey], note };
+    const label = o.id === 'default'
+      ? (plain.reason === 'holiday' ? C.menu.defaultHoliday : plain.base === 'work' ? C.menu.defaultWork : C.menu.defaultRest)
+      : C.menu.options[o.labelKey];
+    return { ...o, label, note };
   });
   return { header: C.menu.header(dayTitle(date), statusText(info, plain)), items, footer: C.menu.footer };
 }
