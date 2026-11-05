@@ -570,15 +570,17 @@ button, input, select { font: inherit; color: inherit; }
 .float-note.is-warn { color: var(--state-lunch-fg); }
 .pip-placeholder {
   display: flex; flex-direction: column; gap: var(--space-2); align-items: center; justify-content: center; width: 100%; min-height: 160px;
-  padding: var(--space-5); border: 2px dashed var(--color-border-control); border-radius: var(--radius-lg);
-  background: var(--color-surface); color: var(--color-text-600); font-weight: 600; cursor: pointer;
+  padding: var(--space-5); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
+  background: var(--color-bg); color: var(--color-text-600); font-weight: 600; cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease);
 }
 .pip-placeholder-note { font: 400 var(--fs-caption)/1.4 var(--font-sans); color: var(--color-text-600); }
-.pip-placeholder .icon { color: var(--color-text-600); }
+.pip-placeholder .icon { width: 24px; height: 24px; color: var(--color-text-600); }
 .pip-placeholder:hover { background: var(--color-brand-50); }
 .pip-placeholder:active { background: var(--color-brand-100); }
-.pip-body { background: var(--color-surface); }
+.pip-body { margin: 0; min-height: 100vh; display: grid; background: var(--color-surface); }
+/* 小窗里卡片铺满窗口（L3）：内容少的状态垂直居中，不留白条；测量用的 measureSmallCard 在主文件里量，不受影响 */
+.pip-body .status-card { min-height: 100vh; align-content: center; }
 
 /* 会变化的数字统一用数字字体栈 + 等宽数字（放在最后，覆盖前面 font 简写里的字体族）。
    雅黑是否支持等宽数字未在 Windows 实测，所以数字不交给 --font-sans。 */

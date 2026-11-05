@@ -58,9 +58,9 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     assert.equal(await txt(c.locator('.card-date')), '2026/11/03 周二');
     assert.equal(await txt(c.locator('.card-badge')), '上班中');
     assert.equal(await txt(c.locator('.card-amount')), '¥ 194.2857');
-    assert.equal(await txt(c.locator('.metric-rate .metric-value')), '¥0.0128 /秒');
+    assert.equal(await txt(c.locator('.metric-rate .metric-value')), '¥0.0128/秒');
     assert.equal(await txt(c.locator('.metric-month .metric-value')), '¥518.10');
-    assert.equal(await txt(c.locator('.card-progress-text')), '已工作 4.20 / 7.00 小时');
+    assert.equal(await txt(c.locator('.card-progress-text')), '已工作 4小时12分 / 共 7小时');
     assert.equal(await c.locator('[role=progressbar]').isVisible(), true);
     assert.equal(await c.locator('.card-gear').isVisible(), true, 'gear shows in the small window');
     assert.equal(await c.locator('.metric-hourly').isVisible(), false, '时薪 only on the main page');
@@ -296,15 +296,15 @@ test('2027: year note shows in the PiP card and the window is not clipped', () =
     await setCheerAndPayday(page);
     await floatFits(page);
     assert.equal(await pip(page).locator('.card-year').isVisible(), true);
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年仅标法定假日');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年调休安排未内置，只标了节日');
   }, { init: stub() }));
 
 test('2027-02 春节: PiP card shows the shortened year note and the window is not clipped', () =>
   withPage('2027-02-05T10:00:00+08:00', async (page) => {
     await setCheerAndPayday(page);
     await floatFits(page);
-    assert.equal(await txt(pip(page).locator('.card-badge')), '休息日');
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年仅标法定假日');
+    assert.equal(await pip(page).locator('.card-badge').innerText(), '法定假日', 'Task 19 H3: float badge never shows the holiday name (innerText: the hidden part is not rendered)');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年调休安排未内置，只标了节日');
     assert.equal(await txt(pip(page).locator('.card-label')), '今天休息 · 春节');
   }, { init: stub() }));
 

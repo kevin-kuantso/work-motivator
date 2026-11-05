@@ -71,6 +71,8 @@ export function createFloatControl(doc, t, { cardRoot, onOpen, onClose, onFail }
     if (typeof RO !== 'function') return;
     cardObserver = new RO(() => syncPlaceholder());
     cardObserver.observe(cardRoot);
+    // 小窗里卡片铺满窗口（min-height: 100vh），内容变高只要还放得下，卡片本身的高度就不变；所以也观察每个内容块（鼓励语、发薪日出现 / 消失时它们的高度会变）
+    for (const child of cardRoot.children) cardObserver.observe(child);
   }
 
   async function open() {
