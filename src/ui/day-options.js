@@ -2,7 +2,7 @@
 import { dayInfo } from '../calendar.js';
 import { monthWage } from '../calc.js';
 import { STRINGS } from '../strings.zh-CN.js';
-import { money, ymd } from './format.js';
+import { money, ymd, lunarText } from './format.js';
 
 const C = STRINGS.calendar;
 const yuan = (v) => `${STRINGS.currency}${money(v)}`;
@@ -100,6 +100,7 @@ export function dayTooltipModel(date, cfg, marks, tables, now) {
   const statusShort = statusShortText(info, plain);
   const pay = yuan(paid ? monthDailyWage(date, cfg, marks, tables) : 0);
   return {
+    lunar: cfg.showLunar ? lunarText(date, STRINGS)?.full ?? null : null,
     title: `${dayTitle(date)}${isToday ? C.todaySuffix : ''}`,
     status: statusText(info, plain),
     source: C.tip.source(sourceLabel),
@@ -113,4 +114,4 @@ export function dayTooltipModel(date, cfg, marks, tables, now) {
   };
 }
 
-export const tooltipText = (m) => C.tip.join([m.title, m.status, m.source, m.pay, m.hint]);
+export const tooltipText = (m) => C.tip.join([m.title, m.lunar, m.status, m.source, m.pay, m.hint].filter(Boolean));

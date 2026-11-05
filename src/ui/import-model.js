@@ -1,6 +1,6 @@
 // 纯函数：把 importState 的结果整理成导入报告（design-spec §8.2）。
 // 「已导入 N 项」= 文件中通过验证并套用的设置字段数 + 月历标记数。
-const CFG_FIELDS = ['salary', 'start', 'end', 'lunchOn', 'lunchStart', 'lunchEnd', 'weekends', 'payday', 'cheer'];
+const CFG_FIELDS = ['salary', 'start', 'end', 'lunchOn', 'lunchStart', 'lunchEnd', 'weekends', 'payday', 'cheer', 'showLunar'];
 
 export function fieldLabel(field, t) {
   if (field === 'marks') return t.importer.marksField;

@@ -1,4 +1,6 @@
 // 纯函数：数字 / 时间 / 日期格式化（不碰 DOM，可在 node 测试）。
+import { lunarDate } from '../lunar.js';
+
 const fmtCache = new Map();
 function nf(digits) {
   if (!fmtCache.has(digits)) {
@@ -23,6 +25,19 @@ export const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d
 
 export function dateLine(d, t) {
   return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${t.weekdays[d.getDay()]}`;
+}
+
+export function lunarText(date, t) {
+  const l = lunarDate(date);
+  if (!l) return null;
+  const s = t.lunar;
+  const month = (l.leap ? s.leap : '') + s.months[l.month - 1];
+  const day = l.day < 10 ? s.first + s.digits[l.day - 1]
+    : l.day === 10 ? s.first + s.ten
+      : l.day < 20 ? s.ten + s.digits[l.day - 11]
+        : l.day === 20 ? s.twenty
+          : l.day < 30 ? s.twenties + s.digits[l.day - 21] : s.thirty;
+  return { full: s.full(month, day), short: l.day === 1 ? month : day };
 }
 
 // 倒数：向上取整到秒（14:12:00.4 距 17:00 显示 2小时48分0秒）。

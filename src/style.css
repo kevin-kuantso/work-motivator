@@ -141,6 +141,7 @@ button, input, select { font: inherit; color: inherit; }
   display: grid; gap: var(--space-3);
 }
 .status-card[data-size="sm"] { padding: var(--space-4); box-shadow: none; border-radius: 0; }
+.status-card[data-size="sm"] { row-gap: 10px; }
 /* 大卡片：纵向 flex，指标格贴在卡片底部（margin-top:auto），所以九种状态的指标格在同一个 y；多出来的空白落在「标签 / 金额」与指标格之间（M11 / V1）。
    最小高度 = 「上班中」卡高，由 app.js 在运行时量（见 card.js measureReferenceHeight：载入、窗口改变、字体载入后）写成 --card-ref-h，
    所以 Windows 字体下也跟着变，不依赖在 macOS 量到的像素。内容更多（鼓励语、发薪日、缺表标签）时照常长高 */
@@ -152,6 +153,7 @@ button, input, select { font: inherit; color: inherit; }
    最高的常见卡片（鼓励语 + 发薪日）+ 两条提示条时左栏仍放得下；小窗（sm）不受影响 */
 @media (max-height: 640px) {
   .status-card[data-size="lg"] { padding-block: 18px; gap: 10px; }
+  @media (max-width: 1199px) { .status-card[data-size="lg"] { padding-block: 16px; } }
 }
 .status-card[data-tone="lunch"] { --tone-bg: var(--state-lunch-bg); --tone-fg: var(--state-lunch-fg); }
 .status-card[data-tone="before"] { --tone-bg: var(--state-before-bg); --tone-fg: var(--state-before-fg); }
@@ -163,6 +165,8 @@ button, input, select { font: inherit; color: inherit; }
 .card-band { position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--tone-fg); transition: background-color var(--dur-base) var(--ease); }
 .card-head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-caption); color: var(--color-text-600); }
 .card-date { font-variant-numeric: tabular-nums; }
+.card-date-group { display: flex; flex-direction: column; min-width: 0; }
+.card-lunar { font: 500 var(--fs-caption)/1.25 var(--font-sans); color: var(--color-text-600); white-space: nowrap; }
 .card-badges { display: inline-flex; gap: var(--space-1); align-items: center; margin-left: auto; }
 .card-badge, .card-tag {
   display: inline-flex; align-items: center; gap: var(--space-1); height: 24px; padding: 0 var(--space-2);
@@ -424,6 +428,9 @@ button, input, select { font: inherit; color: inherit; }
 .day:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
 /* 日期数字：固定在 20px 的方框里（今天 22px 的圆），用 grid 居中；今天的数字另按实际墨迹对齐。 */
 .day-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; height: 20px; line-height: 1; display: grid; place-items: center; border-radius: 50%; }
+.day-date { display: flex; align-items: center; gap: 3px; max-width: 100%; }
+.day-lunar { font: 500 11px/1 var(--font-sans); color: var(--color-text-600); white-space: nowrap; }
+@container (max-width: 74px) { .day-lunar { display: none; } }
 .day-label { display: flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); line-height: 14px; }
 .day.is-manual .day-label { padding-right: 8px; }
 .day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 1px; flex: none; font-size: var(--fs-caption); line-height: 14px; }
@@ -484,7 +491,7 @@ button, input, select { font: inherit; color: inherit; }
 /* 日期提示（Task 18 · V1「白卡盖格」）：白底卡片原样盖在被悬停 / 聚焦的格子上（inset:0，不溢出到旁边或下面的格子），内容水平置中、
    上下留白相等；2px 边框用状态色（工作日绿 / 调休紫 / 带薪蓝 / 法定假日青绿 / 周末休息中性灰 / 今天 brand-600；无薪假边框中性灰、只有状态文字是红）；
    日期粗体、状态用状态色、计薪金额是主角。由 day-tooltip.js 实测、依序试这些档位，选第一个放得下的：
-   is-tight（收紧行距）→ is-compact（拿掉来源）→ is-inline（窄格子：「计薪 ¥…」回到一行）→ is-mini（再小一号字）→ is-no-wd（藏星期）→ is-lean（最后手段：拿掉状态行；金额永远保留）。
+   依次收紧行距、去掉来源或把计薪改成一行；日期格能显示农历时才隐藏提示里的农历，再缩字、藏星期，最后才拿掉状态。
    完整文字始终在 aria-describedby。 */
 .day-tooltip {
   position: absolute; inset: 0; z-index: 15; pointer-events: none; overflow: hidden;
@@ -505,6 +512,8 @@ button, input, select { font: inherit; color: inherit; }
 /* 「单位」：只在单位之间换行（日期、周X、「法定假日·」、「劳动节」…），名字中间不折行 */
 .day-tooltip .u { display: inline-block; white-space: nowrap; }
 .day-tooltip .tip-title { font-weight: 600; color: var(--color-text-900); }
+.day-tooltip .tip-lunar { white-space: nowrap; color: var(--color-text-600); }
+@container (min-width: 74.01px) { .day-tooltip.is-no-lunar .tip-lunar { display: none; } }
 .day-tooltip .tip-status { font-weight: 500; color: var(--tip-fg); }
 .day-tooltip .tip-source { font-size: 11px; line-height: 14px; color: var(--color-text-600); }
 .day-tooltip .tip-pay { line-height: 22px; white-space: nowrap; }
@@ -550,6 +559,10 @@ button, input, select { font: inherit; color: inherit; }
   .day-tooltip.is-mini .pay-label { font-size: 10px; }
   .day-tooltip.is-mini .pay-amt { font-size: 11px; }
   .day-tooltip.is-mini .tip-pay { font-size: 11px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+}
+@container (max-width: 74px) {
+  .day-tooltip.is-lean .tip-title, .day-tooltip.is-lean .tip-lunar { line-height: 10px; }
+  .day-tooltip.is-lean .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: 11px; }
 }
 /* 大格子（≥ 140px，约 1536 / 1920 宽）：字跟着放大；行高不够（6 周月份）时收紧，金额仍 ≥ 日期字号的 1.5 倍 */
 @container (min-width: 140px) {

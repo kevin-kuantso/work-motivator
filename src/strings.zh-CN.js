@@ -54,7 +54,7 @@ export const STRINGS = {
     notObject: '文件内容的结构不正确',
     labels: {
       start: '上班时间', end: '下班时间', lunchStart: '午休开始时间', lunchEnd: '午休结束时间',
-      lunchOn: '午休开关', weekends: '周末上班',
+      lunchOn: '午休开关', weekends: '周末上班', showLunar: '显示农历',
     },
   },
 
@@ -225,6 +225,13 @@ export const STRINGS = {
   duration: (h, m, s) => (h > 0 ? `${h}小时${m}分${s}秒` : `${m}分${s}秒`),
   weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
 
+  lunar: {
+    months: ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'],
+    digits: ['一', '二', '三', '四', '五', '六', '七', '八', '九'],
+    leap: '闰', first: '初', ten: '十', twenty: '二十', twenties: '廿', thirty: '三十',
+    full: (month, day) => `农历${month}${day}`,
+  },
+
   settings: {
     autosaved: '已自动保存',
     sections: {
@@ -249,6 +256,8 @@ export const STRINGS = {
     start: '上班时间',
     end: '下班时间',
     lunchOn: '午休',
+    showLunar: '显示农历',
+    lunarSource: '农历数据来源：香港天文台《公历与农历日期对照表》（2020–2060）。2057 年部分日期因历法边界不确定而不显示。',
     lunchOffHint: '关闭后，午休时段也计为工时',
     lunchStart: '午休开始时间',
     lunchEnd: '午休结束时间',

@@ -1,17 +1,19 @@
 // 日期格悬停 / 聚焦提示（spec §12.2、§13；Task 18 · V1「白卡盖格」）：白底卡片直接盖在该格上（同样大小，inset:0），内容置中，
 // 永远不会盖到下面或旁边的格子；纯视觉层：aria-hidden，屏幕阅读器经由格子的 aria-describedby 读取完整文字（含来源）；
-// pointer-events: none，不拦截点击。行：日期｜状态｜来源｜计薪（金额为主角）。
-// 「来源」行不再按「6 周月份」一刀切，而是实测：依序试各档位（收紧行距 → 拿掉来源 → 窄格子计薪回到一行 → 再小一号字 →
-// 拿掉「周X」→ 最后手段拿掉状态行），金额永远保留。窗口 resize 与字体就绪后重选一次分级（同样的规则，不复活已隐藏的提示）。
+// pointer-events: none，不拦截点击。行：日期｜农历｜状态｜来源｜计薪（金额为主角）。
+// 实测各档位：先收紧、隐藏来源；格子可显示农历时可隐藏提示中的农历，然后继续缩字、隐藏星期，最后才隐藏状态。
+// 窄到格子不显示农历时，提示仍保留农历。金额与 aria-describedby 中的完整文字始终保留。
 import { h } from './dom.js';
 
-const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-no-wd', 'is-lean'];
+const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-no-wd', 'is-lean', 'is-no-lunar'];
 const TIERS = [
   [], ['is-tight'], ['is-compact'], ['is-compact', 'is-tight'],
   ['is-inline'], ['is-inline', 'is-tight'], ['is-inline', 'is-compact'], ['is-inline', 'is-compact', 'is-tight'],
-  ['is-inline', 'is-compact', 'is-tight', 'is-mini'],
-  ['is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd'],
-  ['is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd', 'is-lean'],
+  ['is-no-lunar'], ['is-no-lunar', 'is-tight'], ['is-no-lunar', 'is-compact'], ['is-no-lunar', 'is-compact', 'is-tight'],
+  ['is-no-lunar', 'is-inline'], ['is-no-lunar', 'is-inline', 'is-tight'], ['is-no-lunar', 'is-inline', 'is-compact'], ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-mini'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd', 'is-lean'],
 ];
 
 const kindOf = (btn) => ([...btn.classList].find((c) => c.startsWith('kind-')) ?? 'kind-workday').slice(5);
@@ -49,6 +51,7 @@ export function createDayTooltip(doc) {
     el.replaceChildren(
       // 「11月18日」「周三」各是不可拆的单位：窄格子换行时只在单位之间换（round 3）
       h(doc, 'span', { class: 'tip-title' }, units(m.titleShort, ' ', true)),
+      ...(m.lunar ? [h(doc, 'span', { class: 'tip-lunar', text: m.lunar })] : []),
       // 状态与来源只在「·」处换行（「法定假日·」「劳动节」各是整体），名字中间不折行
       h(doc, 'span', { class: 'tip-status' }, units(m.statusShort)),
       h(doc, 'span', { class: 'tip-source' }, units(m.sourceLabel)),

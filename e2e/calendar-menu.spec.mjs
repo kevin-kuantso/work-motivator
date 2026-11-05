@@ -32,6 +32,11 @@ async function withPage(iso, fn, opts) {
   }
 }
 
+// 提示新增「农历」行（日期之后、状态之前）。可见行里把它单独拆出来，其余行仍与原来的断言逐字比对；
+// 放不下时整行不显示（完整农历始终在 aria-describedby 里），所以只在它出现时才检查。
+const LUNAR_LINE = /^农历/;
+const splitLunar = (lines) => ({ base: lines.filter((l) => !LUNAR_LINE.test(l)), lunar: lines.find((l) => LUNAR_LINE.test(l)), lunarAt: lines.findIndex((l) => LUNAR_LINE.test(l)) });
+
 const card = '#status-card';
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
 const cell = (page, label) => page.locator(`.cal-grid button[aria-label^="${label} "]`);
@@ -206,14 +211,21 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     // R35 / 决定 2：盖在格子上；2026-11 是 6 周月份 → 3 行（不显示「来源」），没有「点击修改」
     // Task 18：来源行只在放得下时出现（实测决定），完整文字始终在 aria-describedby
     const lines = await tipVisibleLines(page);
-    assert.deepEqual([lines[0], lines[1], lines.at(-1)], ['11月7日 周六', '休息日', '计薪 ¥0.00']);
-    assert.ok(lines.length === 3 || (lines.length === 4 && lines[2] === '按周末规则'), `lines: ${lines}`);
+    // 农历行插在日期之后、状态之前；窄格子放不下时整行不显示（aria-describedby 始终有）
+    const { base, lunar } = splitLunar(lines);
+    assert.deepEqual([base[0], base[1], base.at(-1)], ['11月7日 周六', '休息日', '计薪 ¥0.00']);
+    assert.ok(base.length === 3 || (base.length === 4 && base[2] === '按周末规则'), `lines: ${lines}`);
+    if (lunar !== undefined) {
+      assert.equal(lunar, '农历九月廿九', `lunar line: ${lines}`);
+      assert.equal(base.indexOf(lunar), -1);
+      assert.equal(lines[1], lunar, 'lunar sits right under the date line');
+    }
     assert.doesNotMatch(tipText, /点击修改|来源/);
     assert.equal(await tooltip(page).evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
     assert.equal(await tooltip(page).evaluate((el, b) => el.parentElement === b.parentElement, await sat.elementHandle()), true, 'rendered inside the hovered cell');
     // aria-describedby 内容（屏幕阅读器不用鼠标也拿得到）
     const desc = await sat.evaluate((b) => b.getAttribute('aria-describedby').split(' ').map((id) => document.getElementById(id).textContent).join(' '));
-    assert.equal(desc, '11月7日 周六，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
+    assert.equal(desc, '11月7日 周六，农历九月廿九，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
     // 移开即隐藏
     await page.locator('.cal-summary-text').hover();
     assert.equal(await tooltip(page).isVisible(), false);
@@ -230,7 +242,12 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     assert.equal((await focused(page)).key, '2026-11-06');
     assert.equal(await tooltip(page).isVisible(), true, 'shows immediately on keyboard focus');
     const l6 = await tipVisibleLines(page);
-    assert.deepEqual([l6[0], l6[1], l6.at(-1)], ['11月6日 周五', '工作日', '计薪 ¥323.81']);
+    const l6s = splitLunar(l6);
+    assert.deepEqual([l6s.base[0], l6s.base[1], l6s.base.at(-1)], ['11月6日 周五', '工作日', '计薪 ¥323.81']);
+    if (l6s.lunar !== undefined) {
+      assert.equal(l6s.lunar, '农历九月廿八', `keyboard tooltip lines: ${l6}`);
+      assert.equal(l6[1], l6s.lunar, 'lunar sits right under the date line');
+    }
     await page.keyboard.press('Escape');
     assert.equal(await tooltip(page).isVisible(), false, 'Esc hides');
     await page.keyboard.press('ArrowLeft');
@@ -239,8 +256,8 @@ test('tooltip: hover after ~400ms, keyboard focus immediately, aria-describedby,
     assert.equal(await tooltip(page).isVisible(), false, 'blur hides');
     // 节日、调休上班、带薪假的提示
     await page.getByRole('button', { name: /上月/ }).click();
-    assert.match(await cell(page, '10月1日').evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent), /法定假日（国庆），来源：内置·官方通知，当日计薪 ¥0\.00/);
-    assert.match(await cell(page, '10月10日').evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent), /调休上班（国庆），来源：内置·官方通知，当日计薪 ¥377\.78/);
+    assert.match(await cell(page, '10月1日').evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent), /10月1日 周四，农历八月廿一，法定假日（国庆），来源：内置·官方通知，当日计薪 ¥0\.00/);
+    assert.match(await cell(page, '10月10日').evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent), /10月10日 周六，农历九月初一，调休上班（国庆），来源：内置·官方通知，当日计薪 ¥377\.78/);
     assertMainland(tipText, 'tooltip');
   }));
 
@@ -333,15 +350,23 @@ test('clock rollover while the menu is open keeps it usable; 2027 days use the p
 test('R39: 2027 fixed-date holidays carry the 「法定日期（《放假办法》）」 source in tooltip and aria; unknown days do not', () =>
   withPage('2027-01-04T10:00:00+08:00', async (page) => {
     const desc = (label) => cell(page, label).evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent);
-    assert.equal(await desc('1月1日'), '1月1日 周五，法定假日（元旦），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    assert.equal(await desc('1月1日'), '1月1日 周五，农历冬月廿四，法定假日（元旦），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
     assert.match(await desc('1月4日'), /工作日，来源：按默认规则，当日计薪 ¥340\.00/);
+    assert.match(await desc('1月4日'), /1月4日 周一（今天），农历冬月廿七，工作日，/, 'lunar date is in the accessible description');
     await cell(page, '1月1日').hover();
     await page.clock.runFor(450);
-    // 2027-01 是 5 周月份：4 行，第 3 行是来源（短写，不带「来源：」）
-    assert.deepEqual(await tipVisibleLines(page), ['1月1日 周五', '法定假日·元旦', '《放假办法》', '计薪 ¥0.00']);
+    // 2027-01 是 5 周月份：放得下时第 3 行是来源（短写，不带「来源：」）；农历行插在日期之后，
+    // 放不下时先让出来源那一行、再整行藏农历 —— 日期 / 状态 / 计薪 必须始终在
+    const r39 = splitLunar(await tipVisibleLines(page));
+    assert.deepEqual([r39.base[0], r39.base[1], r39.base.at(-1)], ['1月1日 周五', '法定假日·元旦', '计薪 ¥0.00'], `lines: ${JSON.stringify(r39.base)}`);
+    assert.ok(r39.base.length === 3 || (r39.base.length === 4 && r39.base[2] === '《放假办法》'), `lines: ${JSON.stringify(r39.base)}`);
+    if (r39.lunar !== undefined) {
+      assert.equal(r39.lunar, '农历冬月廿四');
+      assert.equal(r39.base.indexOf(r39.lunar), -1);
+    }
     // R40：2027-02-06（周六）是春节初一：法定假日，来源「法定日期」；补假不猜，2 月 9 日仍是普通工作日
     await page.getByRole('button', { name: /下月/ }).click();
-    assert.equal(await desc('2月6日'), '2月6日 周六，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    assert.equal(await desc('2月6日'), '2月6日 周六，农历正月初一，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
     assert.match(await desc('2月9日'), /工作日，来源：按默认规则/);
   }));
 
