@@ -2,6 +2,7 @@
 // 错误通道（储存失败、已保存设置损坏 / 部分无效）：永远显示、不被信息条压掉；同时发生就合并成一条，用「·」分隔。
 // 信息通道（首次提示、联网数据与内置表不同、备份建议）：同一时间只显示一条，首次提示优先；其余排队，前一条关闭后才显示，不丢弃。
 import { h, show, setText } from './dom.js';
+import { icon } from './icons.js';
 
 const ERROR_ORDER = ['storageFail', 'loadIssue'];
 // 联网数据与内置表不同的提示是用户按「检查更新」的直接结果，排在备份建议之前
@@ -33,17 +34,24 @@ export function createBanners(doc, t) {
   const infos = new Map();
   const queue = new Set();
 
+  // M13：提示条里的动作按钮统一成 xs 描边按钮（不再有下划线链接款式）
   const actionButtons = (actions) => actions.map((a) =>
-    h(doc, 'button', { type: 'button', class: `btn btn-xs ${a.link ? 'btn-link' : 'btn-secondary'}`, 'data-action': a.key, text: a.label, onclick: a.onClick }));
+    h(doc, 'button', { type: 'button', class: 'btn btn-xs btn-secondary', 'data-action': a.key, text: a.label, onclick: a.onClick }));
   const closeButton = (onclick) =>
     h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': b.dismiss, title: b.dismiss, text: b.closeGlyph, onclick });
 
+  // M13：错误条正文前加一个 12px 图示（文字本身仍说明问题，图示只是让它更容易被扫到）
+  const errorIcon = icon(doc, 'unpaid');
+  errorIcon.classList.add('banner-icon');
   const errorText = h(doc, 'span', { class: 'banner-text' });
   const errorActions = h(doc, 'span', { class: 'banner-actions' });
-  const errorBar = h(doc, 'div', { class: 'banner banner-error', role: 'alert', hidden: true }, errorText, errorActions);
+  const errorClose = closeButton(dismissErrors);
+  // 关闭钮是横幅的直接子项：动作与正文相邻，关闭钮靠右（.banner-close 的 margin-left:auto 才推得动）
+  const errorBar = h(doc, 'div', { class: 'banner banner-error', role: 'alert', hidden: true }, errorIcon, errorText, errorActions, errorClose);
   const infoText = h(doc, 'span', { class: 'banner-text' });
   const infoActions = h(doc, 'span', { class: 'banner-actions' });
-  const infoBar = h(doc, 'div', { class: 'banner banner-info', role: 'status', hidden: true }, infoText, infoActions);
+  const infoClose = closeButton(() => { const id = shownInfo; if (id == null) return; dismissInfo(id); infos.get(id)?.onDismiss?.(); });
+  const infoBar = h(doc, 'div', { class: 'banner banner-info', role: 'status', hidden: true }, infoText, infoActions, infoClose);
   const root = h(doc, 'div', { class: 'notices' }, errorBar, infoBar);
 
   function dismissErrors() {
@@ -70,7 +78,9 @@ export function createBanners(doc, t) {
     if (keys === errKeys) return;
     errKeys = keys;
     const buttons = m ? actionButtons(m.actions.map((a) => ({ ...a, onClick: (e) => errHandlers.get(a.key)?.(e) }))) : [];
-    errorActions.replaceChildren(...buttons, ...(m?.dismissible ? [closeButton(dismissErrors)] : []));
+    // 关闭钮常驻 DOM（直接子项才能靠右），只在可关闭时显示；errKeys 缓存保证它在焦点里时不重建
+    errorClose.hidden = !m?.dismissible;
+    errorActions.replaceChildren(...buttons);
   }
 
   let shownInfo = null;
@@ -82,8 +92,8 @@ export function createBanners(doc, t) {
     infoBar.dataset.id = id ?? '';
     const it = id ? infos.get(id) : null;
     setText(infoText, it ? it.content : '');
-    infoActions.replaceChildren(...(it ? actionButtons(it.actions ?? []) : []),
-      ...(it && it.closable !== false ? [closeButton(() => { dismissInfo(id); it.onDismiss?.(); })] : []));
+    infoClose.hidden = !(it && it.closable !== false);
+    infoActions.replaceChildren(...(it ? actionButtons(it.actions ?? []) : []));
   }
 
   function setError(id, content, opts = {}) {

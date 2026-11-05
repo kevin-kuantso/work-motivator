@@ -82,18 +82,25 @@ export function pickResult(results) {
   return null;
 }
 
-// tone：success（绿）/ muted（灰）/ info（蓝，「暂未发布」不是错误）/ warn（黄）
-// formatHelp：被拒绝的原因是格式 / 内容不合格（validateHolidayYear）→ 结果后面附「查看格式示例」（R47）；连不上 / 超时 / 过大不附
+// tone：success（绿，「已是最新」也是成功，不是停用状态 L7）/ info（蓝，「暂未发布」不是错误）/ warn（黄）
+// check：只在「已是最新」的结果前加装饰性 ✓（L7）；其余结果保持原样
+// formatHelp：被拒绝的原因是格式 / 内容不合格时展开既有示例；连不上 / 超时 / 过大不展开
 export function resultView(res, t) {
   if (!res) return null;
   const U = t.holidayUpdate;
-  const detail = res.reason ? U.detail(res.reason) : null;
+  const prefix = t.holidayData.allFailed('');
+  const reason = res.reason?.startsWith(prefix) ? res.reason.slice(prefix.length) : res.reason;
+  const detail = reason ? U.detail(reason) : null;
   switch (res.outcome) {
     case 'added': return { tone: 'success', text: U.added(res.years), detail: null };
     case 'refreshed': return { tone: 'success', text: U.refreshed(res.years), detail: null };
     case 'unpublished': return { tone: 'info', text: U.unpublished(res.years[0]), detail: null };
-    case 'network': return { tone: 'warn', text: U.network, detail };
+    case 'network': return { tone: 'warn', text: U.network, detail: null };
     case 'invalid': return { tone: 'warn', text: U.invalid, detail, formatHelp: res.format === true };
+    // 「已是最新」（L7）：绿底 + 文字前的 ✓，不是停用状态。内置表有差异时由页面级提示另行告知，
+    // pickResult 已把受保护年份的 diff 归一成 same，所以这里只需要 same
+    case 'same': return { tone: 'success', text: U.same, detail: null, check: true };
+    // 未知结果不冒充成功：保持原来的灰底「已是最新」文字
     default: return { tone: 'muted', text: U.same, detail: null };
   }
 }

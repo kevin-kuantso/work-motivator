@@ -79,7 +79,7 @@ test('first tick and normal-pace ticks show nothing; one 60 s jump shows exactly
     await page.clock.fastForward(60000);
     assert.equal(await notices(page), 2, 'again after 10 minutes');
     // 横幅不受影响（首次提示仍在）
-    assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), true, 'banners untouched');
+    assert.equal(await page.getByText('现在按默认月薪 ¥6,800、08:30–17:00 计算，请改成你自己的').isVisible(), true, 'banners untouched');
   }));
 
 test('the notice never replaces the calendar undo toast: it waits until the undo toast is gone', () =>

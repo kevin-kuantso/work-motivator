@@ -650,7 +650,7 @@ test('day menu: 「（调休）」 labels, check mark and type icon in separate 
     assert.match(await page.getByRole('menuitemradio').nth(1).textContent(), /^改为上班（调休）/);
     const menu = page.getByRole('menu');
     const desc = await menu.getAttribute('aria-describedby');
-    assert.equal(await page.locator(`#${desc}`).textContent(), '多一个上班日，日薪会变低；多一个休息日，日薪会变高（固定月薪 ÷ 当月应出勤天数）');
+    assert.equal(await page.locator(`#${desc}`).textContent(), '月薪固定，按当月上班天数平分');
     const cols = await page.locator('.day-menu-item[aria-checked="true"]').evaluate((b) => {
       const c = b.querySelector('.day-menu-check').getBoundingClientRect();
       const i = b.querySelector('.day-menu-icon').getBoundingClientRect();
@@ -1211,7 +1211,7 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     await page.locator('#adv-toggle').click();
     assert.equal(await page.getByRole('textbox', { name: '自定义数据网址' }).getAttribute('aria-describedby'), 'explain-custom-url hint-custom-url err-custom-url');
     assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。');
-    assert.equal(await text(page, '#explain-custom-url'), '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空 = 使用默认来源。');
+    assert.equal(await text(page, '#explain-custom-url'), '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空则使用默认来源。');
   }));
 
 // R47「复制示例」：clipboard.writeText 成功 → 「已复制」（剪贴板里就是示例全文）；被拒绝（CDP 把 clipboard-write 设为 denied）
@@ -2160,7 +2160,7 @@ test('calendar toolbar refits its hint after resizing while settings is open', (
     const hint = page.locator('.cal-toolbar .legend-hint');
     assert.equal(await hint.isVisible(), false, 'hint is hidden when it cannot fit');
     await page.setViewportSize({ width: 1280, height: 585 });
-    await page.clock.runFor(100);
+    await hint.waitFor({ state: 'visible' });
     assert.equal(await hint.isVisible(), true, 'hint returns when the toolbar has room');
   }));
 
@@ -2200,4 +2200,45 @@ test('tooltip hides the weekday before the status and keeps the full accessible 
     const full = await page.locator(`#${description}`).textContent();
     assert.match(full, /周二/);
     assert.match(full, /工作日/);
+  }));
+
+test('single-column settings shows a bottom fade until scrolled to the end', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1093, height: 535 });
+    await tab(page, /设置/).click();
+    const settings = page.locator('.settings');
+    const fade = () => page.locator('.tabpanel-settings').evaluate((el) => getComputedStyle(el, '::after').content);
+    assert.notEqual(await fade(), 'none', 'scrollable content has a visible fade');
+    await settings.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await page.waitForFunction(() => !document.querySelector('.settings').classList.contains('is-cut'));
+    assert.equal(await fade(), 'none', 'fade disappears at the bottom');
+    await settings.evaluate((el) => { el.scrollTop = 0; });
+    await page.waitForFunction(() => document.querySelector('.settings').classList.contains('is-cut'));
+    assert.notEqual(await fade(), 'none', 'fade returns when scrolling up');
+  }));
+
+test('settings fade tracks changes in viewport height', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1093, height: 2000 });
+    await tab(page, /设置/).click();
+    const settings = page.locator('.settings');
+    assert.equal(await settings.evaluate((el) => el.classList.contains('is-cut')), false);
+    await page.setViewportSize({ width: 1093, height: 900 });
+    await page.waitForTimeout(250);
+    assert.equal(await settings.evaluate((el) => el.classList.contains('is-cut')), true, 'fade appears when the panel becomes scrollable');
+  }));
+
+test('settings input focus outline does not cross the encouragement hint', () =>
+  withPage(T1412, async (page) => {
+    await page.setViewportSize({ width: 1093, height: 535 });
+    await tab(page, /设置/).click();
+    await page.locator('#f-cheer').focus();
+    const gap = await page.evaluate(() => {
+      const input = document.querySelector('#f-cheer');
+      const hint = document.querySelector('#hint-cheer');
+      const style = getComputedStyle(input);
+      return hint.getBoundingClientRect().top - input.getBoundingClientRect().bottom -
+        parseFloat(style.outlineOffset) - parseFloat(style.outlineWidth);
+    });
+    assert.ok(gap >= 0, `focus outline must not overlap the hint (gap ${gap}px)`);
   }));

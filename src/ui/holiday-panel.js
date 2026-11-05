@@ -37,7 +37,11 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-holiday-import', text: U.importFile, 'aria-describedby': 'hint-holiday-import',
     onclick: () => fileInput.click(),
   });
+  // 结果文字用一个常驻的 Text 节点写，结果前的 ✓ 才能留在同一个 span 里不被 setText 清掉（L7）
   const resultText = h(doc, 'span', { class: 'holiday-result-text' });
+  const resultTextNode = doc.createTextNode('');
+  const resultCheck = icon(doc, 'check'); // 纯装饰（icon() 已 aria-hidden）；只有标了 check 的结果才加
+  resultText.append(resultTextNode);
   const resultDetail = h(doc, 'span', { class: 'holiday-result-detail' });
   const result = h(doc, 'p', { class: 'holiday-result', id: 'holiday-result', role: 'status', 'aria-live': 'polite', hidden: true }, resultText, resultDetail);
 
@@ -76,15 +80,13 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     const b = disclosure.getBoundingClientRect();
     if (b.top < c.top || b.bottom > c.bottom) disclosure.scrollIntoView({ block: 'start' });
   }
-  // 「查看格式示例」（R47：高级设置的格式提示旁、格式不合格的结果后面）：展开示例、带进右栏视野、焦点移到示例的展开钮
+  // 高级设置的格式提示：展开示例、带进右栏视野、焦点移到示例的展开钮
   function revealExample() {
     if (example.hidden) setExample(true);
     else bringIntoView();
     disclosure.focus({ preventScroll: true });
   }
   const showExampleBtn = (id) => h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-xs show-example', id, text: U.showExample, 'aria-controls': 'holiday-example', onclick: revealExample });
-  const resultHelp = showExampleBtn('btn-result-example');
-  resultHelp.hidden = true;
 
   function selectCode() {
     const sel = win.getSelection?.();
@@ -123,7 +125,6 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     line,
     h(doc, 'div', { class: 'act-grid' }, act(checkBtn, 'hint-holiday-check', U.checkHint), act(importBtn, 'hint-holiday-import', U.importHint), fileInput),
     result,
-    resultHelp,
     disclosure,
     example);
 
@@ -165,12 +166,17 @@ export function createHolidayPanel(doc, t, { onCheck, onImportText, onCustomUrl 
     if (checking) checkBtn.setAttribute('aria-disabled', 'true');
     else checkBtn.removeAttribute('aria-disabled');
     const r = status.result;
-    const changed = Boolean(r) && (result.hidden || resultText.textContent !== r.text || resultDetail.textContent !== (r.detail ?? ''));
+    const nextText = r ? r.text : '';
+    const changed = Boolean(r) && (result.hidden || resultTextNode.data !== nextText || resultDetail.textContent !== (r.detail ?? ''));
     show(result, Boolean(r));
     result.dataset.tone = r ? r.tone : '';
-    setText(resultText, r ? r.text : '');
+    if (resultTextNode.data !== nextText) resultTextNode.data = nextText;
+    // ✓ 只加在标了 check 的结果前（L7：「已是最新」是成功，不是停用）；文字节点始终是最后一个子节点
+    const wantCheck = Boolean(r && r.check);
+    if (wantCheck && resultCheck.parentNode !== resultText) resultText.insertBefore(resultCheck, resultTextNode);
+    else if (!wantCheck && resultCheck.parentNode === resultText) resultCheck.remove();
     setText(resultDetail, r && r.detail ? r.detail : '');
-    show(resultHelp, Boolean(r && r.formatHelp));
+    if (changed && r?.formatHelp && example.hidden) setExample(true);
     // 新结果出现时确保看得到（极端情况下设置分页需要内部滚动）；分页隐藏时不动
     if (changed && result.offsetParent !== null) result.scrollIntoView({ block: 'nearest' });
     setText(advSummary, status.customSummary);

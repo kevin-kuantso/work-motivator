@@ -171,6 +171,7 @@ test('empty upstream 2027 file → 「数据来源暂未发布」 info (not an e
     assert.deepEqual(await result(page), { tone: 'info', text: '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: '' });
     const colors = await page.locator('#holiday-result').evaluate((e) => getComputedStyle(e).backgroundColor);
     assert.equal(colors, 'rgb(224, 242, 254)', 'info colour (#E0F2FE), not warn / error');
+    assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').count(), 0, '✓ only on 「已是最新」(L7)');
     assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/04');
     assert.equal(await page.locator('.notices .banner-error').isVisible(), false);
     await tab(page, '月历').click();
@@ -205,7 +206,7 @@ test('auto-check failure is silent; manual check shows the specific message (检
     const r = await result(page);
     assert.equal(r.tone, 'warn');
     assert.equal(r.text, '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」');
-    assert.match(r.detail, /^原因：所有数据源都获取失败：连接数据源失败$/);
+    assert.equal(r.detail, '');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'btn-holiday-check');
   });
 });
@@ -251,13 +252,19 @@ test('manual update does not clear manual marks; 「已更新：新增 2027 年�
     await serve(page, { 2026: REAL_2026, 2027: synth2027() });
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已更新：新增 2027 年假期表', detail: '' });
+    assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').count(), 0, '✓ is only for 「已是最新」(L7)');
     const marks = await page.evaluate(() => JSON.parse(localStorage.getItem('work-motivator-v1')).marks);
     assert.deepEqual(marks, { '2027-01-01': 'work', '2027-01-04': 'unpaidLeave' });
     await tab(page, '月历').click();
     assert.equal(await yearTag(page).isVisible(), false);
     assert.match(await page.locator('.cal-grid button[data-key="2027-01-04"]').getAttribute('aria-label'), /无薪假.*已手动标记/);
     await checkNow(page);
-    assert.deepEqual(await result(page), { tone: 'muted', text: '已是最新 · 刚刚检查过', detail: '' });
+    assert.deepEqual(await result(page), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: '' });
+    // L7：成功的结果前有装饰性 ✓（aria-hidden），文字本身不变
+    const check = page.locator('#holiday-result .holiday-result-text .icon-check');
+    assert.equal(await check.count(), 1);
+    assert.equal(await check.isVisible(), true);
+    assert.equal(await check.getAttribute('aria-hidden'), 'true');
   }));
 
 test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed file → page-level 「N 处不同，未采用」 queued behind the first-run hint; never applied', async () => {
@@ -267,7 +274,8 @@ test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed
   let body = REAL_2026;
   await withPage(JUNE, async (page) => {
     await checkNow(page);
-    assert.deepEqual(await result(page), { tone: 'muted', text: '已是最新 · 刚刚检查过', detail: '' });
+    assert.deepEqual(await result(page), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: '' });
+    assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').isVisible(), true);
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'firstRun');
     body = JSON.stringify(changed);
     await checkNow(page);
@@ -275,7 +283,7 @@ test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'firstRun');
     await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiff');
-    assert.equal(await text(page, '.notices .banner-info .banner-text'), '联网数据与内置表有 2 处不同，未采用');
+    assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与本机内置的有 2 天不同，暂按内置的计算');
     const btns = await page.locator('.notices .banner-info').getByRole('button').allTextContents();
     assert.deepEqual(btns, ['×'], 'dismissible; no 「查看差异」');
     await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
@@ -516,10 +524,10 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     changed.days = changed.days.filter((d) => d.date !== '2027-01-03');
     body2027 = JSON.stringify(changed);
     await checkNow(page);
-    assert.equal(await text(page, '.notices .banner-info .banner-text'), '这是默认值，可在设置里修改', 'first-run hint first');
+    assert.equal(await text(page, '.notices .banner-info .banner-text'), '现在按默认月薪 ¥6,800、08:30–17:00 计算，请改成你自己的', 'first-run hint first');
     await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiffFile');
-    assert.equal(await text(page, '.notices .banner-info .banner-text'), '联网数据与导入的表有 1 处不同，未采用');
+    assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与你导入的文件有 1 天不同，暂按导入的文件计算');
     assert.equal((await holidayRecord(page)).years['2027'].source, 'file');
     assert.equal((await holidayRecord(page)).years['2027'].table.off['2027-01-03'], '元旦', 'file table untouched');
   }, { routes: { 2026: REAL_2026, 2027: () => body2027 } });
@@ -594,8 +602,7 @@ test('harness self-check (R19/R32): protocol-relative //host, wss:// and ws:// a
   }
 });
 
-// ---- R47：格式不合格才附「查看格式示例」；点了展开示例、带进右栏视野、焦点到示例的展开钮 ----
-const helpBtn = (page) => page.locator('#btn-result-example');
+// R47 / M14：格式错误展开唯一的示例入口，高级设置仍可导航到示例。
 async function revealedByHelp(page, btnSel) {
   await page.locator(btnSel).click();
   return page.evaluate(() => {
@@ -612,32 +619,32 @@ async function revealedByHelp(page, btnSel) {
 }
 const REVEALED = { expanded: 'true', shown: true, focus: 'btn-example', toggleInView: true, exTopInView: true, pageScroll: false };
 
-test('R47: import rejected for a FORMAT reason → one result + 「查看格式示例」; not for 「已内置」 or success; the button reveals the example', () =>
+test('R47: import format errors show the example without a duplicate action', () =>
   withPage(NOV4, async (page) => {
     await tab(page, '基本设置').click();
     const wait = (s) => until(page, (x) => document.querySelector('.holiday-result-text').textContent === x, s);
     const one = () => page.evaluate(() => document.querySelectorAll('#holiday-result:not([hidden])').length);
     await importHoliday(page, synth2027({ papers: ['https://example.org/notice.htm'] }));
     await wait('假期数据的出处不是国务院官网（www.gov.cn）的链接');
-    assert.equal(await helpBtn(page).isVisible(), true, 'format failure → help button');
+    assert.equal(await page.locator('#holiday-example').isVisible(), true, 'format failure reveals the example');
+    assert.equal(await page.locator('#btn-result-example').count(), 0, 'no duplicate example button');
     assert.equal(await one(), 1, 'still exactly one result message');
     await importHoliday(page, 'not json at all');
     await wait('文件里没有可用的年份和放假数据，未导入');
-    assert.equal(await helpBtn(page).isVisible(), true, 'not JSON / no year is a format problem too');
+    assert.equal(await page.locator('#holiday-example').isVisible(), true, 'not JSON also reveals the example');
     await importHoliday(page, REAL_2026);
     await wait('2026 年假期已内置，未采用导入的数据');
-    assert.equal(await helpBtn(page).isVisible(), false, '「已内置」 is not a format problem');
+    assert.equal(await page.locator('#btn-result-example').count(), 0);
     await importHoliday(page, synth2027({ days: [day('2027-01-01', true, '元旦'), day('2027-01-04', false, '元旦')] })); // 1/4 是周一
     await wait('假期数据中有调休上班日不在周六或周日');
-    assert.equal(await helpBtn(page).isVisible(), true);
-    await page.setViewportSize({ width: 1280, height: 585 });
-    assert.deepEqual(await revealedByHelp(page, '#btn-result-example'), REVEALED);
+    assert.equal(await page.locator('#holiday-example').isVisible(), true);
+    assert.equal(await page.locator('#btn-example').getAttribute('aria-expanded'), 'true');
     await importHoliday(page, synth2027());
     await until(page, () => document.getElementById('holiday-result').dataset.tone === 'success');
-    assert.equal(await helpBtn(page).isVisible(), false, 'success → no help button');
+    assert.equal(await page.locator('#btn-result-example').count(), 0);
   }));
 
-test('R47: online update rejected for a format reason → help button; network failure / unpublished → none', async () => {
+test('R47: online format error reveals the example; network failure / unpublished do not', async () => {
   const badMakeup = synth2027({ days: [day('2027-01-01', true, '元旦'), day('2027-01-04', false, '元旦')] });
   await withPage(NOV4, async (page) => {
     await checkNow(page);
@@ -645,24 +652,23 @@ test('R47: online update rejected for a format reason → help button; network f
     assert.equal(r.tone, 'warn');
     assert.equal(r.text, '来源数据不完整，已拒绝，未采用');
     assert.match(r.detail, /调休上班日不在周六或周日/);
-    assert.equal(await helpBtn(page).isVisible(), true);
-    await page.setViewportSize({ width: 1280, height: 585 });
-    assert.deepEqual(await revealedByHelp(page, '#btn-result-example'), REVEALED);
+    assert.equal(await page.locator('#holiday-example').isVisible(), true);
+    assert.equal(await page.locator('#btn-result-example').count(), 0);
   }, { routes: { 2026: REAL_2026, 2027: badMakeup } });
   await withPage(NOV4, async (page) => {
     await checkNow(page);
     assert.equal((await result(page)).text, '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」');
-    assert.equal(await helpBtn(page).isVisible(), false, 'network failure: no format help');
+    assert.equal(await page.locator('#holiday-example').isVisible(), false, 'network failure: no format help');
   });
   await withPage(NOV4, async (page) => {
     await checkNow(page);
     assert.equal((await result(page)).tone, 'info');
-    assert.equal(await helpBtn(page).isVisible(), false, 'unpublished: no format help');
+    assert.equal(await page.locator('#holiday-example').isVisible(), false, 'unpublished: no format help');
   }, { routes: { 2026: REAL_2026, 2027: EMPTY_2027 } });
   await withPage(NOV4, async (page) => {
     await checkNow(page);
     assert.match((await result(page)).detail, /不是有效的 JSON 文本/);
-    assert.equal(await helpBtn(page).isVisible(), false, 'not JSON from a server (e.g. a proxy page) is not a file-format problem');
+    assert.equal(await page.locator('#holiday-example').isVisible(), false, 'server non-JSON is not a file-format problem');
   }, { routes: { 2026: REAL_2026, 2027: '<html>blocked</html>' } });
 });
 

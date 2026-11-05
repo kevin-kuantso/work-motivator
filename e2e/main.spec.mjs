@@ -11,6 +11,8 @@ const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', 
 // dist 中即使有 \\uXXXX 转义也要还原后再扫描
 const decode = (s) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, x) => String.fromCharCode(parseInt(x, 16)));
 const VOID_NUMBERS = ['312.64', '44.66', '187.5862', '500.23', '6,565.52', '5,627.59', '21.75', '0.0124'];
+// H1：首次提示的数字来自真实默认设置（月薪 6800、08:30–17:00）
+const FIRST_RUN = '现在按默认月薪 ¥6,800、08:30–17:00 计算，请改成你自己的';
 
 let server;
 let browser;
@@ -88,14 +90,14 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     assert.ok(!all.includes('快速开始'), 'no quick-start card');
     for (const n of VOID_NUMBERS) assert.ok(!all.includes(n), `void ÷21.75 number ${n} must not appear`);
     assert.ok(!all.includes('发薪日：每月 5 号'));
-    // 首次提示：可关闭、关闭后记住
-    const hint = page.getByText('这是默认值，可在设置里修改');
+    // 首次提示：说清现在用的默认值（H1），可关闭、关闭后记住
+    const hint = page.getByText(FIRST_RUN);
     assert.equal(await hint.isVisible(), true);
     assert.equal(await page.locator(infoBar).getByRole('button', { name: '去修改' }).isVisible(), true);
     await page.getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await hint.isVisible(), false);
     await page.reload();
-    assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false, 'dismissal remembered');
+    assert.equal(await page.getByText(FIRST_RUN).isVisible(), false, 'dismissal remembered');
   }));
 
 test('ticks at 100ms and recomputes on visibilitychange', () =>
@@ -225,12 +227,12 @@ test('calendar: day menu marks today as paid then unpaid leave; weekend → make
     assert.match(await todayCell(page, '11月3日').textContent(), /无薪/);
     await page.reload();
     assert.equal(await text(page, `${card} .card-badge`), '无薪假', 'marks persisted');
-    await choose('11月3日', /^恢复默认/);
-    assert.equal(await text(page, `${card} .card-badge`), '上班中', '恢复默认 returns to default');
+    await choose('11月3日', /^恢复为工作日/);
+    assert.equal(await text(page, `${card} .card-badge`), '上班中', '恢复为工作日 returns to default');
     // 休息日：默认 → 调休上班 → 默认
     await choose('11月7日', /改为上班/);
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /调休上班/);
-    await choose('11月7日', /恢复默认/);
+    await choose('11月7日', /^恢复为休息日/);
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
     // 撤销
     await choose('11月7日', /改为上班/);
@@ -337,7 +339,7 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
     await report.waitFor({ state: 'visible' });
     assert.match(await text(page, '.import-report'), /导入失败：无法识别这个文件。当前设置没有被修改。/);
-    assert.match(await text(page, '.import-report'), /原因：不是有效的 JSON 文本/);
+    assert.match(await text(page, '.import-report'), /原因：这不是本工具导出的备份文件/);
     assertNoTraditional(await bodyText(page), 'import failure panel (non-JSON)');
     await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('[1]') });
     await page.getByText('原因：文件内容的结构不正确').waitFor();
@@ -410,7 +412,7 @@ test('corrupt saved settings: visible dismissible notice, not a silent first run
   withPage(T1412, async (page) => {
     assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。');
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '导入备份' }).isVisible(), true, 'the bar offers the button its text refers to');
-    assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false, 'not treated as first run');
+    assert.equal(await page.getByText(FIRST_RUN).isVisible(), false, 'not treated as first run');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
     assertNoTraditional(await bodyText(page), 'corrupt-load notice');
     await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).click();
@@ -421,7 +423,7 @@ test('partly invalid saved settings: notice lists field labels, other fields sti
   withPage(T1412, async (page) => {
     assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：发薪日、月历标记 2026-02-30');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥428.57', 'valid salary 9000 still loaded');
-    assert.equal(await page.getByText('这是默认值，可在设置里修改').isVisible(), false);
+    assert.equal(await page.getByText(FIRST_RUN).isVisible(), false);
   }, seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } }))));
 
 test('two tabs: a change in one tab reaches the other without reload and is never reverted', async () => {
@@ -508,7 +510,7 @@ test('no Traditional characters in visible text or in the shipped file', () =>
     await page.getByRole('button', { name: /高级设置/ }).click();
     assertNoTraditional(await bodyText(page), 'advanced settings open');
     const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');
-    assert.ok(html.includes('这是默认值，可在设置里修改'), 'dist keeps raw UTF-8 Chinese (charset utf8)');
+    assert.ok(html.includes('现在按默认月薪'), 'dist keeps raw UTF-8 Chinese (charset utf8)');
     assertNoTraditional(decode(html), 'dist/work-motivator.html (decoded)');
   }));
 

@@ -117,14 +117,15 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
       h(doc, 'div', { class: 'set-col settings-col' },
         card('holiday', 'holiday', s.sections.holiday, s.holidayDesc(builtinYears), holiday ? holiday.body : null),
         card('backup', 'data', s.sections.backup, s.backupDesc,
+          // H6：导入报告紧跟卡头，导入后不用滚到卡片最下面才看得到结果和按钮
+          report,
           h(doc, 'p', { class: 'para' }, h(doc, 'b', { text: b.exportLead }), b.exportText),
           h(doc, 'p', { class: 'para' }, h(doc, 'b', { text: b.importLead }), b.importText),
           h(doc, 'p', { class: 'para backup-scope', text: b.scope }),
           h(doc, 'div', { class: 'btn-row backup-actions' },
             h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', text: b.export, onclick: onExport }),
             h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', text: b.import, onclick: onImport }),
-            h(doc, 'span', { class: 'warn-note backup-note' }, icon(doc, 'lock'), b.note)),
-          report),
+            h(doc, 'span', { class: 'warn-note backup-note' }, icon(doc, 'lock'), b.note))),
         advCard)));
 
   const readers = {
@@ -203,5 +204,20 @@ export function createSettingsPanel(doc, t, { getCfg, onChange, onExport, onImpo
     input.focus();
   }
 
-  return { el, autosave, sync, flashSaved, focusField };
+  // M16：单栏（窄视窗）时整个设置分页内部滚动，mac 没有常驻滚动条——内容没到底时给底部渐隐提示，滚到底就收起。
+  // 宽视窗下两栏各自滚动，.settings 本身不滚动，这里不加提示（不加高度，也不影响布局）。
+  function refreshFade() {
+    const scrolls = win.getComputedStyle(el).overflowY === 'auto' && el.scrollHeight - el.clientHeight > 1;
+    const more = scrolls && el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    el.classList.toggle('is-cut', more);
+  }
+  el.addEventListener('scroll', refreshFade, { passive: true });
+  // 内容高度和滚动容器尺寸都可能独立变化，需要同时观察。
+  if (typeof win.ResizeObserver === 'function') {
+    const observer = new win.ResizeObserver(refreshFade);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+  }
+
+  return { el, autosave, sync, flashSaved, focusField, refreshFade };
 }
