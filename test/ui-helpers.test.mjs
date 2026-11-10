@@ -58,11 +58,15 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
 });
 
 test('card shows a year note when the holiday table is missing (R15)', () => {
-  const now = at(1, 4, 10, 0, 0, 2027);
+  const now = at(1, 4, 10, 0, 0, 2028);
   const m = cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
-  assert.equal(m.yearNote, '2027 年只标了法定假日，补假和调休未标出');
-  assert.equal(m.yearTitle, '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
+  assert.equal(m.yearNote, '2028 年只标了法定假日，补假和调休未标出');
+  assert.equal(m.yearTitle, '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
   assert.ok([...m.yearNote.replace(/[\d\s]/g, '')].length <= 17, 'short tag stays short (Task 19 F1: truthful wording is longer; the one-line row is checked in e2e)');
+  // P9：2027 有内置表，不再出现缺表提示
+  const now27 = at(1, 4, 10, 0, 0, 2027);
+  const builtin = cardModel({ ...snapshot(now27, cfg, {}), now: now27 }, cfg, t);
+  assert.deepEqual([builtin.yearNote, builtin.yearTitle], [null, '']);
 });
 
 test('card model per status', () => {
@@ -131,7 +135,8 @@ test('month grid starts on Monday and flags missing holiday tables', () => {
   assert.equal(g.weeks.flat().find((c) => c?.today).day, 3);
   assert.equal(g.hasMarks, true);
   assert.equal(g.tableMissing, false);
-  assert.equal(monthGrid(2027, 0, cfg, {}, at(11, 3)).tableMissing, true);
+  assert.equal(monthGrid(2028, 0, cfg, {}, at(11, 3)).tableMissing, true);
+  assert.equal(monthGrid(2027, 0, cfg, {}, at(11, 3)).tableMissing, false, 'P9: 2027 is built in');
   const oct = monthGrid(2026, 9, cfg, {}, null);
   assert.equal(oct.weeks.flat().find((c) => c?.day === 1).holidayName, '国庆');
   assert.equal(oct.hasMarks, false);

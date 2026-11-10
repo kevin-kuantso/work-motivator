@@ -48,17 +48,32 @@ test('online and imported tables: the basis says where the data came from, never
 });
 
 test('no-table current / future years (tag shown in the same row): ranges only, basis in title; never an official claim', () => {
-  const jan = ctx(2027, 1);
-  assert.equal(jan.text, '元旦 1/1 放假');
+  const jan = ctx(2028, 1);
+  assert.equal(jan.text, '元旦 1/1 放假；春节 1/25–1/28 放假', 'R40 lunar days');
   assert.equal(jan.sub, undefined, 'the missing-table tag already explains it; nothing extra in the pill');
-  assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
+  assert.equal(jan.title, '元旦 1/1 放假；春节 1/25–1/28 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
   assert.equal(jan.check, false);
-  assert.equal(ctx(2027, 2).text, '春节 2/5–2/8 放假', 'R40 lunar days');
-  const mar = ctx(2027, 3);
-  assert.deepEqual([mar.tone, mar.check, mar.text], ['unknown', false, '本月没有已标出的法定假日']);
+  assert.deepEqual([ctx(2028, 3).tone, ctx(2028, 3).check, ctx(2028, 3).text], ['unknown', false, '本月没有已标出的法定假日']);
   assert.equal(ctx(2036, 1).text, '元旦 1/1 放假', '2036: fixed days only');
   assert.equal(ctx(2036, 2).text, '本月没有已标出的法定假日', '2036: no lunar data, nothing claimed');
-  for (const [y, m] of [[2027, 1], [2027, 3], [2036, 1], [2036, 2]]) assert.doesNotMatch(ctx(y, m).title, /国务院|依据/, `${y}-${m}`);
+  for (const [y, m] of [[2028, 1], [2028, 3], [2036, 1], [2036, 2]]) assert.doesNotMatch(ctx(y, m).title, /国务院|依据/, `${y}-${m}`);
+});
+
+// P9：2027 年国办通知（2026-11）发布后内置整年日期表，依据改为国务院通知，命名与 2026 一致
+test('P9: built-in 2027 months: official ranges and make-up days, basis cites the State Council notice', () => {
+  const jan = ctx(2027, 1);
+  assert.deepEqual([jan.tone, jan.check, jan.text], ['holiday', false, '元旦 1/1–1/3 放假；春节 1/31 调休上班']);
+  assert.equal(jan.title, '元旦 1/1–1/3 放假；春节 1/31 调休上班 · 依据 2027 年国务院放假通知');
+  assert.equal(jan.sub, undefined);
+  assert.equal(ctx(2027, 2).text, '春节 2/5–2/13 放假，2/14 调休上班');
+  assert.equal(ctx(2027, 3).text, '本月没有法定假日');
+  assert.equal(ctx(2027, 3).title, '本月没有法定假日 · 依据 2027 年国务院放假通知');
+  assert.equal(ctx(2027, 4).text, '清明 4/3–4/5 放假');
+  assert.equal(ctx(2027, 5).text, '劳动节 5/1–5/5 放假，5/8 调休上班');
+  assert.equal(ctx(2027, 6).text, '端午 6/9 放假');
+  assert.equal(ctx(2027, 9).text, '中秋 9/15 放假；国庆 9/26 调休上班');
+  assert.equal(ctx(2027, 10).text, '国庆 10/1–10/7 放假，10/9 调休上班');
+  for (const m of [1, 2, 4, 5, 6, 9, 10]) assert.match(ctx(2027, m).title, /· 依据 2027 年国务院放假通知$/, `month ${m}`);
 });
 
 test('no-table PAST years: no tag; the pill states what the app marked (R49: fixed-only wording for 2025, never 「待公布」)', () => {
@@ -71,8 +86,10 @@ test('no-table PAST years: no tag; the pill states what the app marked (R49: fix
   assert.equal(mar.sub, undefined);
   assert.equal(mar.title, '本月没有已标出的法定假日 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
   assert.doesNotMatch(oct.title + mar.title, /待公布|国务院/);
-  // 2027 也会变成过去：今天是 2028 年时
-  assert.equal(ctx(2027, 1, HOLIDAYS_CN, new Date(2028, 0, 5)).title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出', 'a past lunar year keeps the lunar wording (title)');
+  // 无表年份变成过去时措辞不变（2028 在 2029 年回看）
+  assert.equal(ctx(2028, 1, HOLIDAYS_CN, new Date(2029, 0, 5)).title, '元旦 1/1 放假；春节 1/25–1/28 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出', 'a past lunar year keeps the lunar wording (title)');
+  // 有表的 2027 变成过去：依据仍是国务院通知
+  assert.equal(ctx(2027, 1, HOLIDAYS_CN, new Date(2028, 0, 5)).title, '元旦 1/1–1/3 放假；春节 1/31 调休上班 · 依据 2027 年国务院放假通知');
 });
 
 test('years before 2025 without a table: nothing is marked and the pill says so', () => {
@@ -105,22 +122,24 @@ test('monthHolidays ignores manual marks and the weekends switch (pure table / s
 
 test('R41 (amended round 3) missing-table tag: every no-table year, past or future; wording follows what is actually marked', () => {
   assert.equal(missingTableTag(2026, NOW, HOLIDAYS_CN, t), null, 'has a table');
+  assert.equal(missingTableTag(2027, NOW, HOLIDAYS_CN, t), null, '2027 is built in since the 2026-11 notice');
   assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t).text, '2025 年只标了元旦、劳动节、国庆', 'past year: visible qualifier too (round 3)');
-  assert.deepEqual(missingTableTag(2027, NOW, HOLIDAYS_CN, t), {
-    kind: 'lunar', text: '2027 年只标了法定假日，补假和调休未标出',
-    title: '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
+  assert.deepEqual(missingTableTag(2028, NOW, HOLIDAYS_CN, t), {
+    kind: 'lunar', text: '2028 年只标了法定假日，补假和调休未标出',
+    title: '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
   });
   assert.equal(missingTableTag(2027, NOW, { ...HOLIDAYS_CN, 2027: online2027 }, t), null, 'online table');
+  assert.equal(missingTableTag(2028, NOW, { ...HOLIDAYS_CN, 2028: online2027 }, t), null, 'online table for 2028');
   const f = missingTableTag(2036, NOW, HOLIDAYS_CN, t);
   assert.equal(f.kind, 'fixed');
   assert.equal(f.text, '2036 年只标了元旦、劳动节、国庆'); // 名字取自 STATUTORY_FIXED（F1：固定日期年份不说「标了法定假日」）
   assert.match(f.title, /元旦、劳动节、国庆/);
   assert.ok([...f.text].filter((c) => /\p{Script=Han}/u.test(c)).length <= 14, '≤ 14 CJK characters');
   assert.equal(missingTableTag(2035, new Date(2035, 5, 1), HOLIDAYS_CN, t).kind, 'lunar');
-  assert.equal(missingTableTag(2027, new Date(2028, 0, 1), HOLIDAYS_CN, t).kind, 'lunar', 'a past lunar year keeps its tag');
+  assert.equal(missingTableTag(2028, new Date(2029, 0, 1), HOLIDAYS_CN, t).kind, 'lunar', 'a past lunar year keeps its tag');
   assert.equal(missingTableTag(2025, new Date(2025, 5, 1), HOLIDAYS_CN, t).kind, 'fixed', '2025 current (clock in 2025): fixed days only');
   assert.equal(missingTableTag(2024, new Date(2024, 5, 1), HOLIDAYS_CN, t).text, '2024 年未标法定假日');
-  assert.deepEqual([2024, 2025, 2026, 2027, 2035, 2036].map(noTableKind), ['none', 'fixed', 'fixed', 'lunar', 'lunar', 'fixed']);
+  assert.deepEqual([2024, 2025, 2026, 2027, 2028, 2035, 2036].map(noTableKind), ['none', 'fixed', 'fixed', 'fixed', 'lunar', 'lunar', 'fixed']);
 });
 
 // R49（fix round 1 · C1）：说 app 知道什么（未内置 / 未标出），不说世界的状态（未公布 / 待公布）；fixed 与 lunar 年份措辞分开；
@@ -150,7 +169,10 @@ test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and t
   const joined = all.join('|');
   assert.doesNotMatch(joined, /未公布|待公布|国务院|依据/);
   assert.doesNotMatch(joined, /标出法定假日本身/, 'fixed years do not use the lunar sentence');
-  // 2027（lunar）对照：用 lunar 句子
-  assert.match(ctx(2027, 2).title, /标出法定假日本身；补假、调休和延长的假日未标出$/);
-  assert.doesNotMatch(missingTableTag(2027, NOW, HOLIDAYS_CN, t).title + missingTableTag(2036, NOW, HOLIDAYS_CN, t).title + missingTableTag(2024, new Date(2024, 0, 1), HOLIDAYS_CN, t).title, /未公布|待公布/);
+  // 2028（lunar）对照：用 lunar 句子
+  assert.match(ctx(2028, 1).title, /标出法定假日本身；补假、调休和延长的假日未标出$/);
+  // 内置的 2027 不进这套措辞：依据国务院通知
+  assert.match(ctx(2027, 2).title, /依据 2027 年国务院放假通知$/);
+  assert.equal(missingTableTag(2027, NOW, HOLIDAYS_CN, t), null);
+  assert.doesNotMatch(missingTableTag(2028, NOW, HOLIDAYS_CN, t).title + missingTableTag(2036, NOW, HOLIDAYS_CN, t).title + missingTableTag(2024, new Date(2024, 0, 1), HOLIDAYS_CN, t).title, /未公布|待公布/);
 });

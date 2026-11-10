@@ -1,4 +1,7 @@
-// 中国大陆 2026 法定节假日（国办发明电〔2025〕7号），日期为本地 'YYYY-MM-DD'。
+// 中国大陆法定节假日，日期为本地 'YYYY-MM-DD'。
+// 2026：国办发明电〔2025〕7号；2027：国办发明电〔2026〕10号。
+//   https://www.gov.cn/zhengce/content/202611/content_7085101.htm
+// 没有内置表的年份仍按 R39 / R40 的回退规则（STRINGS + statutory-dates.js）显示，见 calendar.js。
 import { STRINGS } from './strings.zh-CN.js';
 
 const H = STRINGS.holidays;
@@ -38,6 +41,25 @@ export const HOLIDAYS_CN = {
       [H.labour, 5, 9],
       [H.national, 9, 20],
       [H.national, 10, 10],
+    ],
+  ),
+  2027: build(
+    2027,
+    [
+      [H.newYear, [1, 1], [1, 3]],
+      [H.spring, [2, 5], [2, 13]],
+      [H.qingming, [4, 3], [4, 5]],
+      [H.labour, [5, 1], [5, 5]],
+      [H.dragonBoat, [6, 9], [6, 9]],
+      [H.midAutumn, [9, 15], [9, 15]],
+      [H.national, [10, 1], [10, 7]],
+    ],
+    [
+      [H.spring, 1, 31],
+      [H.spring, 2, 14],
+      [H.labour, 5, 8],
+      [H.national, 9, 26],
+      [H.national, 10, 9],
     ],
   ),
 };

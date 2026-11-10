@@ -291,21 +291,30 @@ test('PiP height with cheer + payday after work fits', () =>
     assert.equal(await pip(page).locator('.card-payday').isVisible(), true);
   }, { init: stub() }));
 
-test('2027: year note shows in the PiP card and the window is not clipped', () =>
-  withPage('2027-01-04T10:00:00+08:00', async (page) => {
+test('2028: no-table year — the year note shows in the PiP card and the window is not clipped', () =>
+  withPage('2028-01-04T10:00:00+08:00', async (page) => {
     await setCheerAndPayday(page);
     await floatFits(page);
     assert.equal(await pip(page).locator('.card-year').isVisible(), true);
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年只标了法定假日，补假和调休未标出');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2028 年只标了法定假日，补假和调休未标出');
   }, { init: stub() }));
 
-test('2027-02 春节: PiP card shows the shortened year note and the window is not clipped', () =>
-  withPage('2027-02-05T10:00:00+08:00', async (page) => {
+test('2028-01 春节: PiP card shows the shortened year note and the window is not clipped', () =>
+  withPage('2028-01-26T10:00:00+08:00', async (page) => {
     await setCheerAndPayday(page);
     await floatFits(page);
     assert.equal(await pip(page).locator('.card-badge').innerText(), '法定假日', 'Task 19 H3: float badge never shows the holiday name (innerText: the hidden part is not rendered)');
-    assert.equal(await txt(pip(page).locator('.card-year')), '2027 年只标了法定假日，补假和调休未标出');
+    assert.equal(await txt(pip(page).locator('.card-year')), '2028 年只标了法定假日，补假和调休未标出');
     assert.equal(await txt(pip(page).locator('.card-label')), '今天休息 · 春节');
+  }, { init: stub() }));
+
+test('2027 春节: built-in table — no year note in the PiP card and the window is not clipped', () =>
+  withPage('2027-02-06T10:00:00+08:00', async (page) => {
+    await setCheerAndPayday(page);
+    await floatFits(page);
+    assert.equal(await pip(page).locator('.card-badge').innerText(), '法定假日');
+    assert.equal(await txt(pip(page).locator('.card-label')), '今天休息 · 春节');
+    assert.equal(await pip(page).locator('.card-year').isVisible(), false);
   }, { init: stub() }));
 
 test('2026: no year note in the PiP card', () =>

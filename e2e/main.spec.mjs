@@ -258,25 +258,31 @@ test('calendar shows holiday names, legend, and a summary-row tag for years with
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年只标了法定假日，补假和调休未标出');
+    // 2027 已有内置表（国务院 2026-11 通知）：不再出现「未内置」标签
+    assert.equal(await visible(page, '.cal-year-tag'), false);
     assertNoTraditional(await bodyText(page), 'rest day + 2027 view');
+    // 2028 仍无内置表 → 标签回来
+    for (let i = 0; i < 12; i++) await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2028 年 1 月');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出');
+    assertNoTraditional(await bodyText(page), 'rest day + 2028 view');
     await page.getByRole('button', { name: '回到今天' }).click();
     assert.equal(await text(page, '.cal-title'), '2026 年 10 月');
     assert.equal(await visible(page, '.cal-year-tag'), false);
   }));
 
-test('2027 (no built-in holiday table): the status card says so', () =>
-  withPage('2027-01-04T10:00:00+08:00', async (page) => {
+test('2028 (no built-in holiday table): the status card says so', () =>
+  withPage('2028-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await visible(page, `${card} .card-year`), true);
-    assert.equal(await text(page, `${card} .card-year`), '2027 年只标了法定假日，补假和调休未标出');
-    assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
-    // R39：1/1 是固定法定假日 → 1 月 20 个工作日、日薪 340.00；10:00 已赚 340 × 5400/25200 = 72.8571
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 72.8571');
-    assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥340.00');
-    assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥72.86');
-    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 20 天 · 日薪 ¥340.00');
-    assert.match(await page.locator('.cal-grid button[data-key="2027-01-01"]').getAttribute('aria-label'), /^1月1日 周五，法定假日（元旦）/);
-    assertNoTraditional(await bodyText(page), '2027 card');
+    assert.equal(await text(page, `${card} .card-year`), '2028 年只标了法定假日，补假和调休未标出');
+    assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
+    // R39：1/1 是固定法定假日 → 1 月 17 个工作日（无补假 / 调休数据）、日薪 400.00；10:00 已赚 400 × 5400/25200 = 85.7143
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 85.7143');
+    assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥400.00');
+    assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥485.71');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 17 天 · 日薪 ¥400.00');
+    assert.match(await page.locator('.cal-grid button[data-key="2028-01-01"]').getAttribute('aria-label'), /^1月1日 周六，法定假日（元旦）/);
+    assertNoTraditional(await bodyText(page), '2028 card');
   }));
 
 test('lunch, before-work and after-work states', async () => {

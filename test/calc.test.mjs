@@ -176,25 +176,49 @@ test('monthWage: shared daily-wage helper used by snapshot and the calendar prev
   assert.equal(monthWage(2026, 9, cfg, {}).workdays, 18);
 });
 
+// 2027 现在有内置表；无表路径用显式注入的不含 2027 的表集合覆盖（R39 / R40 回退语义照旧）
+const NO_2027 = { 2026: { off: { '2026-01-01': '元旦' }, makeup: {}, source: 'builtin' } };
+
 test('R39: 2027-01-04 10:00 (no table): Jan 1 is a statutory rest day -> 20 workdays, daily wage 340', () => {
-  const s = snapshot(new Date(2027, 0, 4, 10, 0, 0), cfg, {});
+  const s = snapshot(new Date(2027, 0, 4, 10, 0, 0), cfg, {}, NO_2027);
   assert.equal(s.tableMissing, true);
   near(s.dailyWage, 340, 1e-9);
   near(s.earned, 340 * 5400 / 25200, 1e-6); // 72.8571…
   near(s.monthTotal, 340 * 5400 / 25200, 1e-6); // Jan 1 rest -> 0; today = earned
-  const f = snapshot(new Date(2027, 0, 1, 10, 0, 0), cfg, {});
+  const f = snapshot(new Date(2027, 0, 1, 10, 0, 0), cfg, {}, NO_2027);
   assert.equal(f.status, 'restDay');
   assert.equal(f.earned, 0);
 });
 
+test('R39: 2027 with the built-in table: Jan 1-3 rest, Jan 4 work -> 21 workdays, daily wage 323.81', () => {
+  const s = snapshot(new Date(2027, 0, 4, 10, 0, 0), cfg, {});
+  assert.equal(s.tableMissing, false);
+  near(s.dailyWage, 6800 / 21, 1e-9);
+  near(s.dailyWage, 323.81, 0.005);
+  near(s.earned, 6800 / 21 * 5400 / 25200, 1e-6);
+  // 春节 2/14 调休上班：当月 15 个工作日
+  near(monthWage(2027, 1, cfg, {}).dailyWage, 453.33, 0.005);
+  assert.equal(monthWage(2027, 1, cfg, {}).workdays, 15);
+});
+
 test('R40: 2027 daily wages with the lunar / solar-term legal days (no table)', () => {
-  const expected = { 1: 18, 2: 23, 6: 22, 7: 22, 10: 22 }; // month index -> workdays
+  const expected = { 0: 20, 1: 20, 5: 22, 9: 20 }; // month index -> workdays（只剩固定日 + 周末）
+  for (const [m, n] of Object.entries(expected)) {
+    const w = monthWage(2027, Number(m), cfg, {}, NO_2027);
+    assert.equal(w.workdays, n, `month index ${m}`);
+    near(w.dailyWage, 6800 / n, 1e-9);
+  }
+  near(monthWage(2027, 1, cfg, {}, NO_2027).dailyWage, 340, 0.005);
+});
+
+test('R40: 2027 daily wages with the built-in table (春节 / 劳动节 / 中秋)', () => {
+  const expected = { 1: 15, 4: 19, 8: 22, 6: 22, 9: 17 }; // month index -> workdays
   for (const [m, n] of Object.entries(expected)) {
     const w = monthWage(2027, Number(m), cfg, {});
     assert.equal(w.workdays, n, `month index ${m}`);
     near(w.dailyWage, 6800 / n, 1e-9);
   }
-  near(monthWage(2027, 1, cfg, {}).dailyWage, 377.78, 0.005);
-  near(monthWage(2027, 2, cfg, {}).dailyWage, 295.65, 0.005);
-  near(monthWage(2027, 6, cfg, {}).dailyWage, 309.09, 0.005);
+  near(monthWage(2027, 1, cfg, {}).dailyWage, 453.33, 0.005);
+  near(monthWage(2027, 4, cfg, {}).dailyWage, 357.89, 0.005);
+  near(monthWage(2027, 9, cfg, {}).dailyWage, 400, 1e-9);
 });

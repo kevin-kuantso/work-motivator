@@ -8,7 +8,7 @@ import { STATUTORY_LUNAR } from '../statutory-dates.js';
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
 const PLAIN = { weekends: false }; // 法定假日 / 调休与周末开关无关
 
-// 无表年份实际标出了什么：'lunar'（2027–2035：固定日期 + 春节 / 清明 / 端午 / 中秋）、'fixed'（其他 ≥ 2025：六个固定日期）、'none'（< 2025：什么都没标）
+// 无表年份实际标出了什么：'lunar'（2028–2035：固定日期 + 春节 / 清明 / 端午 / 中秋）、'fixed'（其他 ≥ 2025：六个固定日期）、'none'（< 2025：什么都没标）
 export function noTableKind(year) {
   if (has(STATUTORY_LUNAR, year)) return 'lunar';
   return year >= STATUTORY_FIXED_FROM_YEAR ? 'fixed' : 'none';

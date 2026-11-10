@@ -182,6 +182,11 @@ test('default sources', () => {
 // ---- auto check ----
 const only2026 = { 2026: HOLIDAYS_CN[2026] };
 test('yearsToAutoCheck', () => {
+  // P9：2027 已内置 → 2026-11 起不再为次年抓取
+  assert.deepEqual(yearsToAutoCheck(new Date(2026, 10, 4), HOLIDAYS_CN, null), []);
+  assert.deepEqual(yearsToAutoCheck(new Date(2027, 0, 4), HOLIDAYS_CN, null), []);
+  assert.deepEqual(yearsToAutoCheck(new Date(2028, 0, 4), HOLIDAYS_CN, null), [2028]);
+  assert.equal(HOLIDAYS_CN[2027].source, 'builtin');
   assert.deepEqual(yearsToAutoCheck(new Date(2026, 10, 4), only2026, null), [2027]);
   assert.deepEqual(yearsToAutoCheck(new Date(2026, 5, 1), only2026, null), []);
   assert.deepEqual(yearsToAutoCheck(new Date(2027, 0, 4), only2026, null), [2027]);
@@ -196,10 +201,14 @@ test('yearsToAutoCheck', () => {
 const t2027 = { 2027: { off: { '2027-01-01': '元旦' }, makeup: { '2027-01-02': '元旦' }, source: 'online' } };
 test('tables param drives dayInfo / workdaysInMonth / snapshot; default unchanged', () => {
   const d = new Date(2027, 0, 1);
-  assert.equal(dayInfo(d, cfg, {}).tableMissing, true);
-  assert.equal(dayInfo(d, cfg, {}).source, 'statutory');
-  assert.equal(dayInfo(d, cfg, {}).base, 'rest');
-  assert.equal(dayInfo(new Date(2027, 0, 4), cfg, {}).source, 'rule');
+  assert.equal(dayInfo(d, cfg, {}, only2026).tableMissing, true);
+  assert.equal(dayInfo(d, cfg, {}, only2026).source, 'statutory');
+  assert.equal(dayInfo(d, cfg, {}, only2026).base, 'rest');
+  assert.equal(dayInfo(new Date(2027, 0, 4), cfg, {}, only2026).source, 'rule');
+  // 默认（内置 2027 表）：表在，但 1/4 不在表内 → 普通工作日，source 仍是 rule
+  assert.equal(dayInfo(d, cfg, {}).source, 'builtin');
+  const w = dayInfo(new Date(2027, 0, 4), cfg, {});
+  assert.deepEqual([w.tableMissing, w.base, w.reason, w.source], [false, 'work', 'weekday', 'rule']);
   const i = dayInfo(d, cfg, {}, t2027);
   assert.equal(i.base, 'rest');
   assert.equal(i.source, 'online');

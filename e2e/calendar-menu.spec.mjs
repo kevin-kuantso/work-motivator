@@ -325,7 +325,7 @@ test('no leaked listeners (and no stray hover timer) after opening and closing 2
     }
   } }));
 
-test('clock rollover while the menu is open keeps it usable; 2027 days use the plain weekend rule', () =>
+test('clock rollover while the menu is open keeps it usable; 2027 days come from the built-in official table (元旦 holiday, 春节 make-up day)', () =>
   withPage('2026-12-31T23:59:58+08:00', async (page) => {
     await openMenu(page, '12月26日');
     await page.clock.runFor(3000);
@@ -333,42 +333,79 @@ test('clock rollover while the menu is open keeps it usable; 2027 days use the p
     assert.equal(await menu(page).isVisible(), false, 'menu for a day no longer shown closes');
     const f = await focused(page);
     assert.notEqual(f.key, null, 'focus not lost: it is on a calendar cell');
+    // 2027 内置表：1/2（周六）属于元旦连休，不再按周末规则
     await openMenu(page, '1月2日');
-    assert.equal(await text(page, '.day-menu-header'), '1月2日 周六 · 休息日');
+    assert.equal(await text(page, '.day-menu-header'), '1月2日 周六 · 法定假日（元旦）');
     assert.equal(await page.getByRole('menuitemradio').count(), 2);
     await page.keyboard.press('Escape');
     await openMenu(page, '1月1日');
-    assert.equal(await text(page, '.day-menu-header'), '1月1日 周五 · 法定假日（元旦）', 'R39: fixed-date statutory holiday');
+    assert.equal(await text(page, '.day-menu-header'), '1月1日 周五 · 法定假日（元旦）', '2027 内置表: 元旦连休的第一天');
     assert.equal(await page.getByRole('menuitemradio').count(), 2);
     await page.keyboard.press('Escape');
     await openMenu(page, '1月4日');
     assert.equal(await text(page, '.day-menu-header'), '1月4日 周一 · 工作日');
     assert.equal(await page.getByRole('menuitemradio').count(), 4);
+    await page.keyboard.press('Escape');
+    // 1/31（周日）是春节调休上班：这一天算工作日，菜单给 4 项
+    await openMenu(page, '1月31日');
+    assert.equal(await text(page, '.day-menu-header'), '1月31日 周日 · 调休上班（春节）');
+    assert.equal(await page.getByRole('menuitemradio').count(), 4);
+    assert.match(await menu(page).innerText(), /恢复为工作日/);
     assertMainland(await menu(page).innerText(), '2027 menu');
   }));
 
-test('R39: 2027 fixed-date holidays carry the 「法定日期（《放假办法》）」 source in tooltip and aria; unknown days do not', () =>
-  withPage('2027-01-04T10:00:00+08:00', async (page) => {
+test('R39: 2027 uses the built-in official table (「内置·官方通知」 source, 调休 included); 2028 falls back to 「法定日期（《放假办法》）」 and does not guess', async () => {
+  // 2027：内置表——放假与调休都算，来源写「内置·官方通知」
+  await withPage('2027-01-04T10:00:00+08:00', async (page) => {
     const desc = (label) => cell(page, label).evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent);
-    assert.equal(await desc('1月1日'), '1月1日 周五，农历冬月廿四，法定假日（元旦），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
-    assert.match(await desc('1月4日'), /工作日，来源：按默认规则，当日计薪 ¥340\.00/);
+    assert.equal(await desc('1月1日'), '1月1日 周五，农历冬月廿四，法定假日（元旦），来源：内置·官方通知，当日计薪 ¥0.00，点击修改');
+    assert.match(await desc('1月4日'), /工作日，来源：按默认规则，当日计薪 ¥323\.81/);
     assert.match(await desc('1月4日'), /1月4日 周一（今天），农历冬月廿七，工作日，/, 'lunar date is in the accessible description');
+    // 1/31（周日）调休上班：仍算工作日，但有节日名与来源
+    assert.equal(await desc('1月31日'), '1月31日 周日，农历腊月廿四，调休上班（春节），来源：内置·官方通知，当日计薪 ¥323.81，点击修改');
     await cell(page, '1月1日').hover();
     await page.clock.runFor(450);
-    // 2027-01 是 5 周月份：放得下时第 3 行是来源（短写，不带「来源：」）；农历行插在日期之后，
+    // 2027-01 是 5 周月份：放得下时多一行来源（短写，不带「来源：」）；农历行插在日期之后，
     // 放不下时先让出来源那一行、再整行藏农历 —— 日期 / 状态 / 计薪 必须始终在
     const r39 = splitLunar(await tipVisibleLines(page));
     assert.deepEqual([r39.base[0], r39.base[1], r39.base.at(-1)], ['1月1日 周五', '法定假日·元旦', '计薪 ¥0.00'], `lines: ${JSON.stringify(r39.base)}`);
-    assert.ok(r39.base.length === 3 || (r39.base.length === 4 && r39.base[2] === '《放假办法》'), `lines: ${JSON.stringify(r39.base)}`);
+    assert.ok(r39.base.length === 3 || (r39.base.length === 4 && r39.base[2] === '内置·官方通知'), `lines: ${JSON.stringify(r39.base)}`);
     if (r39.lunar !== undefined) {
       assert.equal(r39.lunar, '农历冬月廿四');
       assert.equal(r39.base.indexOf(r39.lunar), -1);
     }
-    // R40：2027-02-06（周六）是春节初一：法定假日，来源「法定日期」；补假不猜，2 月 9 日仍是普通工作日
+    await cell(page, '1月31日').hover();
+    await page.clock.runFor(450);
+    const makeup = splitLunar(await tipVisibleLines(page));
+    assert.deepEqual([makeup.base[0], makeup.base[1], makeup.base.at(-1)], ['1月31日 周日', '调休上班·春节', '计薪 ¥323.81'], `lines: ${JSON.stringify(makeup.base)}`);
+    assert.ok(makeup.base.length === 3 || (makeup.base.length === 4 && makeup.base[2] === '内置·官方通知'), `lines: ${JSON.stringify(makeup.base)}`);
+    if (makeup.lunar !== undefined) assert.equal(makeup.lunar, '农历腊月廿四');
+    // 春节：2/5–2/13 放假，2/14（周日）调休上班
     await page.getByRole('button', { name: /下月/ }).click();
-    assert.equal(await desc('2月6日'), '2月6日 周六，农历正月初一，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
-    assert.match(await desc('2月9日'), /工作日，来源：按默认规则/);
-  }));
+    assert.equal(await desc('2月6日'), '2月6日 周六，农历正月初一，法定假日（春节），来源：内置·官方通知，当日计薪 ¥0.00，点击修改');
+    assert.equal(await desc('2月14日'), '2月14日 周日，农历正月初九，调休上班（春节），来源：内置·官方通知，当日计薪 ¥453.33，点击修改');
+    assert.match(await desc('2月15日'), /工作日，来源：按默认规则，当日计薪 ¥453\.33/);
+  });
+  // 2028：没有年度表——只标《放假办法》的法定日期，补假 / 调休不猜
+  await withPage('2028-01-04T10:00:00+08:00', async (page) => {
+    const desc = (label) => cell(page, label).evaluate((b) => document.getElementById(b.getAttribute('aria-describedby')).textContent);
+    assert.equal(await desc('1月1日'), '1月1日 周六，农历腊月初五，法定假日（元旦），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    assert.match(await desc('1月4日'), /工作日，来源：按默认规则，当日计薪 ¥400\.00/);
+    assert.match(await desc('1月4日'), /1月4日 周二（今天），农历腊月初八，工作日，/, 'lunar date is in the accessible description');
+    assert.equal(await desc('1月25日'), '1月25日 周二，农历腊月廿九，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    assert.equal(await desc('1月28日'), '1月28日 周五，农历正月初三，法定假日（春节），来源：法定日期（《放假办法》），当日计薪 ¥0.00，点击修改');
+    // 1/24 与 1/31 都不猜：普通工作日
+    assert.match(await desc('1月24日'), /工作日，来源：按默认规则，当日计薪 ¥400\.00/, 'no invented compensation day');
+    assert.match(await desc('1月31日'), /工作日，来源：按默认规则/, 'no invented extended holiday');
+    await cell(page, '1月1日').hover();
+    await page.clock.runFor(450);
+    // 2028-01 是 6 周月份：只保证日期 / 状态 / 计薪 三行，来源与农历行可能被让出
+    const r39 = splitLunar(await tipVisibleLines(page));
+    assert.deepEqual([r39.base[0], r39.base[1], r39.base.at(-1)], ['1月1日 周六', '法定假日·元旦', '计薪 ¥0.00'], `lines: ${JSON.stringify(r39.base)}`);
+    assert.ok(r39.base.length === 3 || (r39.base.length === 4 && r39.base[2] === '《放假办法》'), `lines: ${JSON.stringify(r39.base)}`);
+    if (r39.lunar !== undefined) assert.equal(r39.lunar, '农历腊月初五');
+  });
+});
 
 test('rollover inside the same month refreshes an open menu in place', () =>
   withPage('2026-11-03T23:59:58+08:00', async (page) => {
