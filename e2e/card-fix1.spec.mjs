@@ -150,8 +150,9 @@ test('今日满勤可得 is hidden on 休息日 / 法定假日 / 无薪假 and s
   }
 });
 
-test('F1: no-table years — the card says exactly what is marked (2025 fixed, 2027 lunar)', async () => {
-  for (const [iso, want] of [['2025-11-04T10:00:00+08:00', '2025 年只标了元旦、劳动节、国庆'], ['2027-01-04T10:00:00+08:00', '2027 年只标了法定假日，补假和调休未标出']]) {
+test('F1: no-table years — the card says exactly what is marked (2025 fixed, 2028 lunar)', async () => {
+  // 2027 已有内置表（gov.cn 2026-11 通知），缺表年的 lunar 用例改用第一个无表的 2028。
+  for (const [iso, want] of [['2025-11-04T10:00:00+08:00', '2025 年只标了元旦、劳动节、国庆'], ['2028-01-04T10:00:00+08:00', '2028 年只标了法定假日，补假和调休未标出']]) {
     const { context, page } = await openAt(browser, server.url, iso, { viewport: { width: 1280, height: 585 }, init: seed({}) });
     try {
       assert.equal((await page.locator('#status-card .card-year').textContent()).trim(), want);

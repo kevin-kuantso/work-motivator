@@ -265,7 +265,7 @@ test('tabs: tablist / tab / tabpanel ARIA, roving tabindex, ←/→/Home/End, hi
     assert.equal(await page.locator('.day-menu').isVisible(), false);
   }));
 
-test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month end), preventDefault; ignored elsewhere', () =>
+test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month end), preventDefault; ignored elsewhere — 2026-11 → 2027 内置年 → 2028 无内置表年（闰年 2/29）', () =>
   withPage(T1412, async (page) => {
     await page.evaluate(() => {
       window.__pg = [];
@@ -288,16 +288,33 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     await page.keyboard.press('PageDown');
     assert.equal(await title(), '2027 年 2 月');
     assert.equal((await focused(page)).key, '2027-02-28');
+    // 继续走进「无内置表」的年份（2028 起只有法定日期回退）：同号日期跨月照常，月底夹取仍按真实天数
+    for (let i = 0; i < 10; i++) await page.keyboard.press('PageDown'); // 2027-03-28 … 2027-12-28
+    assert.equal(await title(), '2027 年 12 月');
+    assert.equal((await focused(page)).key, '2027-12-28');
+    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+    assert.equal((await focused(page)).key, '2027-12-31');
+    await page.keyboard.press('PageDown');
+    assert.equal(await title(), '2028 年 1 月');
+    assert.equal((await focused(page)).key, '2028-01-31');
+    await page.keyboard.press('PageDown');
+    assert.equal(await title(), '2028 年 2 月');
+    assert.equal((await focused(page)).key, '2028-02-29', '1/31 → 2/29 (clamped to the leap-year month end)');
+    await page.keyboard.press('PageUp');
+    assert.equal(await title(), '2028 年 1 月');
+    assert.equal((await focused(page)).key, '2028-01-29', '29 日存在，不夹取');
+    await page.keyboard.press('PageDown');
+    assert.equal((await focused(page)).key, '2028-02-29');
     assert.equal(await page.evaluate(() => document.querySelectorAll('.cal-grid button[tabindex="0"]').length), 1);
-    assert.equal(await page.locator('.cal-grid button[tabindex="0"]').getAttribute('data-key'), '2027-02-28', 'tab stop follows focus');
+    assert.equal(await page.locator('.cal-grid button[tabindex="0"]').getAttribute('data-key'), '2028-02-29', 'tab stop follows focus');
     assert.ok((await page.evaluate(() => window.__pg)).every(Boolean), 'all handled PgUp/PgDn were preventDefault-ed');
     // 修饰键：不处理
     await page.keyboard.press('Shift+PageUp');
-    assert.equal(await title(), '2027 年 2 月');
+    assert.equal(await title(), '2028 年 2 月');
     // 焦点不在日期格：不处理
     await page.locator('.cal-next').focus();
     await page.keyboard.press('PageDown');
-    assert.equal(await title(), '2027 年 2 月');
+    assert.equal(await title(), '2028 年 2 月');
     assert.equal((await page.evaluate(() => window.__pg)).at(-1), false);
     // R29：工具列不放可见的键盘提示；按键只写在「上月」「下月」的悬停提示里（无障碍名称仍是按钮文字）
     assert.equal(await page.locator('.cal-toolbar kbd, .cal-keys').count(), 0, 'no visible key hint in the toolbar');
@@ -422,7 +439,7 @@ test('「回到今天」 is emphasised with the target month when viewing anothe
     assert.equal(await text(page, '.cal-today'), '回到今天');
   }));
 
-test('summary row: workdays and daily wage live; missing-table tag in the summary row (2027 clock)', async () => {
+test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2028 fallback keeps the missing-table tag in the summary row', async () => {
   await withPage(T1412, async (page) => {
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
     assert.equal(await page.locator('.cal-year-tag').isVisible(), false);
@@ -432,39 +449,97 @@ test('summary row: workdays and daily wage live; missing-table tag in the summar
     await page.getByRole('button', { name: /上月/ }).click();
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
   });
+  // 2027 是内置表（国务院通知）：照实算调休，摘要行不再挂「未内置」标签
   await withPage('2027-01-04T10:00:00+08:00', async (page) => {
-    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 20 天 · 日薪 ¥340.00');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年只标了法定假日，补假和调休未标出');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
+    assert.equal(await page.locator('.cal-year-tag').isVisible(), false, 'built-in year carries no missing-table tag');
+    assert.equal(await page.locator('.cal-toolbar .cal-year-tag').count(), 0, 'not in the toolbar');
+    assert.match(await cell(page, '1月31日').getAttribute('aria-label'), /^1月31日 周日，调休上班（春节）/);
+    const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(h <= 30, `summary row stays one line (${h})`);
+    // 2027-02 是唯一的 4 周月份：内置表把春节连休 2/5–2/13 与 2/14 调休都算进去
+    await page.setViewportSize({ width: 1280, height: 585 });
+    await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 15 天 · 日薪 ¥453.33');
+    assert.equal(await page.locator('.cal-year-tag').isVisible(), false);
+    const m4 = await measure(page);
+    console.log(`MEASURE ${JSON.stringify({ case: '2027-02 built-in', tab: 'calendar', ...m4 })}`);
+    assertFits(m4, '2027-02 at 1280x585');
+    assert.equal(m4.weeks, 4);
+    // 2027-05 是 6 周月份：没有标签时 1280×585 也不滚动
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2027 年 5 月');
+    const m = await measure(page);
+    console.log(`MEASURE ${JSON.stringify({ case: '2027-05', tab: 'calendar', ...m })}`);
+    assertCalendarFits(m, '2027-05 at 1280x585');
+  });
+  // 2028 没有年度表：只有法定日期回退，摘要行带标签；2028-01 本身是 6 周月份
+  await withPage('2028-01-04T10:00:00+08:00', async (page) => {
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 17 天 · 日薪 ¥400.00');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出');
+    assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     assert.equal(await page.locator('.cal-toolbar .cal-year-tag').count(), 0, 'not in the toolbar');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
-    // 2027-05 是 6 周月份：带标签时 1280×585 仍不滚动
     await page.setViewportSize({ width: 1280, height: 585 });
-    for (let i = 0; i < 4; i++) await page.getByRole('button', { name: /下月/ }).click();
-    assert.equal(await text(page, '.cal-title'), '2027 年 5 月');
-    const m = await measure(page);
-    console.log(`MEASURE ${JSON.stringify({ case: '2027-05 tag', tab: 'calendar', ...m })}`);
-    assertCalendarFits(m, '2027-05 at 1280x585');
+    const m6 = await measure(page);
+    console.log(`MEASURE ${JSON.stringify({ case: '2028-01 tag', tab: 'calendar', ...m6 })}`);
+    assertCalendarFits(m6, '2028-01 at 1280x585');
+    assert.equal(m6.weeks, 6);
+    // 2028-07 也是 6 周月份：标签在时仍不滚动
+    for (let i = 0; i < 6; i++) await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2028 年 7 月');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
+    const m7 = await measure(page);
+    console.log(`MEASURE ${JSON.stringify({ case: '2028-07 tag', tab: 'calendar', ...m7 })}`);
+    assertCalendarFits(m7, '2028-07 at 1280x585');
+    assert.equal(m7.weeks, 6);
   });
 });
 
-// R40：2027 年 2 月（无表）：春节 2/5–2/8 标旗子 + 「春节」，周末也标；补假 / 调休不猜
-test('2027-02 (no table): 春节 2/5-2/8 marked, summary 18 days, tag text, fits at 1280x585', () =>
-  withPage('2027-02-04T10:00:00+08:00', async (page) => {
+// R40：2028 年 1 月（无表）：春节 1/25–1/28 标旗子 + 「春节」，周末也标；补假 / 调休不猜（1/24、1/31 照常上班）
+test('2028-01 (no table): 春节 1/25-1/28 marked, summary 17 days, tag text, 6 weeks fit at 1280x585', () =>
+  withPage('2028-01-04T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
-    assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
-    for (const [label, wd] of [['2月5日', '周五'], ['2月6日', '周六'], ['2月7日', '周日'], ['2月8日', '周一']]) {
+    assert.equal(await text(page, '.cal-title'), '2028 年 1 月');
+    for (const [label, wd] of [['1月25日', '周二'], ['1月26日', '周三'], ['1月27日', '周四'], ['1月28日', '周五']]) {
       assert.match(await cell(page, label).getAttribute('aria-label'), new RegExp(`^${label} ${wd}，法定假日（春节）`), label);
       assert.equal(await cell(page, label).locator('.day-label').textContent(), '春节', `${label} badge: flag + name only (Task 18)`);
       assert.equal(await cell(page, label).locator('.day-label svg.icon-holiday').count(), 1, `${label} flag icon`);
     }
-    assert.match(await cell(page, '2月9日').getAttribute('aria-label'), /^2月9日 周二，工作日/, 'no invented compensation day');
-    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
-    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2027 年只标了法定假日，补假和调休未标出');
-    assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2027 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
+    assert.match(await cell(page, '1月24日').getAttribute('aria-label'), /^1月24日 周一，工作日/, 'no invented compensation day');
+    assert.match(await cell(page, '1月31日').getAttribute('aria-label'), /^1月31日 周一，工作日/, 'no invented extended holiday');
+    // 元旦由《放假办法》的固定日期给出
+    assert.match(await cell(page, '1月1日').getAttribute('aria-label'), /^1月1日 周六，法定假日（元旦）/);
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 17 天 · 日薪 ¥400.00');
+    assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出');
+    assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     assert.ok((await text(page, '.cal-summary .cal-year-tag')).length <= 24, 'tag <= 24 chars (Task 19 L11/F1: truthful plain-language wording is longer; row still one line below)');
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
+    const m = await measure(page);
+    console.log(`MEASURE ${JSON.stringify({ case: '2028-01 春节', tab: 'calendar', ...m })}`);
+    assertCalendarFits(m, '2028-01 at 1280x585'); // 2028-01 是 6 周月份
+    await shot(page, 'task-16-jan2028.png');
+  }));
+
+// 2027 已是内置表：春节连休 2/5–2/13 与 2/14 调休上班都照国务院通知标出
+test('2027-02 (built-in): 春节 2/5-2/13 marked, 2/14 调休上班, summary 15 days, no tag, 4 weeks fit', () =>
+  withPage('2027-02-04T10:00:00+08:00', async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
+    for (const [label, wd] of [['2月5日', '周五'], ['2月6日', '周六'], ['2月7日', '周日'], ['2月8日', '周一'], ['2月13日', '周六']]) {
+      assert.match(await cell(page, label).getAttribute('aria-label'), new RegExp(`^${label} ${wd}，法定假日（春节）`), label);
+      assert.equal(await cell(page, label).locator('.day-label').textContent(), '春节', `${label} badge: flag + name only (Task 18)`);
+      assert.equal(await cell(page, label).locator('.day-label svg.icon-holiday').count(), 1, `${label} flag icon`);
+    }
+    // 2/14（周日）是调休上班：仍算工作日，「班」+ 节日名
+    assert.match(await cell(page, '2月14日').getAttribute('aria-label'), /^2月14日 周日，调休上班（春节）/);
+    assert.equal(await cell(page, '2月14日').locator('.day-tag').textContent(), '班');
+    assert.match(await cell(page, '2月15日').getAttribute('aria-label'), /^2月15日 周一，工作日/, 'the extended holiday ends on 2/13');
+    assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 15 天 · 日薪 ¥453.33');
+    assert.equal(await page.locator('.cal-year-tag').isVisible(), false, 'built-in year: no missing-table tag');
     const m = await measure(page);
     console.log(`MEASURE ${JSON.stringify({ case: '2027-02 春节', tab: 'calendar', ...m })}`);
     assertFits(m, '2027-02 at 1280x585'); // 2027-02 只有 4 周，不是 6 周月份
@@ -1044,25 +1119,62 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
     assert.equal((await pill(page)).check, false, 'no ✓ without a table');
   }));
 
-test('summary pill + tag: 2027-01 (fixed day) and 2027-02 (lunar days) with the clock in 2026; 2036-01 (other no-table year)', async () => {
+test('summary pill + tag: 2027 (built-in 国务院 notice: 元旦 + 春节调休, 劳动节, 中秋 / 国庆) and 2028 (no table: only the statutory dates)', async () => {
+  // 2027 是内置表：照实说放假与调休，不再挂缺表标签
   await withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
     const jan = await pill(page);
-    assert.equal(jan.text, '元旦 1/1 放假');
-    assert.equal(jan.title, '元旦 1/1 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
-    assert.equal(jan.check, false);
-    assert.equal(await tagText(page), '2027 年只标了法定假日，补假和调休未标出');
+    assert.equal(jan.text, '元旦 1/1–1/3 放假；春节 1/31 调休上班');
+    assert.equal(jan.title, '元旦 1/1–1/3 放假；春节 1/31 调休上班 · 依据 2027 年国务院放假通知');
+    assert.deepEqual([jan.tone, jan.flag, jan.border, jan.cut], ['holiday', true, 'solid', false]);
+    assert.equal(await tagText(page), null, 'built-in year: no qualifier tag');
     assert.ok(await summaryOneLine(page) <= 30);
     await page.getByRole('button', { name: /下月/ }).click();
-    assert.equal((await pill(page)).text, '春节 2/5–2/8 放假');
-    assert.equal(await tagText(page), '2027 年只标了法定假日，补假和调休未标出');
+    const feb = await pill(page);
+    assert.equal(feb.text, '春节 2/5–2/13 放假，2/14 调休上班');
+    assert.equal(feb.title, '春节 2/5–2/13 放假，2/14 调休上班 · 依据 2027 年国务院放假通知');
+    assert.equal(await tagText(page), null);
     await page.getByRole('button', { name: /下月/ }).click();
     const mar = await pill(page);
-    assert.deepEqual([mar.text, mar.tone, mar.check, mar.border], ['本月没有已标出的法定假日', 'unknown', false, 'dashed']);
-    assert.doesNotMatch(mar.text + mar.title, /国务院|依据/);
+    assert.deepEqual([mar.text, mar.tone, mar.check, mar.border], ['本月没有法定假日', 'none', true, 'none'], 'a table month without holidays is a known 「none」, not 「unknown」');
+    assert.equal(mar.title, '本月没有法定假日 · 依据 2027 年国务院放假通知');
+    // 2027-05（6 周）与 2027-10：劳动节 / 国庆的长假 + 调休都在内置表里
+    await page.getByRole('button', { name: /下月/ }).click();
+    await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2027 年 5 月');
+    const may = await pill(page);
+    assert.equal(may.text, '劳动节 5/1–5/5 放假，5/8 调休上班');
+    assert.equal(may.cut, false, 'fits at 1280');
+    for (let i = 0; i < 5; i++) await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2027 年 10 月');
+    assert.equal((await pill(page)).text, '国庆 10/1–10/7 放假，10/9 调休上班');
+    assert.equal(await tagText(page), null);
+  });
+  // 2028 没有年度表：只标《放假办法》的法定日期，标签与胶囊都说清楚补假 / 调休未标出
+  await withPage('2028-01-04T10:00:00+08:00', async (page) => {
+    await page.setViewportSize({ width: 1280, height: 585 });
+    const jan = await pill(page);
+    assert.equal(jan.text, '元旦 1/1 放假；春节 1/25–1/28 放假');
+    assert.equal(jan.title, '元旦 1/1 放假；春节 1/25–1/28 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
+    assert.equal(jan.check, false, 'no ✓ without a table');
+    assert.equal(await tagText(page), '2028 年只标了法定假日，补假和调休未标出');
+    assert.ok(await summaryOneLine(page) <= 30);
+    await page.getByRole('button', { name: /下月/ }).click();
+    const feb = await pill(page);
+    assert.deepEqual([feb.text, feb.tone, feb.check, feb.border], ['本月没有已标出的法定假日', 'unknown', false, 'dashed']);
+    assert.doesNotMatch(feb.text + feb.title, /国务院|依据/);
+    assert.equal(await tagText(page), '2028 年只标了法定假日，补假和调休未标出');
+    // 2028-10（6 周）只标国庆的前三天
+    for (let i = 0; i < 8; i++) await page.getByRole('button', { name: /下月/ }).click();
+    assert.equal(await text(page, '.cal-title'), '2028 年 10 月');
+    const oct = await pill(page);
+    assert.equal(oct.text, '国庆 10/1–10/3 放假');
+    assert.equal(oct.title, '国庆 10/1–10/3 放假 · 按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
+    assert.equal(oct.cut, false, 'fits at 1280');
+    assert.equal(await tagText(page), '2028 年只标了法定假日，补假和调休未标出');
   });
   await withPage('2036-01-07T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
@@ -1077,28 +1189,30 @@ test('summary pill + tag: 2027-01 (fixed day) and 2027-02 (lunar days) with the 
 });
 
 // 联网 / 导入的年份：依据写数据的真实来源（自己开页面：联网成功时开页只会请求第一个来源，与 withPage 的「全部被中止」前提不同）
-const FILE2027 = JSON.stringify({
-  year: 2027, papers: ['https://www.gov.cn/zhengce/test-2027.htm'],
-  days: [{ name: '元旦', date: '2027-01-01', isOffDay: true }, { name: '元旦', date: '2027-01-02', isOffDay: true }, { name: '元旦', date: '2027-01-03', isOffDay: true }],
+// 2027 已内置，不会自动检查；2028 起才是「靠联网 / 导入拿到年度表」的年份
+const FILE2028 = JSON.stringify({
+  year: 2028, papers: ['https://www.gov.cn/zhengce/test-2028.htm'],
+  days: [{ name: '元旦', date: '2028-01-01', isOffDay: true }, { name: '元旦', date: '2028-01-02', isOffDay: true }, { name: '元旦', date: '2028-01-03', isOffDay: true }],
 }); // 虚构的测试数据，只为满足校验规则
 test('summary pill for an online-table year and for an imported-file year: 「依据联网取得的…」 / 「依据导入的…」', async () => {
   for (const mode of ['online', 'file']) {
-    const o = await openAt(browser, server.url, '2026-11-04T09:00:00+08:00', {
+    const o = await openAt(browser, server.url, '2027-11-04T09:00:00+08:00', {
       viewport: { width: 1280, height: 585 },
       beforeGoto: (page) => (mode === 'online'
-        ? page.route(/cdn\.jsdelivr\.net\/.*\/2027\.json/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FILE2027, headers: { 'access-control-allow-origin': '*' } }))
+        ? page.route(/cdn\.jsdelivr\.net\/.*\/2028\.json/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FILE2028, headers: { 'access-control-allow-origin': '*' } }))
         : Promise.resolve()),
     });
     try {
       const p = o.page;
       if (mode === 'file') {
         await tab(p, '基本设置').click();
-        await p.locator('#holiday-file').setInputFiles({ name: '2027.json', mimeType: 'application/json', buffer: Buffer.from(FILE2027) });
+        await p.locator('#holiday-file').setInputFiles({ name: '2028.json', mimeType: 'application/json', buffer: Buffer.from(FILE2028) });
         await p.locator('#holiday-result[data-tone="success"]').waitFor();
         await tab(p, '月历').click();
       }
       await p.getByRole('button', { name: /下月/ }).click();
       await p.getByRole('button', { name: /下月/ }).click();
+      assert.equal(await text(p, '.cal-title'), '2028 年 1 月');
       assert.equal((await pill(p)).text, '元旦 1/1–1/3 放假');
       assert.equal(await tagText(p), null, 'table present: no tag');
       await p.getByRole('button', { name: /下月/ }).click();
@@ -1106,11 +1220,11 @@ test('summary pill for an online-table year and for an imported-file year: 「�
       assert.equal(feb.text, '本月没有法定假日', 'M10: the basis is only in title');
       assert.equal(
         feb.title,
-        mode === 'online' ? '本月没有法定假日 · 依据联网取得的 2027 年放假数据' : '本月没有法定假日 · 依据导入的 2027 年假期表',
+        mode === 'online' ? '本月没有法定假日 · 依据联网取得的 2028 年放假数据' : '本月没有法定假日 · 依据导入的 2028 年假期表',
         'the basis moved to title');
       assert.equal(feb.border, 'none', 'M10: no dashed box for a month that really has no holiday');
       assert.equal(feb.check, true);
-      assert.doesNotMatch(feb.text, /国务院/);
+      assert.doesNotMatch(feb.text + feb.title, /国务院/);
       assert.deepEqual(o.errors.map(String), []);
       assert.deepEqual(o.consoleErrors, []);
     } finally {
@@ -1217,7 +1331,7 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     assert.equal(await text(page, '.section-backup .warn-note'), '备份文件含月薪，请妥善保管');
     assert.equal(await text(page, '.adv-sub'), '一般不用改');
     assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
-    assert.deepEqual(await page.locator('#holiday-status .chip').allTextContents(), ['2026 年 · 内置', '2027 年 · 未内置']);
+    assert.deepEqual(await page.locator('#holiday-status .chip').allTextContents(), ['2026 年 · 内置', '2027 年 · 内置']);
     // 格式示例：真实 2026 节选、GitHub 地址是文字不是链接
     await page.locator('#btn-example').click();
     assert.equal(await text(page, '#btn-example'), '▾收起导入文件的格式示例');
@@ -1333,7 +1447,7 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
     await page.getByRole('button', { name: /下月/ }).click();
     check(await grab(page, ['.cal-summary .cal-year-tag', '.cal-note[data-tone="holiday"] .cal-note-text']));
     await tab(page, '基本设置').click();
-    check(await grab(page, ['.chip-ok', '.chip-miss', '.chip-note', '.act-hint', '.scard-desc', '.scard-title', '.row-label', '.row-hint', '.para', '.para b', '.warn-note', '.disclosure', '.adv-sub', '.adv-summary', '.unit', '.switch-state']));
+    check(await grab(page, ['.chip-ok', '.act-hint', '.scard-desc', '.scard-title', '.row-label', '.row-hint', '.para', '.para b', '.warn-note', '.disclosure', '.adv-sub', '.adv-summary', '.unit', '.switch-state']));
     await page.locator('#btn-example').click();
     await page.locator('#adv-toggle').click();
     check(await grab(page, ['.example-head span', '.code', '.ex-line', '.mono', '#hint-custom-url', '#explain-custom-url']));
@@ -1341,6 +1455,10 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
     await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
     check(await grab(page, ['#float-keep', '.pip-placeholder-title', '.pip-placeholder-note', '#btn-float']));
   }, { init: FLOAT_STUB });
+  await withPage('2027-11-03T14:12:00+08:00', async (page) => {
+    await tab(page, '基本设置').click();
+    check(await grab(page, ['.chip-miss', '.chip-note']));
+  });
   await withPage(T1412, async (page) => {
     check(await grab(page, ['#float-note', '#btn-float']));
   }, { init: NO_PIP });
@@ -1495,7 +1613,7 @@ test('B minors: chip group is announced once (aria-label only, no duplicate text
       aria: e.getAttribute('aria-label'), sr: e.querySelector('.visually-hidden')?.textContent ?? null,
       exposed: [...e.childNodes].filter((n) => n.nodeType === 1 && n.getAttribute('aria-hidden') !== 'true').map((n) => n.className),
     }));
-    assert.equal(st.aria, '假期数据状态：2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03');
+    assert.equal(st.aria, '假期数据状态：2026 年 · 内置 · 2027 年 · 内置 · 上次检查 11/03');
     // fix round 2：只保留一份（分组名称）；可见的胶囊对读屏隐藏，没有重复的隐藏文字
     assert.equal(st.sr, null, 'no visually-hidden duplicate of the group name');
     assert.deepEqual(st.exposed, [], 'chips / last-check are aria-hidden: the sentence is announced once');
@@ -1516,19 +1634,19 @@ test('B minors: chip group is announced once (aria-label only, no duplicate text
     assert.ok(seq.includes(''), 'cleared between announcements');
     const m = await measure(page);
     assert.equal(m.scrollH <= m.ih, true);
-  }));
+  }, { init: `localStorage.setItem('work-motivator-v1-holidays', JSON.stringify({ version: 1, years: {}, lastCheck: Date.parse('2026-11-03T14:12:00+08:00') }));` }));
 
 // ---- Task 14 fix round 1 · Block C（R49 / R50）----
 
 // R50：提示的每一行都不被省略号截断（scrollWidth ≤ clientWidth）：2026 年全部 7 个节日的放假 / 调休、今天、带薪 / 无薪 / 手动标记，
-// 四种视窗；5 周月份用内置 2026 表，6 周月份（2027-05）用导入的测试表（7 个节日名都放进去，虚构数据只为测宽度）
-const WIDTH2027 = JSON.stringify({
-  year: 2027, papers: ['https://www.gov.cn/zhengce/test-width-2027.htm'],
+// 四种视窗；5 周月份用内置 2026 表，6 周月份（2027-05 内置、2028-07 用导入的测试表）都覆盖
+const WIDTH2028 = JSON.stringify({
+  year: 2028, papers: ['https://www.gov.cn/zhengce/test-width-2028.htm'],
   days: [
-    ...['元旦', '春节', '清明', '劳动节', '端午', '中秋', '国庆'].map((n, i) => ({ name: n, date: `2027-05-${String(3 + i).padStart(2, '0')}`, isOffDay: true })),
-    ...[['元旦', '01'], ['春节', '02'], ['清明', '15'], ['劳动节', '16'], ['端午', '22'], ['中秋', '23'], ['国庆', '29']].map(([n, d]) => ({ name: n, date: `2027-05-${d}`, isOffDay: false })),
+    ...['元旦', '春节', '清明', '劳动节', '端午', '中秋', '国庆'].map((n, i) => ({ name: n, date: `2028-07-${String(3 + i).padStart(2, '0')}`, isOffDay: true })),
+    ...[['元旦', '01'], ['春节', '02'], ['清明', '15'], ['劳动节', '16'], ['端午', '22'], ['中秋', '23'], ['国庆', '29']].map(([n, d]) => ({ name: n, date: `2028-07-${d}`, isOffDay: false })),
   ],
-}); // 2027-05-01 是周六；所有调休日都在周六 / 周日
+}); // 2028-07-01 是周六；所有调休日都在周六 / 周日
 async function tipLines(page, key) {
   const c = page.locator(`.cal-grid button[data-key="${key}"]`);
   await c.hover();
@@ -1559,10 +1677,10 @@ async function tipLines(page, key) {
   await page.mouse.move(0, 0);
   return r;
 }
-test('R50: no tooltip line is truncated — every 2026 festival (off + make-up), today, leave / manual states; 5-week and 6-week months; four viewports', () =>
+test('R50: no tooltip line is truncated — every 2026 festival (off + make-up), today, leave / manual states; 5-week and 6-week months (built-in 2027-05, imported 2028-07); four viewports', () =>
   withPage(T1412, async (page) => {
     await tab(page, '基本设置').click();
-    await page.locator('#holiday-file').setInputFiles({ name: '2027.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2027) });
+    await page.locator('#holiday-file').setInputFiles({ name: '2028.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2028) });
     await page.locator('#holiday-result[data-tone="success"]').waitFor();
     await tab(page, '月历').click();
     // 手动标记：11/5 带薪假、11/6 无薪假、11/7（周六）改为上班、11/9 改为休息
@@ -1577,7 +1695,8 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     const months = [
       ...builtin,
       ['2026-11', ['2026-11-03', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-09', '2026-11-18']], // 6 周：今天 / 带薪 / 无薪 / 手动上班 / 手动休息 / 工作日
-      ['2027-05', ['2027-05-03', '2027-05-04', '2027-05-05', '2027-05-06', '2027-05-07', '2027-05-08', '2027-05-09', '2027-05-01', '2027-05-02', '2027-05-15', '2027-05-16', '2027-05-22', '2027-05-23', '2027-05-29']], // 6 周：7 个节日名的放假与调休
+      ['2027-05', ['2027-05-01', '2027-05-03', '2027-05-05', '2027-05-08']], // 6 周（内置表）：劳动节连休 + 5/8 调休上班，来源是长文案「内置·官方通知」
+      ['2028-07', ['2028-07-03', '2028-07-04', '2028-07-05', '2028-07-06', '2028-07-07', '2028-07-08', '2028-07-09', '2028-07-01', '2028-07-02', '2028-07-15', '2028-07-16', '2028-07-22', '2028-07-23', '2028-07-29']], // 6 周：7 个节日名的放假与调休
     ];
     const go = async (ym) => {
       const [y, m] = ym.split('-').map(Number);
@@ -1692,15 +1811,15 @@ test('Task 18: tooltip text contrast ≥ 4.5:1 on its white card for every varia
   }));
 
 // Task 18：格子标签——法定假日只有旗子 + 节日名（没有「假」字）；调休上班保留「班」+ 节日名；任何格子的标签都不被截断（≥ 1000px 宽的各种视窗）；
-// 无障碍名称不变（仍写「法定假日（春节）」）。2026-01…2027-12 每一格；2027-05 用导入的虚构表把 7 个节日名各与「班」配一遍
-test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「班」 kept; no label truncated for 2026-01…2027-12 at 8 viewports; accessible names intact', () =>
+// 无障碍名称不变（仍写「法定假日（春节）」）。2026-01…2028-12 每一格：2026 / 2027 用内置表，2028-07 用导入的虚构表把 7 个节日名各与「班」配一遍
+test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「班」 kept; no label truncated for 2026-01…2028-12 at 8 viewports; accessible names intact', () =>
   withPage(T1412, async (page) => {
     await tab(page, '基本设置').click();
-    await page.locator('#holiday-file').setInputFiles({ name: '2027.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2027) });
+    await page.locator('#holiday-file').setInputFiles({ name: '2028.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2028) });
     await page.locator('#holiday-result[data-tone="success"]').waitFor();
     await tab(page, '月历').click();
     const months = [];
-    for (const y of [2026, 2027]) for (let m = 1; m <= 12; m++) months.push([y, m]);
+    for (const y of [2026, 2027, 2028]) for (let m = 1; m <= 12; m++) months.push([y, m]);
     const go = async (y, m) => {
       await page.locator('.cal-today').click();
       const diff = (y - 2026) * 12 + (m - 11);
@@ -2128,11 +2247,11 @@ test('A round 2: while floating, the placeholder follows the live card when its 
 // ---- Task 14 fix round 3 · C ----
 
 // 每个无表年份（过去或将来）摘要行都有看得见的简短标签；胶囊与标签都不被截断（1000×700 + 四种视窗）
-test('C round 3: every no-table year (2024 / 2025 / 2027 / 2036) shows a visible qualifier tag in the summary row; nothing truncated at 1000×700 and the four viewports', () =>
+test('C round 3: every no-table year (2024 / 2025 / 2028 / 2036) shows a visible qualifier tag in the summary row; nothing truncated at 1000×700 and the four viewports', () =>
   withPage(T1412, async (page) => {
     const cases = [
       ['2025-10', '2025 年只标了元旦、劳动节、国庆'], ['2025-11', '2025 年只标了元旦、劳动节、国庆'],
-      ['2027-05', '2027 年只标了法定假日，补假和调休未标出'], ['2036-10', '2036 年只标了元旦、劳动节、国庆'], ['2024-05', '2024 年未标法定假日'],
+      ['2028-10', '2028 年只标了法定假日，补假和调休未标出'], ['2036-10', '2036 年只标了元旦、劳动节、国庆'], ['2024-05', '2024 年未标法定假日'],
     ];
     const rows = [];
     for (const [w, ht] of [[1000, 700], ...VIEWPORTS]) {

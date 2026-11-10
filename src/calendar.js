@@ -10,7 +10,7 @@ export function dayInfo(date, cfg, marks, tables = HOLIDAYS_CN) {
   const key = keyOf(date);
   const table = tables[date.getFullYear()];
   const tableMissing = !table;
-  // R39 / R40：无表的 2025 年起，标 6 个固定日期的法定假日；2027–2035 另加春节 / 清明 / 端午 / 中秋
+  // R39 / R40：无表的 2025 年起，标 6 个固定日期的法定假日；2028–2035 另加春节 / 清明 / 端午 / 中秋
   // （内置日期表，见 statutory-dates.js）。同一天两者重合时固定日期的名称优先。补假 / 调休 / 延长日待年度通知，不猜。
   let fixedName = null;
   if (!table && date.getFullYear() >= STATUTORY_FIXED_FROM_YEAR) {

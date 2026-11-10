@@ -35,12 +35,22 @@ test('dayOptions: a marked day keeps the options of its DEFAULT type, current on
   assert.deepEqual(ids(dayOptions(plain(at(11, 3)), 'rest')), ['default', 'rest', 'paidLeave', 'unpaidLeave']);
 });
 
+const NO_2027 = { 2026: HOLIDAYS_CN[2026] }; // 2027 已内置；无表回退用显式注入的表集合覆盖
+
 test('dayOptions: 2027 without a table falls back to the plain weekend rule', () => {
-  const tables = HOLIDAYS_CN;
+  const tables = NO_2027;
   assert.equal(tables[2027], undefined);
-  assert.deepEqual(ids(dayOptions(plain(at(1, 1, 2027)))), ['default', 'work'], '2027-01-01 is a statutory rest day (R39)');
-  assert.deepEqual(ids(dayOptions(plain(at(1, 4, 2027)))), ['default', 'rest', 'paidLeave', 'unpaidLeave']);
-  assert.deepEqual(ids(dayOptions(plain(at(1, 2, 2027)))), ['default', 'work']);
+  assert.deepEqual(ids(dayOptions(plain(at(1, 1, 2027), cfg, tables))), ['default', 'work'], '2027-01-01 is a statutory rest day (R39)');
+  assert.deepEqual(ids(dayOptions(plain(at(1, 4, 2027), cfg, tables))), ['default', 'rest', 'paidLeave', 'unpaidLeave']);
+  assert.deepEqual(ids(dayOptions(plain(at(1, 2, 2027), cfg, tables))), ['default', 'work']);
+});
+
+test('dayOptions: 2027 with the built-in table (元旦 1/1–1/3, 春节 调休 2/14)', () => {
+  assert.deepEqual(ids(dayOptions(plain(at(1, 1, 2027)))), ['default', 'work'], 'holiday → rest default');
+  assert.deepEqual(ids(dayOptions(plain(at(1, 4, 2027)))), ['default', 'rest', 'paidLeave', 'unpaidLeave'], 'after 元旦 → work');
+  assert.deepEqual(ids(dayOptions(plain(at(2, 9, 2027)))), ['default', 'work'], '春节 span');
+  assert.deepEqual(ids(dayOptions(plain(at(2, 14, 2027)))), ['default', 'rest', 'paidLeave', 'unpaidLeave'], '调休上班 → work default');
+  assert.equal(menuModel(at(2, 14, 2027), cfg, {}, HOLIDAYS_CN).header, '2月14日 周日 · 调休上班（春节）');
 });
 
 test('applyOption maps option ids to marks exactly and never mutates', () => {
@@ -181,16 +191,23 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(tip(at(1, 1, 2027), {}, {}).sourceLabel, '《放假办法》');
   assert.equal(tip(at(1, 1, 2027), {}, online).status, '法定假日（元旦）');
   assert.equal(tip(at(1, 9, 2027), {}, online).status, '调休上班（元旦）');
-  assert.equal(tip(at(1, 4, 2027)).source, '来源：按默认规则', 'no table, weekday → default rule');
-  const fixed = tip(at(1, 1, 2027));
+  assert.equal(tip(at(1, 4, 2027), {}, NO_2027).source, '来源：按默认规则', 'no table, weekday → default rule');
+  const fixed = tip(at(1, 1, 2027), {}, NO_2027);
   assert.equal(fixed.source, '来源：法定日期（《放假办法》）');
   assert.equal(fixed.status, '法定假日（元旦）');
   assert.equal(fixed.pay, '当日计薪 ¥0.00');
   assert.match(tooltipText(fixed), /来源：法定日期（《放假办法》）/);
   assert.equal(tip(at(1, 1, 2027), { '2027-01-01': 'work' }).source, '来源：手动标记', 'user mark wins');
-  assert.equal(tip(at(1, 2, 2027)).source, '来源：按周末规则', 'no table, Saturday → weekend rule');
+  assert.equal(tip(at(1, 2, 2027), {}, NO_2027).source, '来源：按周末规则', 'no table, Saturday → weekend rule');
   assert.equal(tip(at(11, 7), {}, HOLIDAYS_CN, { ...cfg, weekends: true }).source, '来源：按默认规则', 'weekend counted as workday');
-  assert.equal(tip(at(1, 4, 2027)).status, '工作日');
+  assert.equal(tip(at(1, 4, 2027), {}, NO_2027).status, '工作日');
+  // 内置 2027 表：来源写内置·官方通知，春节 span / 调休上班都来自表
+  const builtin = tip(at(2, 9, 2027));
+  assert.equal(builtin.status, '法定假日（春节）');
+  assert.equal(builtin.source, '来源：内置·官方通知');
+  assert.equal(tip(at(2, 14, 2027)).status, '调休上班（春节）');
+  assert.equal(tip(at(2, 14, 2027)).pay, '当日计薪 ¥453.33', 'Feb 2027: 6800 ÷ 15');
+  assert.equal(tip(at(1, 1, 2027)).source, '来源：内置·官方通知');
 });
 
 test('tooltipText joins the same lines used by the visual tooltip', () => {

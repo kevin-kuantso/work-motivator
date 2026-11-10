@@ -32,6 +32,8 @@ const file2027 = () => ({
   ],
 });
 const resp = (body, ok = true, status = 200) => ({ ok, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
+// 2027 自 P9 起内置：这些流程测试要的是「该年没有表」的路径，所以显式注入不含 2027 的表集合
+const NO_2027 = { 2026: HOLIDAYS_CN[2026] };
 
 // ---- URL ----
 test('buildSourceUrl replaces every {year}', () => {
@@ -151,21 +153,28 @@ const online2027 = { off: { '2027-01-01': '元旦' }, makeup: {}, source: 'onlin
 test('statusLine / statusModel: built-in / online / imported / missing chips; 上次检查 only when checked', () => {
   const nov = new Date(2026, 10, 20, 9);
   const file2027t = { ...online2027, source: 'file' };
-  assert.equal(statusLine(nov, HOLIDAYS_CN, null, t), '2026 年 · 内置 · 2027 年 · 未内置');
-  assert.equal(statusLine(nov, HOLIDAYS_CN, new Date(2026, 10, 3, 8).getTime(), t), '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03');
+  // P9：2027 从 2026-11 起内置，两个年份胶囊都是「内置」
+  assert.equal(statusLine(nov, HOLIDAYS_CN, null, t), '2026 年 · 内置 · 2027 年 · 内置');
+  assert.equal(statusLine(nov, HOLIDAYS_CN, new Date(2026, 10, 3, 8).getTime(), t), '2026 年 · 内置 · 2027 年 · 内置 · 上次检查 11/03');
+  // 未内置仍要覆盖：注入不含 2027 的表集合
+  assert.equal(statusLine(nov, NO_2027, null, t), '2026 年 · 内置 · 2027 年 · 未内置');
+  assert.equal(statusLine(nov, NO_2027, new Date(2026, 10, 3, 8).getTime(), t), '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03');
   assert.equal(statusLine(nov, { ...HOLIDAYS_CN, 2027: online2027 }, nov.getTime(), t),
     '2026 年 · 内置 · 2027 年 · 联网更新 · 上次检查 11/20');
   // R30：导入的年份不声称来源
   assert.equal(statusLine(nov, { ...HOLIDAYS_CN, 2027: file2027t }, null, t), '2026 年 · 内置 · 2027 年 · 已导入文件');
-  // 11 月之前只列当年；有下一年的表时也列出
-  assert.equal(statusLine(new Date(2026, 5, 1), HOLIDAYS_CN, null, t), '2026 年 · 内置');
+  // 11 月之前只列当年；有下一年的表时也列出（P9 后 2027 已内置，所以 6 月也列出来）
+  assert.equal(statusLine(new Date(2026, 5, 1), HOLIDAYS_CN, null, t), '2026 年 · 内置 · 2027 年 · 内置');
+  assert.equal(statusLine(new Date(2026, 5, 1), NO_2027, null, t), '2026 年 · 内置');
   assert.equal(statusLine(new Date(2026, 5, 1), { ...HOLIDAYS_CN, 2027: online2027 }, null, t), '2026 年 · 内置 · 2027 年 · 联网更新');
-  assert.equal(statusLine(new Date(2027, 0, 4), HOLIDAYS_CN, null, t), '2027 年 · 未内置');
+  assert.equal(statusLine(new Date(2027, 0, 4), HOLIDAYS_CN, null, t), '2027 年 · 内置');
+  assert.equal(statusLine(new Date(2028, 0, 4), HOLIDAYS_CN, null, t), '2028 年 · 未内置');
   assert.deepEqual(statusModel(nov, { ...HOLIDAYS_CN, 2027: file2027t }, new Date(2026, 10, 3, 8).getTime(), t), {
     chips: [{ year: 2026, kind: 'builtin', text: '2026 年 · 内置' }, { year: 2027, kind: 'file', text: '2027 年 · 已导入文件' }],
     lastCheck: '上次检查 11/03',
   });
   assert.deepEqual(statusModel(nov, { ...HOLIDAYS_CN, 2027: online2027 }, null, t).chips.map((c) => c.kind), ['builtin', 'online']);
+  assert.deepEqual(statusModel(nov, NO_2027, null, t).chips.map((c) => c.kind), ['builtin', 'missing']);
   assert.equal(statusModel(nov, HOLIDAYS_CN, null, t).lastCheck, null);
 });
 
@@ -225,6 +234,21 @@ test('auto-check: before Nov 1 no request at all', async () => {
   assert.equal(loadLastCheck(h.storage), null, 'nothing to check -> lastCheck untouched');
 });
 
+test('auto-check: 2027 built in -> nothing to fetch in Nov 2026 either', async () => {
+  // P9：2027 有了内置表，11 月起也不再为次年抓取
+  const h = harness({ now: new Date(2026, 10, 4, 9), fetchImpl: async () => { throw new Error('should not fetch'); } });
+  await h.api.autoCheckIfNeeded();
+  assert.deepEqual(h.calls, []);
+  assert.equal(loadLastCheck(h.storage), null, 'no attempt -> lastCheck untouched');
+  assert.equal(h.tables()[2027], HOLIDAYS_CN[2027]);
+  // 次年（2028）没有表时照常抓取（空文件会继续试下一个来源）
+  const empty2028 = JSON.stringify({ year: 2028, papers: [], days: [] });
+  const n = harness({ now: new Date(2027, 10, 4, 9), fetchImpl: byHost({ 'cdn.jsdelivr.net': resp(empty2028) }) });
+  await n.api.autoCheckIfNeeded();
+  assert.ok(n.calls.length >= 1);
+  assert.ok(n.calls.every((u) => u.endsWith('/2028.json')), n.calls.join(', '));
+});
+
 test('R37: default order cdn.jsdelivr → fastly.jsdelivr → raw; 5 s per source by default', async (t) => {
   assert.deepEqual(DEFAULT_HOLIDAY_SOURCES.map((u) => new URL(buildSourceUrl(u, 2027)).host), ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'raw.githubusercontent.com']);
   t.mock.timers.enable({ apis: ['setTimeout'] });
@@ -254,7 +278,7 @@ test('R37: a stale empty / invalid copy on jsDelivr does not hide the real file 
 });
 
 test('auto-check from 2026-11-04: valid 2027 applied, persisted, quiet toast, lastCheck saved', async () => {
-  const h = harness({ fetchImpl: byHost({ 'cdn.jsdelivr.net': resp(file2027()) }) });
+  const h = harness({ tables: NO_2027, fetchImpl: byHost({ 'cdn.jsdelivr.net': resp(file2027()) }) });
   await h.api.autoCheckIfNeeded();
   assert.deepEqual(h.calls, ['https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/2027.json']);
   assert.equal(h.tables()[2027].source, 'online');
@@ -270,7 +294,7 @@ test('auto-check from 2026-11-04: valid 2027 applied, persisted, quiet toast, la
 });
 
 test('auto-check: empty 2027 -> 「暂未发布」 info result, nothing applied; failures silent; lastCheck saved', async () => {
-  const h = harness({ fetchImpl: byHost({ 'githubusercontent': resp(fx('holiday-cn-2027-empty.json')), 'jsdelivr': resp(fx('holiday-cn-2027-empty.json')) }) });
+  const h = harness({ tables: NO_2027, fetchImpl: byHost({ 'githubusercontent': resp(fx('holiday-cn-2027-empty.json')), 'jsdelivr': resp(fx('holiday-cn-2027-empty.json')) }) });
   await h.api.autoCheckIfNeeded();
   assert.equal(h.calls.length, 3, 'all three mirrors tried');
   assert.equal(h.tables()[2027], undefined);
@@ -279,7 +303,7 @@ test('auto-check: empty 2027 -> 「暂未发布」 info result, nothing applied;
   assert.match(h.last().result.text, /^数据来源暂未发布 2027 年放假安排/);
   assert.ok(loadLastCheck(h.storage));
 
-  const f = harness({ fetchImpl: async () => { throw new TypeError('offline'); } });
+  const f = harness({ tables: NO_2027, fetchImpl: async () => { throw new TypeError('offline'); } });
   await f.api.autoCheckIfNeeded();
   assert.equal(f.calls.length, 3);
   assert.deepEqual(f.notes, []);
@@ -290,7 +314,7 @@ test('auto-check: empty 2027 -> 「暂未发布」 info result, nothing applied;
 test('custom URL is tried first (auto and manual)', async () => {
   const storage = memStore();
   saveCustomUrl(storage, 'https://mirror.example.org/hc/{year}.json');
-  const h = harness({ storage, fetchImpl: byHost({ 'mirror.example.org': resp(file2027()) }) });
+  const h = harness({ storage, tables: NO_2027, fetchImpl: byHost({ 'mirror.example.org': resp(file2027()) }) });
   await h.api.autoCheckIfNeeded();
   assert.deepEqual(h.calls, ['https://mirror.example.org/hc/2027.json']);
   assert.equal(h.tables()[2027].source, 'online');
@@ -298,7 +322,7 @@ test('custom URL is tried first (auto and manual)', async () => {
 
 test('manual check: current year (built-in, compared) + next year in Nov; one result; built-in never overridden', async () => {
   const real = fx('holiday-cn-2026.json');
-  const h = harness({ fetchImpl: byHost({ '2026.json': resp(real), '2027.json': resp(fx('holiday-cn-2027-empty.json')) }) });
+  const h = harness({ tables: NO_2027, fetchImpl: byHost({ '2026.json': resp(real), '2027.json': resp(fx('holiday-cn-2027-empty.json')) }) });
   const p = h.api.checkNow();
   assert.equal(h.last().checking, true, '检查中 while running');
   await p;
@@ -313,7 +337,7 @@ test('manual check: built-in diff -> page-level info notice with N, not applied'
   const changed = fx('holiday-cn-2026.json');
   changed.days = changed.days.filter((d) => d.date !== '2026-10-07'); // 少一天放假
   changed.days.push({ name: '国庆节', date: '2026-10-11', isOffDay: false }); // 多一个调休（周日）
-  const h = harness({ now: new Date(2026, 5, 1, 9), fetchImpl: byHost({ '2026.json': resp(changed) }) });
+  const h = harness({ now: new Date(2026, 5, 1, 9), tables: NO_2027, fetchImpl: byHost({ '2026.json': resp(changed) }) });
   await h.api.checkNow();
   assert.deepEqual(h.notes, [['info', '网上的放假安排与本机内置的有 2 天不同，暂按内置的计算']]);
   assert.equal(h.tables()[2026], HOLIDAYS_CN[2026]);
@@ -322,7 +346,7 @@ test('manual check: built-in diff -> page-level info notice with N, not applied'
 });
 
 test('manual check: failure shows the specific message; invalid file rejected; existing data intact', async () => {
-  const f = harness({ fetchImpl: async () => { throw new TypeError('offline'); } });
+  const f = harness({ tables: NO_2027, fetchImpl: async () => { throw new TypeError('offline'); } });
   await f.api.checkNow();
   assert.equal(f.last().result.text, '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」');
   assert.equal(f.last().result.detail, null);
@@ -331,7 +355,7 @@ test('manual check: failure shows the specific message; invalid file rejected; e
   const bad = file2027();
   bad.days.push({ name: '劳动节', date: '2027-05-06', isOffDay: false }); // 周四调休上班
   const storage = memStore();
-  const i = harness({ storage, fetchImpl: byHost({ '2027.json': resp(bad), '2026.json': resp(fx('holiday-cn-2026.json')) }) });
+  const i = harness({ storage, tables: NO_2027, fetchImpl: byHost({ '2027.json': resp(bad), '2026.json': resp(fx('holiday-cn-2026.json')) }) });
   await i.api.checkNow();
   assert.equal(i.last().result.text, '来源数据不完整，已拒绝，未采用');
   assert.match(i.last().result.detail, /调休上班日不在周六或周日/);
@@ -341,7 +365,7 @@ test('manual check: failure shows the specific message; invalid file rejected; e
 
 test('manual check: added 2027 then same; online year refreshed when upstream changed', async () => {
   let body = file2027();
-  const h = harness({ fetchImpl: byHost({ '2027.json': () => resp(body), '2026.json': resp(fx('holiday-cn-2026.json')) }) });
+  const h = harness({ tables: NO_2027, fetchImpl: byHost({ '2027.json': () => resp(body), '2026.json': resp(fx('holiday-cn-2026.json')) }) });
   await h.api.checkNow();
   assert.equal(h.last().result.text, '已更新：新增 2027 年假期表');
   await h.api.checkNow();
@@ -355,7 +379,7 @@ test('manual check: added 2027 then same; online year refreshed when upstream ch
 
 test('auto + manual concurrently: run one after the other, 2027 applied once', async () => {
   let n = 0;
-  const h = harness({ fetchImpl: byHost({ '2027.json': () => { n++; return resp(file2027()); }, '2026.json': resp(fx('holiday-cn-2026.json')) }) });
+  const h = harness({ tables: NO_2027, fetchImpl: byHost({ '2027.json': () => { n++; return resp(file2027()); }, '2026.json': resp(fx('holiday-cn-2026.json')) }) });
   const a = h.api.autoCheckIfNeeded();
   const b = h.api.checkNow();
   await Promise.all([a, b]);
@@ -366,7 +390,7 @@ test('auto + manual concurrently: run one after the other, 2027 applied once', a
 
 test('importFile: success / rejected / no year / built-in year / not JSON', () => {
   const storage = memStore();
-  const h = harness({ storage, fetchImpl: async () => { throw new Error('no'); } });
+  const h = harness({ storage, tables: NO_2027, fetchImpl: async () => { throw new Error('no'); } });
   assert.deepEqual(h.api.importFile(JSON.stringify(file2027())), { ok: true, year: 2027 });
   assert.equal(h.last().result.text, '已导入 2027 年假期表（放假 3 天，调休上班 1 天）');
   assert.equal(h.last().result.tone, 'success');
@@ -414,7 +438,7 @@ test('setCustomUrl: invalid not saved; empty clears; status summary follows', ()
 
 test('reload (other tab changed the holidays key): re-read tables, no storage write', () => {
   const storage = memStore();
-  const h = harness({ storage, fetchImpl: async () => { throw new Error('no'); } });
+  const h = harness({ storage, tables: NO_2027, fetchImpl: async () => { throw new Error('no'); } });
   const other = memStore();
   saveOnlineYear(other, 2027, { table: validateHolidayYear(file2027(), 2027).table, papers: file2027().papers, source: 'https://example.org/2027.json', fetchedAt: 1 });
   storage.m[HOLIDAYS_STORAGE_KEY] = other.m[HOLIDAYS_STORAGE_KEY];
@@ -436,7 +460,7 @@ test('R30: online data never overwrites an imported (file) year; differing data 
   const body = file2027();
   body.days.push({ name: '清明节', date: '2027-04-05', isOffDay: true }); // 多 1 天
   const notes = [];
-  let cur = HOLIDAYS_CN;
+  let cur = NO_2027;
   const api = startHolidayUpdate({
     storage, clock: () => new Date(2026, 10, 4, 9),
     fetchImpl: byHost({ '2027.json': resp(body), '2026.json': resp(fx('holiday-cn-2026.json')) }),
@@ -508,7 +532,7 @@ test('store: a stored source must be exactly \'file\' or start with https:// —
 test('R32: an in-flight manual check does not overwrite a newer import result; auto-check never replaces a user result', async () => {
   let release;
   const gate = new Promise((r) => { release = r; });
-  const h = harness({ fetchImpl: async (url) => { await gate; throw new TypeError(`offline ${url}`); } });
+  const h = harness({ tables: NO_2027, fetchImpl: async (url) => { await gate; throw new TypeError(`offline ${url}`); } });
   const p = h.api.checkNow();
   assert.equal(h.api.importFile(JSON.stringify(file2027())).ok, true);
   assert.match(h.last().result.text, /^已导入 2027 年假期表/);
@@ -520,14 +544,14 @@ test('R32: an in-flight manual check does not overwrite a newer import result; a
   // 后台自动检查（暂未发布）不替换刚显示的导入结果
   let rel2;
   const gate2 = new Promise((r) => { rel2 = r; });
-  const a = harness({ fetchImpl: async () => { await gate2; return resp(fx('holiday-cn-2027-empty.json')); } });
+  const a = harness({ tables: NO_2027, fetchImpl: async () => { await gate2; return resp(fx('holiday-cn-2027-empty.json')); } });
   const auto = a.api.autoCheckIfNeeded();
   a.api.importFile('not json');
   rel2();
   await auto;
   assert.equal(a.last().result.text, '文件里没有可用的年份和放假数据，未导入');
   // 手动检查之后再按一次：最新那次的结果
-  const m = harness({ fetchImpl: byHost({ '2026.json': resp(fx('holiday-cn-2026.json')), '2027.json': resp(fx('holiday-cn-2027-empty.json')) }) });
+  const m = harness({ tables: NO_2027, fetchImpl: byHost({ '2026.json': resp(fx('holiday-cn-2026.json')), '2027.json': resp(fx('holiday-cn-2027-empty.json')) }) });
   await Promise.all([m.api.checkNow(), m.api.checkNow()]);
   assert.equal(m.last().result.tone, 'info');
 });
@@ -598,7 +622,7 @@ test('R47: fetchHolidayYear marks validateHolidayYear failures as format:true; s
 });
 
 test('R47: importFile result carries formatHelp for format failures only (not for 「已内置」 or success)', () => {
-  const h = harness({ fetchImpl: async () => { throw new Error('offline'); } });
+  const h = harness({ tables: NO_2027, fetchImpl: async () => { throw new Error('offline'); } });
   const r = () => h.last().result;
   h.api.importFile('not json');
   assert.equal(r().formatHelp, true, 'not JSON / no year');

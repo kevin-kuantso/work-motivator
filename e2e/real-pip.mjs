@@ -9,12 +9,13 @@
 //
 // 测试用的措施（仅在 harness 内，不进成品）：
 //  - init script 把页面的 Date 平移到 2026-11-03(二) 14:12:00 本地时间后照真实速度往前走（本机现在是晚上，会不跳金额）。
-//  - 网络（R19）：时钟在 2026-11-03，app 开页会自动检查 2027 年假期表。为了不碰真实网络又保持确定性，
-//    经 CDP Fetch 域拦截所有 http(s) 请求：三个假期数据来源主机的 2027.json 用「上游空文件」fixture 回应
-//    （app 应进入「数据来源暂未发布」信息状态），其他任何外部请求一律 failRequest 并记为 FAIL。
+//  - 网络（R19）：时钟在 2026-11-03，app 开页会检查「还没有内置表」的年份。2026 与 2027 都已内置
+//    （2027 为国务院办公厅 2026-11 通知），所以开页不产生任何外部请求。为了不碰真实网络又保持确定性，
+//    经 CDP Fetch 域拦截所有 http(s) 请求：一个都不回应，任何外部请求一律 failRequest 并记为 FAIL
+//    （步骤 9 断言整个过程 0 个请求）。
 //  - init script 包装 setInterval/clearInterval 以计算「存活的 100ms 计时器」数量；包装 requestWindow 以记录 app 要求的尺寸。
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -36,10 +37,10 @@ const withTimeout = (p, ms, what) => {
   ]).finally(() => clearTimeout(timer));
 };
 // PiP 文件的安全取法：视窗已关闭时得到 null（而不是抛错）
-const HOLIDAY_HOSTS = /^https:\/\/(raw\.githubusercontent\.com\/NateScarlet\/holiday-cn\/master|cdn\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master|fastly\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master)\/2027\.json$/;
-// 每次 reload 前只清掉假期数据键（含 lastCheck）：INIT 每次载入都把页面时钟回拨到 14:12:00，
-// 旧的 lastCheck 会时而落在「未来」时而不会，是否重查就取决于载入快慢（实测 6 或 9 个请求，不确定）。
-// 清掉后每次载入都确定地重查一次。「每天最多一次」由 npm test / npm run e2e 覆盖。设置键不受影响。
+// 只用于诊断：把「本该一个都没有的假期数据请求」单独点名（不回应任何请求）。
+const HOLIDAY_HOSTS = /^https:\/\/(raw\.githubusercontent\.com\/NateScarlet\/holiday-cn\/master|cdn\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master|fastly\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master)\/\d{4}\.json$/;
+// 每次 reload 前只清掉假期数据键（含 lastCheck）：2026 / 2027 都是内置表，清掉后仍应正常显示内置数据、
+// 且依旧不发任何请求——顺带覆盖「本地没有联网记录时内置表照样够用」。「每天最多一次」由 npm test / npm run e2e 覆盖。设置键不受影响。
 const CLEAR_HOLIDAYS = `localStorage.removeItem('work-motivator-v1-holidays')`;
 const PIPDOC = '(documentPictureInPicture.window ? documentPictureInPicture.window.document : null)';
 
@@ -263,23 +264,13 @@ async function main() {
         consoleMsgs.push(`log.${m.params.entry.level}: ${m.params.entry.text} ${m.params.entry.url ?? ''}`);
       }
     });
-    // ---- 网络：拦截全部 http(s)，只用 fixture 回应假期来源（不碰真实网络）----
-    const empty2027 = await readFile(join(root, 'test', 'fixtures', 'holiday-cn-2027-empty.json'));
-    const fulfilled = [];
+    // ---- 网络：拦截全部 http(s)，一个都不回应（不碰真实网络）；2026 / 2027 已内置，本该一个请求都没有 ----
     const refused = [];
     A.on((m) => {
       if (m.method !== 'Fetch.requestPaused') return;
       const { requestId, request } = m.params;
-      if (HOLIDAY_HOSTS.test(request.url)) {
-        fulfilled.push(request.url);
-        A.send('Fetch.fulfillRequest', {
-          requestId, responseCode: 200, body: empty2027.toString('base64'),
-          responseHeaders: [{ name: 'content-type', value: 'application/json; charset=utf-8' }, { name: 'access-control-allow-origin', value: '*' }],
-        }).catch((e) => refused.push(`fulfill failed ${request.url}: ${e.message}`));
-      } else {
-        refused.push(request.url);
-        A.send('Fetch.failRequest', { requestId, errorReason: 'InternetDisconnected' }).catch(() => {});
-      }
+      refused.push(HOLIDAY_HOSTS.test(request.url) ? `holiday-data! ${request.url}` : request.url);
+      A.send('Fetch.failRequest', { requestId, errorReason: 'InternetDisconnected' }).catch(() => {});
     });
     await A.send('Fetch.enable', { patterns: [{ urlPattern: 'http://*' }, { urlPattern: 'https://*' }] });
     await A.send('Runtime.enable');
@@ -291,12 +282,12 @@ async function main() {
     await A.send('Page.bringToFront');
     await sleep(500);
 
-    // ===== 9 假期数据：开页自动检查 2027 → 上游空文件 → 「暂未发布」信息状态（不是错误、不套用）=====
-    const idle9 = await waitFor(A, '!!document.getElementById("btn-holiday-check") && !document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && !document.getElementById("holiday-result").hidden', 10000);
-    const h9 = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, text: r.querySelector('.holiday-result-text').textContent, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), tag2027: [...document.querySelectorAll('.cal-year-tag')].map((e) => e.hidden), rec: localStorage.getItem('work-motivator-v1-holidays'), errBar: !document.querySelector('.notices .banner-error').hidden, toast: !document.querySelector('.toast').hidden }; })()`);
-    check('9', idle9 !== null && fulfilled.length === 3 && refused.length === 0, '开页自动检查只请求三个来源的 2027.json（经 CDP Fetch 以空文件 fixture 回应），无其他外部请求', `fulfilled=${JSON.stringify(fulfilled)} refused=${JSON.stringify(refused)} idle after ~${idle9}ms`);
-    check('9', h9.tone === 'info' && h9.text === '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。' && !h9.errBar && !h9.toast, '空文件 -> 「数据来源暂未发布」信息状态（info，不是错误，无 toast）', JSON.stringify({ tone: h9.tone, text: h9.text, errBar: h9.errBar, toast: h9.toast }));
-    check('9', h9.line === '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03' && JSON.parse(h9.rec).years && Object.keys(JSON.parse(h9.rec).years).length === 0, '状态行显示 2027 未内置且未套用任何数据', `line="${h9.line}" record=${h9.rec}`);
+    // ===== 9 假期数据：2026 与 2027 都已内置 → 开页不发任何请求，也不出现「暂未发布」信息 =====
+    const idle9 = await waitFor(A, '!!document.getElementById("btn-holiday-check") && !document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && (document.getElementById("holiday-status").getAttribute("aria-label") || "").includes("2027 年 · 内置")', 10000);
+    const h9 = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { hidden: r.hidden, tone: r.dataset.tone, text: r.querySelector('.holiday-result-text').textContent, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), tagHidden: [...document.querySelectorAll('.cal-year-tag')].map((e) => e.hidden), rec: localStorage.getItem('work-motivator-v1-holidays'), errBar: !document.querySelector('.notices .banner-error').hidden, toast: !document.querySelector('.toast').hidden }; })()`);
+    check('9', idle9 !== null && refused.length === 0, '2026 / 2027 都已内置 -> 开页不请求任何假期数据（CDP Fetch 仍全量拦截，0 个请求）', `refused=${JSON.stringify(refused)} idle after ~${idle9}ms`);
+    check('9', h9.hidden === true && h9.text === '' && h9.tone === '' && !h9.errBar && !h9.toast, '自动检查无事可做 -> 结果区保持隐藏（没有「暂未发布」、不是错误、无 toast）', JSON.stringify({ hidden: h9.hidden, tone: h9.tone, text: h9.text, errBar: h9.errBar, toast: h9.toast }));
+    check('9', h9.line === '2026 年 · 内置 · 2027 年 · 内置' && h9.rec === null && h9.tagHidden.length === 1 && h9.tagHidden[0] === true, '状态行显示两年都已内置、没有写入联网记录、月历没有缺表年标签', `line="${h9.line}" record=${h9.rec} tags=${JSON.stringify(h9.tagHidden)}`);
     info('0', 'opener 视窗', `innerWidth x innerHeight = ${await ev(A, 'innerWidth + "x" + innerHeight')}; outer = ${await ev(A, 'outerWidth + "x" + outerHeight')}`);
     info('0', 'page', `${await ev(A, 'location.href')} ; app Date = ${await ev(A, 'new Date().toString()')} ; reduced-motion=${await ev(A, 'matchMedia("(prefers-reduced-motion: reduce)").matches')}`);
     await shot(A, 'main-before');
@@ -458,13 +449,12 @@ async function main() {
     await sleep(2000);
     const s7 = statsOf(await ev(A, '__chg'), 2000);
     check('7', s7.perSec >= 8, 'reload 后金额照常跳动', `changes/s=${s7.perSec}`);
-    // 本脚本共载入 3 次（开页、步骤 6 reload、步骤 7 reload），每次之前都清掉假期数据键 → 预期 3 × 3 = 9 个请求，
-    // 全部是三个 fixture 网址，且最后一次 reload 后仍是「暂未发布」信息状态。
-    await waitFor(A, '!document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && !document.getElementById("holiday-result").hidden', 5000);
-    const h9bAll = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { tone: r.dataset.tone, hidden: r.hidden, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), busy: document.getElementById('btn-holiday-check').getAttribute('aria-disabled'), rec: localStorage.getItem('work-motivator-v1-holidays'), now: Date.now() }; })()`);
-    const h9b = h9bAll.tone;
+    // 本脚本共载入 3 次（开页、步骤 6 reload、步骤 7 reload），每次之前都清掉假期数据键；
+    // 2026 / 2027 都是内置表 → 3 次载入合计仍应是 0 个外部请求，且结果区始终隐藏。
+    await waitFor(A, '!document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && (document.getElementById("holiday-status").getAttribute("aria-label") || "").includes("2027 年 · 内置")', 5000);
+    const h9bAll = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { hidden: r.hidden, tone: r.dataset.tone, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), busy: document.getElementById('btn-holiday-check').getAttribute('aria-disabled'), rec: localStorage.getItem('work-motivator-v1-holidays'), now: Date.now() }; })()`);
     info('9', 'reload 后假期数据区', JSON.stringify(h9bAll));
-    check('9', fulfilled.length === 9 && fulfilled.every((u) => HOLIDAY_HOSTS.test(u)) && refused.length === 0 && h9b === 'info', '每次载入（含 2 次 reload，之前清掉假期数据键）都只请求三个 fixture 网址，reload 后仍是「暂未发布」信息状态', `fulfilled=${fulfilled.length} refused=${refused.length} tone=${h9b}`);
+    check('9', refused.length === 0 && h9bAll.hidden === true && h9bAll.tone === '' && h9bAll.line === '2026 年 · 内置 · 2027 年 · 内置' && h9bAll.rec === null, '三次载入（含 2 次 reload，之前清掉假期数据键）都不发请求、不写联网记录、结果区保持隐藏', `refused=${refused.length} ${JSON.stringify(refused)} hidden=${h9bAll.hidden} tone=${h9bAll.tone} line="${h9bAll.line}" rec=${h9bAll.rec}`);
     const o7 = await openPip(A);
     await sleep(300);
     const c7 = await closeAndMeasure(A, 'x');
