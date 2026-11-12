@@ -4,6 +4,19 @@ import assert from 'node:assert/strict';
 import { startServer, launch, openAt, expectedAutoUrls, tipVisibleLines } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
+
+// 本文件断言的是中国地区文案与年表：明确写入旧版（v1，无地区）设置，让应用走「旧数据一律归中国」的迁移路径，
+// 不依赖应用当前的新用户默认地区（台湾）。旧设置里午休 11:30–13:00 与「开启午休」是一组合法值。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
+// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+const seeded = (init) => {
+  if (init == null) return CN_SEED;
+  if (typeof init === 'string') return `${CN_SEED}\n${init}`;
+  if (typeof init === 'function') return `${CN_SEED}\n(${init.toString()})();`;
+  if (typeof init.content === 'string') return { ...init, content: `${CN_SEED}\n${init.content}` };
+  return init;
+};
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用'];
 
@@ -19,7 +32,7 @@ after(async () => {
 });
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...opts, init: seeded(opts?.init) });
   try {
     // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
@@ -111,6 +124,24 @@ test('click opens a menu with header, options and footer; keyboard moves; Esc re
     assert.equal((await focused(page)).key, '2026-11-07', 'focus back on the cell after applying');
   }));
 
+test('calendar undo remains available after the toast expires and reverses only the latest change', () =>
+  withPage(T1412, async (page) => {
+    const undo = page.locator('.cal-undo');
+    assert.equal(await undo.getAttribute('aria-disabled'), 'true');
+    await openMenu(page, '11月2日');
+    await page.locator('.day-menu-item[data-option="paidLeave"]').click();
+    await openMenu(page, '11月3日');
+    await page.locator('.day-menu-item[data-option="unpaidLeave"]').click();
+    await page.clock.runFor(5100);
+    assert.equal(await page.locator('.toast').isVisible(), false);
+    await undo.click();
+    assert.match(await cell(page, '11月2日').getAttribute('aria-label'), /带薪假/);
+    assert.doesNotMatch(await cell(page, '11月3日').getAttribute('aria-label'), /无薪假/);
+    await undo.click();
+    assert.doesNotMatch(await cell(page, '11月2日').getAttribute('aria-label'), /带薪假/);
+    assert.equal(await undo.getAttribute('aria-disabled'), 'true');
+  }));
+
 test('click outside closes; clicking the same cell toggles; only one menu at a time', () =>
   withPage(T1412, async (page) => {
     await openMenu(page, '11月7日');
@@ -139,7 +170,7 @@ test('Saturday 11/7 → 改为上班: daily wage 309.09, manual dot, undo, survi
     assert.match(await cell(page, '11月7日').getAttribute('aria-label'), /调休上班.*已手动标记/);
     assert.equal(await cell(page, '11月7日').locator('.day-dot').count(), 1);
     assert.match(await text(page, '.toast-text'), /11\/7 已标记为调休上班/);
-    await page.getByRole('button', { name: '撤销' }).click();
+    await page.getByRole('button', { name: '撤销', exact: true }).click();
     assert.equal(await daily(page), '¥323.81');
     assert.equal(await cell(page, '11月7日').locator('.day-dot').count(), 0);
     assert.match(await cell(page, '11月7日').getAttribute('aria-label'), /周末/);

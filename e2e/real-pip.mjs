@@ -108,6 +108,10 @@ async function trustedClick(c, sel) {
 
 // ---------- 注入页面的 harness ----------
 const INIT = `(() => {
+  if (!sessionStorage.getItem('realPipSeeded')) {
+    localStorage.setItem('work-motivator-v1', JSON.stringify({version: 2, salary: 6800, lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00'}));
+    sessionStorage.setItem('realPipSeeded', '1');
+  }
   const R = Date;
   const off = new R(2026, 10, 3, 14, 12, 0).getTime() - R.now();
   class D extends R {
@@ -307,6 +311,17 @@ async function main() {
     check('1', /当前赚钱速度/.test(p1.text), 'PiP 含「当前赚钱速度」', 'present');
     check('1', !/时薪/.test(p1.text) && !/今日满勤可得/.test(p1.text), 'PiP 不含「时薪」「今日满勤可得」(innerText)', `lg-only computed display=${p1.lgOnlyDisplay}`);
     check('1', p1.openerIv100 === 0 && p1.iv100 === 1, '计时器已移到 PiP（开启者 0 个、PiP 1 个 100ms interval）', `opener=${p1.openerIv100} pip=${p1.iv100}`);
+
+    // 地區切換不重建卡片：實際 PiP 與主文件必須同步語言、幣別和主題。
+    const switchRegion = async (region) => ev(A, `(() => { const el = document.getElementById('f-region'); el.value = '${region}'; el.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+    await switchRegion('TW');
+    await sleep(300);
+    const twProfile = await ev(A, `(() => { const d = ${PIPDOC}; return { mainLang: document.documentElement.lang, pipLang: d?.documentElement.lang, mainTitle: document.title, pipTitle: d?.title, mainTheme: document.documentElement.dataset.theme, pipTheme: d?.documentElement.dataset.theme, text: d?.getElementById('status-card')?.textContent, height: d?.documentElement.scrollHeight, viewport: d?.documentElement.clientHeight }; })()`);
+    check('regional', twProfile.mainLang === 'zh-TW' && twProfile.pipLang === 'zh-TW' && twProfile.mainTitle === twProfile.pipTitle && twProfile.mainTheme === twProfile.pipTheme && twProfile.text?.includes('NT$') && twProfile.height <= twProfile.viewport, '切換臺灣時 PiP 語言、標題、主題、幣別一致且不裁切', JSON.stringify(twProfile));
+    await switchRegion('CN');
+    await sleep(300);
+    const cnProfile = await ev(A, `(() => { const d = ${PIPDOC}; return { mainLang: document.documentElement.lang, pipLang: d?.documentElement.lang, mainTitle: document.title, pipTitle: d?.title, mainTheme: document.documentElement.dataset.theme, pipTheme: d?.documentElement.dataset.theme, text: d?.getElementById('status-card')?.textContent }; })()`);
+    check('regional', cnProfile.mainLang === 'zh-CN' && cnProfile.pipLang === 'zh-CN' && cnProfile.mainTitle === cnProfile.pipTitle && cnProfile.mainTheme === cnProfile.pipTheme && cnProfile.text?.includes('¥'), '切回中國時 PiP 語言、標題、主題與幣別一致', JSON.stringify(cnProfile));
     info('1', 'PiP 窗口 vis / 按钮文字', `pip visibilityState=${p1.vis}; btn="${p1.btn}"`);
 
     // ===== 2 尺寸 =====

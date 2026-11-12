@@ -2,9 +2,11 @@
 // 2026：国办发明电〔2025〕7号；2027：国办发明电〔2026〕10号。
 //   https://www.gov.cn/zhengce/content/202611/content_7085101.htm
 // 没有内置表的年份仍按 R39 / R40 的回退规则（STRINGS + statutory-dates.js）显示，见 calendar.js。
-import { STRINGS } from './strings.zh-CN.js';
-
-const H = STRINGS.holidays;
+// Official China calendar labels are provider data, not the active UI language.
+const H = Object.freeze({
+  newYear: '元旦', spring: '春节', qingming: '清明', labour: '劳动节',
+  dragonBoat: '端午', midAutumn: '中秋', national: '国庆',
+});
 const pad = (n) => String(n).padStart(2, '0');
 
 function expand(year, name, [m1, d1], [m2, d2], into) {
@@ -75,3 +77,5 @@ export const STATUTORY_FIXED = {
   '10-02': H.national,
   '10-03': H.national,
 };
+
+export const CN_HOLIDAY_NAMES = H;

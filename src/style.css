@@ -2,24 +2,24 @@
 :root {
   --color-brand-50:#F0FDF4; --color-brand-100:#DCFCE7; --color-brand-600:#15803D; --color-brand-700:#166534;
   --color-surface:#FFFFFF; --color-bg:#F8FAFB;
+  --color-card:#FFFFFF; --color-calendar-day:#FFFFFF; --color-settings-head:#F8FAFB;
+  --color-toast-action:#BBF7D0;
   --color-border-subtle:#E5E7EB; --color-border-control:#6B7280;
   --color-text-900:#1F2937; --color-text-600:#4B5563; --color-text-500:#6B7280;
 
   --state-working-bg:#DCFCE7; --state-working-fg:#166534;
-  --state-lunch-bg:#FEF3C7;   --state-lunch-fg:#92400E;
-  --state-before-bg:#E0F2FE;  --state-before-fg:#075985;
+  --state-lunch-bg:#E4F3DB;   --state-lunch-fg:#25613B; --state-lunch-fill:#28734B;
+  --warning-bg:#DFE3DA; --warning-fg:#2F3A29;
+  --state-before-bg:#E4EDE3;  --state-before-fg:#3C5340;
   --state-after-bg:#CCFBF1;   --state-after-fg:#115E59;
   --state-rest-bg:#F3F4F6;    --state-rest-fg:#4B5563;
   --state-holiday-bg:#CCFBF1; --state-holiday-fg:#115E59; /* 法定假日：与月历提示的假日同色系（不用上班），不再和普通休息日同灰 */
-  --state-lunch-fill:#B45309; /* 午休进度条填色（琥珀 700：对轨道 4.06:1、对白卡片 5.02:1；比 #92400E 亮、不发脏） */
-  --state-paid-bg:#DBEAFE;    --state-paid-fg:#1E40AF;
+  --state-paid-bg:#DDECE7;    --state-paid-fg:#275C50;
   --state-unpaid-bg:#FFE4E6;  --state-unpaid-fg:#9F1239;
-  --state-makeup-bg:#EDE9FE;  --state-makeup-fg:#5B21B6;
+  --state-makeup-bg:#EBEEDD;  --state-makeup-fg:#515C2E;
   --state-unpaid-stripe:#FFF1F2;
 
-  /* 月历格子：弱化的日期数字仍须 ≥ 4.5:1（spec §13.3；test/layout-model.test.mjs 实算）
-     H4：法定假日格用看得出的浅绿（#A7F3D0 + #065F46，数字 5.99:1；对周末的中性灰 #F3F4F6 是两套色系，不是同一片灰），
-     周末数字 #4B5563 对 #F3F4F6 6.87:1 */
+  /* 月历日期数字对对应格子背景须 ≥ 4.5:1；法定假日与普通休息日使用可区分的色调。 */
   --cal-weekend-bg:#F3F4F6;  --cal-weekend-num:#4B5563;
   --cal-holiday-bg:#A7F3D0;  --cal-holiday-num:#065F46;
   --cal-rest-bg:#F3F4F6;
@@ -27,15 +27,172 @@
   --font-sans:'Microsoft YaHei UI','Microsoft YaHei','PingFang SC','Noto Sans SC',system-ui,sans-serif;
   /* 会跳动的数字：只用系统字体；拉丁 / 数字取 Segoe UI（Windows）或系统 UI 字体（Mac），中文落到雅黑 / 苹方 */
   --font-num:"Segoe UI",system-ui,"Microsoft YaHei UI","PingFang SC",sans-serif;
-  --fs-hero-lg:56px; --fs-hero-sm:40px; --fs-metric-lg:20px; --fs-metric-sm:16px;
-  --fs-title:16px; --fs-body:14px; --fs-label:12px; --fs-caption:12px;
+  /* 五档字号共用一个比例；主金额和月历提示也跟随。 */
+  --fs-scale:1;
+  --fs-hero-lg:calc(56px * var(--fs-scale)); --fs-hero-sm:calc(40px * var(--fs-scale));
+  --fs-metric-lg:calc(20px * var(--fs-scale)); --fs-metric-sm:calc(16px * var(--fs-scale));
+  --fs-title:calc(16px * var(--fs-scale)); --fs-body:calc(14px * var(--fs-scale));
+  --fs-label:calc(12px * var(--fs-scale)); --fs-caption:calc(12px * var(--fs-scale));
 
   --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px; --space-7:48px;
   --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-full:999px;
   --shadow-card:0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .08);
   --dur-fast:120ms; --dur-base:200ms; --ease:cubic-bezier(.2,0,0,1);
   --control-height:36px; --control-sm:32px;
+  /* 触屏最小可点高度：只在窄于 1000px 时套到按钮 / 分页标签 / 折叠行上（见文件末尾的触屏一节） */
+  --tap-min:44px;
 }
+/* M 保持原有大小；相邻档位相差 10 个百分点。 */
+:root[data-font-scale="xs"] { --fs-scale:.8; }
+:root[data-font-scale="s"] { --fs-scale:.9; }
+:root[data-font-scale="m"] { --fs-scale:1; }
+:root[data-font-scale="l"] { --fs-scale:1.1; }
+:root[data-font-scale="xl"] { --fs-scale:1.2; }
+:root:lang(zh-TW) {
+  --font-sans:'Microsoft JhengHei UI','Microsoft JhengHei','PingFang TC','Noto Sans TC',system-ui,sans-serif;
+  --font-num:"Segoe UI",system-ui,"Microsoft JhengHei UI","PingFang TC",sans-serif;
+}
+:root[data-theme="blue"] {
+  --color-brand-50:#EFF6FF; --color-brand-100:#DBEAFE; --color-brand-600:#1D4ED8; --color-brand-700:#1E40AF;
+  --color-bg:#E8F1FC; --color-surface:#F6FAFF; --color-card:#EAF3FF; --color-calendar-day:#EDF5FF; --color-settings-head:#E7F1FE;
+  --color-border-subtle:#CFDFF1; --color-toast-action:#BFDBFE;
+  --color-text-900:#1E293B; --color-text-600:#475569; --color-text-500:#596C83;
+  --state-working-bg:#D9EAFE; --state-working-fg:#1E40AF;
+  --state-before-bg:#E2E8F8; --state-before-fg:#374A80;
+  --state-after-bg:#D9F0F1; --state-after-fg:#155E63;
+  --state-holiday-bg:#D9F0F1; --state-holiday-fg:#155E63;
+  --state-lunch-bg:#E2EBFA; --state-lunch-fg:#304D85; --state-lunch-fill:#315D9C;
+  --warning-bg:#CFDAE9; --warning-fg:#24384C;
+  --state-rest-bg:#E8EDF4; --state-rest-fg:#475569;
+  --state-paid-bg:#E3E5FA; --state-paid-fg:#373F92;
+  --state-makeup-bg:#EDE5F7; --state-makeup-fg:#643985;
+  --state-unpaid-bg:#FBE3E8; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF1F4;
+  --cal-weekend-bg:#E8EDF4; --cal-weekend-num:#475569; --cal-rest-bg:#E8EDF4;
+  --cal-holiday-bg:#B9E5E7; --cal-holiday-num:#155E63;
+}
+:root[data-theme="orange"] {
+  --color-brand-50:#FFF7ED; --color-brand-100:#FFEDD5; --color-brand-600:#9A3412; --color-brand-700:#7C2D12;
+  --color-bg:#FBEEE2; --color-surface:#FFFAF5; --color-card:#FFF0E2; --color-calendar-day:#FFF3E8; --color-settings-head:#FCEBDB;
+  --color-border-subtle:#EBD8C8; --color-toast-action:#FED7AA;
+  --color-text-900:#392A25; --color-text-600:#69534A; --color-text-500:#796256;
+  --state-working-bg:#FFE1C7; --state-working-fg:#9A3412;
+  --state-before-bg:#F3E6DC; --state-before-fg:#765042;
+  --state-after-bg:#ECEBCF; --state-after-fg:#535F2B;
+  --state-holiday-bg:#ECEBCF; --state-holiday-fg:#535F2B;
+  --state-lunch-bg:#FBE6D8; --state-lunch-fg:#8F3E27; --state-lunch-fill:#A0492C;
+  --warning-bg:#E2D3C2; --warning-fg:#40322A;
+  --state-rest-bg:#F1E9E3; --state-rest-fg:#69534A;
+  --state-paid-bg:#E7ECDB; --state-paid-fg:#486036;
+  --state-makeup-bg:#F1DFDC; --state-makeup-fg:#874B43;
+  --state-unpaid-bg:#FBE2E2; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF1F1;
+  --cal-weekend-bg:#F1E9E3; --cal-weekend-num:#69534A; --cal-rest-bg:#F1E9E3;
+  --cal-holiday-bg:#D9DFB7; --cal-holiday-num:#465426;
+}
+/* Curated palettes: keep semantic states readable and distinct from ordinary days. */
+:root[data-theme="teal"] {
+  --color-brand-50:#EAF5F3; --color-brand-100:#D1E2E0; --color-brand-600:#086B64; --color-brand-700:#075650;
+  --color-bg:#E9F2F1; --color-surface:#F7FBFA; --color-card:#E9F5F3; --color-calendar-day:#F0F8F6; --color-settings-head:#E4F0EE;
+  --color-border-subtle:#CDDFDC; --color-toast-action:#A8CAC7;
+  --color-text-900:#203532; --color-text-600:#415D59; --color-text-500:#526D69;
+  --state-working-bg:#D1EAE5; --state-working-fg:#075650;
+  --state-before-bg:#E1EAE6; --state-before-fg:#40564D;
+  --state-after-bg:#D9E8F2; --state-after-fg:#24546C;
+  --state-holiday-bg:#D9E8F2; --state-holiday-fg:#24546C;
+  --state-lunch-bg:#DDEADF; --state-lunch-fg:#315C43; --state-lunch-fill:#31694B;
+  --warning-bg:#D9E2D5; --warning-fg:#344335;
+  --state-rest-bg:#E5EBE9; --state-rest-fg:#475E58;
+  --state-paid-bg:#DDE7EE; --state-paid-fg:#36566C;
+  --state-makeup-bg:#E8E9D9; --state-makeup-fg:#535B31;
+  --state-unpaid-bg:#FBE3E8; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF1F4;
+  --cal-weekend-bg:#E5EBE9; --cal-weekend-num:#475E58; --cal-rest-bg:#E5EBE9;
+  --cal-holiday-bg:#C4DFE9; --cal-holiday-num:#24546C;
+}
+:root[data-theme="rose"] {
+  --color-brand-50:#FBF0F4; --color-brand-100:#F4DAE4; --color-brand-600:#910543; --color-brand-700:#790838;
+  --color-bg:#F8EEF2; --color-surface:#FFF9FB; --color-card:#FCEFF4; --color-calendar-day:#FFF4F8; --color-settings-head:#F8E8EF;
+  --color-border-subtle:#E9D6DE; --color-toast-action:#E8B9CC;
+  --color-text-900:#38262F; --color-text-600:#68505C; --color-text-500:#765D68;
+  --state-working-bg:#F5DBE6; --state-working-fg:#790838;
+  --state-before-bg:#EEE3E8; --state-before-fg:#634955;
+  --state-after-bg:#E5E8F4; --state-after-fg:#414D76;
+  --state-holiday-bg:#E5E8F4; --state-holiday-fg:#414D76;
+  --state-lunch-bg:#F4E2DC; --state-lunch-fg:#774332; --state-lunch-fill:#874C39;
+  --warning-bg:#E8DAD7; --warning-fg:#503A36;
+  --state-rest-bg:#F1E8EC; --state-rest-fg:#68505C;
+  --state-paid-bg:#E6EBDD; --state-paid-fg:#4A5E37;
+  --state-makeup-bg:#EEE2F2; --state-makeup-fg:#65436C;
+  --state-unpaid-bg:#FBE3E8; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF1F4;
+  --cal-weekend-bg:#F1E8EC; --cal-weekend-num:#68505C; --cal-rest-bg:#F1E8EC;
+  --cal-holiday-bg:#D7DDF1; --cal-holiday-num:#414D76;
+}
+:root[data-theme="slate"] {
+  --color-brand-50:#F0F1EF; --color-brand-100:#E0E1DE; --color-brand-600:#444940; --color-brand-700:#353631;
+  --color-bg:#ECEDEA; --color-surface:#FAFBF9; --color-card:#F2F4F0; --color-calendar-day:#F7F8F6; --color-settings-head:#EDEFEA;
+  --color-border-subtle:#D5D8D1; --color-toast-action:#C9CEC4;
+  --color-text-900:#292D28; --color-text-600:#50584E; --color-text-500:#626A60;
+  --state-working-bg:#E1E6DD; --state-working-fg:#353F34;
+  --state-before-bg:#E8E9E3; --state-before-fg:#50584A;
+  --state-after-bg:#DFEAEB; --state-after-fg:#34595B;
+  --state-holiday-bg:#DFEAEB; --state-holiday-fg:#34595B;
+  --state-lunch-bg:#E7E8D9; --state-lunch-fg:#545B38; --state-lunch-fill:#5E653A;
+  --warning-bg:#E0E0D6; --warning-fg:#414437;
+  --state-rest-bg:#E8EAE7; --state-rest-fg:#50584E;
+  --state-paid-bg:#E0E6EC; --state-paid-fg:#40566A;
+  --state-makeup-bg:#E9E4EA; --state-makeup-fg:#625063;
+  --state-unpaid-bg:#FBE3E8; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF1F4;
+  --cal-weekend-bg:#E8EAE7; --cal-weekend-num:#50584E; --cal-rest-bg:#E8EAE7;
+  --cal-holiday-bg:#C8DEDF; --cal-holiday-num:#34595B;
+}
+/* 彩虹主题以暖棕色统一操作与选中态；粉、杏黄、薄荷、天蓝作为淡彩背景，
+   不取代休假等语义颜色，也不改变其他主题的控件。 */
+:root[data-theme="rainbow"] {
+  --color-brand-50:#FFF5EE; --color-brand-100:#FBE9DC; --color-brand-600:#88432F; --color-brand-700:#703522;
+  --color-bg:#FAF9F7; --color-surface:#FFFFFF; --color-card:#FFFFFF; --color-calendar-day:#FFFFFF; --color-settings-head:#FAF7F3;
+  --color-border-subtle:#E7E2DC; --color-toast-action:#FBE9DC;
+  --color-text-900:#2F3437; --color-text-600:#5A5F66; --color-text-500:#6B7076;
+  --state-working-bg:#D9F2E6; --state-working-fg:#0B5F3E;
+  --state-before-bg:#E2EDF1; --state-before-fg:#365461;
+  --state-after-bg:#DCEBF7; --state-after-fg:#17466B;
+  --state-holiday-bg:#D7EDEE; --state-holiday-fg:#0F5257;
+  --state-lunch-bg:#FBE7D7; --state-lunch-fg:#7C3D14; --state-lunch-fill:#A34D1E;
+  --warning-bg:#E7DCCF; --warning-fg:#4A3A22;
+  --state-rest-bg:#ECEFED; --state-rest-fg:#465652;
+  --state-paid-bg:#DDF0E2; --state-paid-fg:#1F6B3A;
+  --state-makeup-bg:#FBEBD3; --state-makeup-fg:#7A4A0F;
+  --state-unpaid-bg:#FBE0E6; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF4F6;
+  --cal-weekend-bg:#ECEFED; --cal-weekend-num:#465652; --cal-rest-bg:#ECEFED;
+  --cal-holiday-bg:#CBEBEC; --cal-holiday-num:#0F5257;
+  --radius-sm:8px; --radius-md:12px; --radius-lg:18px;
+  --shadow-card:inset 0 1px 0 rgb(255 255 255 / .9), 0 6px 20px rgb(46 51 56 / .07);
+  --rainbow-band:linear-gradient(90deg, #EE9EB4, #F5C27F 30%, #9FD9B8 65%, #91CDE4);
+  --rainbow-glow:
+    radial-gradient(ellipse at 0% 0%, rgb(243 174 192 / .35), transparent 55%),
+    radial-gradient(ellipse at 100% 0%, rgb(248 210 150 / .38), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(166 225 190 / .32), transparent 55%),
+    radial-gradient(ellipse at 0% 100%, rgb(155 211 234 / .32), transparent 55%);
+}
+:root[data-theme="rainbow"] .status-card { background: var(--rainbow-glow), var(--color-card); }
+:root[data-theme="rainbow"] .card-band { height: 5px; background-image: var(--rainbow-band); }
+:root[data-theme="rainbow"] .main-panel { box-shadow: var(--shadow-card); }
+/* 保留实线选中态，在强制颜色模式下也不依赖渐变。 */
+:root[data-theme="rainbow"] .tab[aria-selected="true"] { color: var(--color-brand-700); border-bottom-color: var(--color-brand-600); }
+:root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface); border-color: #D6B6A5; color: var(--color-brand-700); }
+:root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-brand-50); border-color: var(--color-brand-600); }
+:root[data-theme="rainbow"] .status-card[data-tone="working"] .bar { background: #FFF8F5; }
+:root[data-theme="rainbow"] .status-card[data-tone="working"] .bar-fill { background: #D95C72; }
+:root[data-theme="rainbow"] .section-pay .scard-head { background: #FCE4EC; }
+:root[data-theme="rainbow"] .section-holiday .scard-head { background: #FFF0D5; }
+:root[data-theme="rainbow"] .section-backup .scard-head { background: #DCF3E5; }
+:root[data-theme="rainbow"] .section-display .scard-head { background: #DDEFF9; }
+:root[data-theme="rainbow"] .section-holiday .chip-ok { background: #DDEFF9; color: #17466B; }
+:root[data-theme="rainbow"] .switch:checked { background: #24745F; border-color: #24745F; }
+:root[data-theme="rainbow"] .card-cheer { color: var(--color-brand-700); }
+/* 普通工作日用轻淡四色；有语义标记的日期沿用各自颜色。 */
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 1) .day.kind-workday { background: #FCE7EE; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 2) .day.kind-workday { background: #FFF1D9; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 3) .day.kind-workday { background: #E1F4E8; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n) .day.kind-workday { background: #E1F1F9; }
+:root[data-theme="rainbow"] .cal-cell .day.kind-workday:hover { background: var(--color-brand-100); }
 .amount { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
@@ -80,19 +237,20 @@ button, input, select { font: inherit; color: inherit; }
 .btn-secondary { border-color: var(--color-border-control); background: var(--color-surface); }
 .btn-secondary:hover, .btn-ghost:hover { background: var(--color-brand-50); }
 .btn-ghost { color: var(--color-text-600); }
-.btn-s { min-height: 28px; padding: 0 var(--space-3); font-size: 13px; border-radius: var(--radius-sm); }
-.btn-xs { min-height: 24px; padding: 0 var(--space-2); font-size: 12px; border-radius: var(--radius-sm); }
+.btn-s { min-height: 28px; padding: 0 var(--space-3); font-size: calc(13px * var(--fs-scale)); border-radius: var(--radius-sm); }
+.btn-xs { min-height: 24px; padding: 0 var(--space-2); font-size: calc(12px * var(--fs-scale)); border-radius: var(--radius-sm); }
 
-/* Header：只有标题（「悬浮成小窗」在左栏，R38） */
-.app-header { display: flex; align-items: center; min-height: 28px; margin-bottom: var(--space-2); flex: none; }
-.app-header h1 { font-size: 18px; line-height: 28px; font-weight: 700; }
+/* Header：品牌图示与标题（「悬浮成小窗」在左栏）。 */
+.app-header { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; margin-bottom: var(--space-2); flex: none; }
+.app-logo { width: calc(28px * var(--fs-scale)); height: calc(28px * var(--fs-scale)); flex: none; object-fit: contain; }
+.app-header h1 { font-size: calc(18px * var(--fs-scale)); line-height: calc(28px * var(--fs-scale)); font-weight: 700; }
 
 /* Banners（单行薄条约 28px；info → before, error → unpaid） */
 .notices { display: grid; gap: var(--space-2); margin-bottom: var(--space-2); flex: none; }
 .notices:not(:has(> :not([hidden]))) { display: none; }
 .banner {
   margin: 0; min-height: 28px; padding: 0 var(--space-1) 0 var(--space-3); border-radius: var(--radius-sm);
-  display: flex; align-items: center; gap: var(--space-2); font-size: 13px; line-height: 20px;
+  display: flex; align-items: center; gap: var(--space-2); font-size: calc(13px * var(--fs-scale)); line-height: calc(20px * var(--fs-scale));
 }
 .banner-text { flex: 0 1 auto; min-width: 0; padding: var(--space-1) 0; }
 .banner-info { background: var(--state-before-bg); color: var(--state-before-fg); }
@@ -103,7 +261,7 @@ button, input, select { font: inherit; color: inherit; }
 .banner-close {
   margin-left: auto; flex: none;
   min-width: 28px; min-height: 28px; border: 0; background: none; cursor: pointer;
-  font-size: 18px; line-height: 1; border-radius: var(--radius-sm); color: inherit;
+  font-size: calc(18px * var(--fs-scale)); line-height: 1; border-radius: var(--radius-sm); color: inherit;
 }
 .banner-close:hover { background: rgb(0 0 0 / .06); }
 
@@ -126,17 +284,20 @@ button, input, select { font: inherit; color: inherit; }
 .tab {
   height: 32px; padding: 0 var(--space-3); margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent;
   background: none; cursor: pointer; font-weight: 500; color: var(--color-text-600);
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-base) var(--ease);
 }
 .tab:hover { color: var(--color-text-900); }
 .tab[aria-selected="true"] { color: var(--color-brand-700); border-bottom-color: var(--color-brand-600); font-weight: 600; }
 .tabpanel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.tabpanel:not([hidden]) { animation: tab-enter var(--dur-base) var(--ease) both; }
+@keyframes tab-enter { from { opacity: 0; } to { opacity: 1; } }
 .tabpanel-settings { container-type: inline-size; position: relative; }
 
 /* StatusCard */
 .card-slot { container-type: inline-size; position: relative; }
 .status-card {
   --tone-bg: var(--state-working-bg); --tone-fg: var(--state-working-fg);
-  position: relative; overflow: hidden; background: var(--color-surface);
+  position: relative; overflow: hidden; background: var(--color-card);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: var(--space-5);
   display: grid; gap: var(--space-3);
 }
@@ -183,21 +344,21 @@ button, input, select { font: inherit; color: inherit; }
   background: none; color: var(--color-text-600); cursor: pointer; align-items: center; justify-content: center;
 }
 .status-card[data-size="sm"] .card-gear { display: inline-flex; }
-.status-card[data-size="sm"] .lg-only { display: none; }
 /* 最小高 24px = 20px 强调标签（已下班 / 休息日 / 无薪假）的行高：12px 的小标签与强调标签同高，状态切换时卡高不变；小字贴近下方金额 */
 .card-label { display: flex; align-items: flex-end; min-height: 24px; font: 500 var(--fs-body)/1.4 var(--font-sans); color: var(--color-text-900); }
 .card-amount {
   font-weight: 700; line-height: 1.1; white-space: nowrap; color: var(--color-text-900);
-  font-size: clamp(32px, 12.5cqi, var(--fs-hero-lg));
+  /* 理想字号等比例放大；金额过宽时才由 fitHero 缩小以免裁切。 */
+  font-size: calc(clamp(32px, 12.5cqi, 56px) * var(--fs-scale) * var(--hero-fit, 1));
 }
-.status-card[data-size="sm"] .card-amount { font-size: var(--fs-hero-sm); }
+.status-card[data-size="sm"] .card-amount { font-size: calc(var(--fs-hero-sm) * var(--hero-fit, 1)); }
 .amount-tail { color: var(--color-text-500); }
 .status-card.is-settled .amount-tail { color: inherit; }
-/* 收工当下的金额高亮（Task 17）：一次、约 1.2 s、淡绿褪去；背景色 + 等量 padding / 负 margin（文字离色块边缘 ≥ 6px，版面不位移）。减少动态：不播（也不会加类） */
+/* 收工当下的金额高亮：工作状态浅色褪去；背景色 + 等量 padding / 负 margin 避免版面位移。减少动态时不播。 */
 .card-amount.is-celebrating { border-radius: var(--radius-md); padding: 2px 6px; margin: -2px -6px; animation: wm-cheer 1.2s var(--ease) 1; }
 @keyframes wm-cheer { 0% { background-color: var(--state-working-bg); } 100% { background-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { .card-amount.is-celebrating { animation: none; } }
-.card-cheer { color: var(--color-text-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-cheer { color: var(--color-text-900); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-progress { display: grid; gap: var(--space-1); }
 /* 头一行（M4）：左「工时进度」，右倒数（14px、深色）；没有进度条的状态倒数另起一行（.card-countdown-slot） */
 .card-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); min-height: 21px; }
@@ -219,17 +380,16 @@ button, input, select { font: inherit; color: inherit; }
 .metric-value { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
 .status-card[data-size="sm"] .metric-value { font-size: var(--fs-metric-sm); }
 
-/* Settings（基本设置分页，Task 14 / redesign-v3）：两栏 = 两种用途；每组是有边框的卡片，卡头灰底 + 标题 + 一句用途说明。
-   默认状态两栏都放得下；展开「格式示例」或「高级设置」放不下时，只让该栏自己内部滚动（决定 1），页面与分页标签不动。 */
+/* Settings（基本设置分页）：两栏 = 两种用途；内容放不下时各栏独立滚动，页面与分页标签不动。 */
 .tabpanel-settings { overflow: hidden; }
 .settings { position: relative; height: 100%; min-height: 0; overflow: hidden; }
 /* position: relative：分页内的绝对定位元素（看不见的文件输入框等）以滚动区为包含块，被它裁剪，不会把整页撑出卷轴 */
 /* 「已自动保存」放在分页标签那一行的右侧（app.js 把它放在 .main-panel 下、相对它定位，不被分页的 overflow 裁掉，也不盖住卡片文字） */
-.autosave { position: absolute; top: 14px; right: 16px; z-index: 1; font-size: var(--fs-caption); line-height: 20px; color: var(--color-brand-700); background: var(--color-surface); animation: fade-out 1.5s var(--ease) forwards; }
+.autosave { position: absolute; top: 14px; right: 16px; z-index: 1; font-size: var(--fs-caption); line-height: calc(20px * var(--fs-scale)); color: var(--color-brand-700); background: var(--color-surface); animation: fade-out 1.5s var(--ease) forwards; }
 @keyframes fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .autosave { animation: none; } }
-.set-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); height: 100%; min-height: 0; align-items: stretch; }
-.set-col { display: grid; gap: 10px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 2px; }
+.set-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; height: 100%; min-height: 0; align-items: stretch; }
+.set-col { display: grid; gap: 16px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 2px; }
 /* 不预留卷轴槽（R51 A2）：Windows 常驻卷轴（12–17px）只在真的需要滚动时才占宽，默认状态不会因此把卡头挤成两行 */
 /* 分页较窄（1000–1199px 宽的视窗）改单栏：整个设置内容在分页内部滚动（R51 A1），每张卡都滚得到，分页标签与页面不动 */
 @container (max-width: 760px) {
@@ -249,21 +409,23 @@ button, input, select { font: inherit; color: inherit; }
   .settings, .set-grid { height: auto; }
   .set-col { overflow: visible; }
 }
-.scard { border: 1px solid #D1D5DB; border-radius: var(--radius-md); background: var(--color-surface); min-width: 0; }
-.scard-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 1px; padding: 7px 14px; background: var(--color-bg); border-bottom: 1px solid var(--color-border-subtle); border-radius: var(--radius-md) var(--radius-md) 0 0; }
-.scard-title { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; font-weight: 700; line-height: 20px; color: var(--color-text-900); }
+.scard { border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); background: var(--color-surface); min-width: 0; }
+.scard-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 4px; padding: 12px 16px; background: var(--color-settings-head); border-bottom: 1px solid var(--color-border-subtle); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.scard-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: calc(15px * var(--fs-scale)); font-weight: 700; line-height: calc(20px * var(--fs-scale)); color: var(--color-text-900); }
 .scard-title .icon { color: var(--color-brand-700); flex: none; }
-.scard-desc { margin: 0; text-wrap: balance; font-size: 12px; line-height: 17px; color: var(--color-text-600); }
-.scard-body { padding: 8px 14px 10px; display: grid; gap: 6px; min-width: 0; }
+.scard-desc { margin: 0; text-wrap: balance; font-size: calc(13px * var(--fs-scale)); line-height: calc(19px * var(--fs-scale)); color: var(--color-text-600); }
+.scard-body { padding: 14px 16px 16px; display: grid; gap: 10px; min-width: 0; }
 /* 标签 → 控件：固定标签栏宽，所有行对齐同一条竖线；提示与错误在控件下方 */
 .row { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 12px; align-items: center; min-height: 32px; }
-.row-label { font-size: 14px; font-weight: 500; color: var(--color-text-600); }
+.row-label { font-size: calc(14px * var(--fs-scale)); font-weight: 500; color: var(--color-text-600); }
 .row-ctrl { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.row-hint, .row-msg { grid-column: 2; margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--color-text-600); }
-.group-sep { height: 1px; background: var(--color-border-subtle); margin: 2px 0; }
+.row-hint, .row-msg { grid-column: 2; margin: 4px 0 0; font-size: calc(13px * var(--fs-scale)); line-height: calc(19px * var(--fs-scale)); color: var(--color-text-600); }
+.row-ctrl .disclosure, .license-block .disclosure { flex: none; white-space: nowrap; }
+.license-block { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+.group-sep { height: 1px; background: var(--color-border-subtle); margin: 5px 0; }
 .inp, .sel {
   height: 32px; padding: 0 10px; border: 1px solid var(--color-border-control); border-radius: var(--radius-sm);
-  background: var(--color-surface); font-size: 14px; min-width: 0;
+  background: var(--color-surface); font-size: calc(14px * var(--fs-scale)); min-width: 0;
 }
 .inp-money { width: 132px; }
 .inp-time { width: 128px; flex: 0 1 128px; }
@@ -278,7 +440,7 @@ button, input, select { font: inherit; color: inherit; }
 /* 焦点框贴合控件外缘；说明文字留出描边空间。 */
 .inp:focus-visible, .sel:focus-visible { outline-offset: 0; }
 .input-prefix-sign { flex: none; font-weight: 600; color: var(--color-text-600); }
-.unit, .to { flex: none; font-size: 14px; color: var(--color-text-600); }
+.unit, .to { flex: none; font-size: calc(14px * var(--fs-scale)); color: var(--color-text-600); }
 .field-error { margin: 0; font-size: var(--fs-caption); color: var(--state-unpaid-fg); }
 .field-error:empty { display: none; }
 .field-hint { margin: 0; font-size: var(--fs-caption); line-height: 1.4; color: var(--color-text-600); }
@@ -293,12 +455,22 @@ button, input, select { font: inherit; color: inherit; }
 }
 .switch:checked { background: var(--color-brand-600); border-color: var(--color-brand-600); }
 .switch:checked::after { background: #fff; transform: translateX(16px); }
-.switch-state { font-size: 14px; color: var(--color-text-900); min-width: 1em; }
+.switch-state { font-size: calc(14px * var(--fs-scale)); color: var(--color-text-900); min-width: 1em; }
 .cheer-count { flex: none; margin-left: auto; min-width: 3em; text-align: right; font-size: var(--fs-caption); color: var(--color-text-600); font-variant-numeric: tabular-nums; }
-.para { margin: 0; font-size: 13px; line-height: 19px; color: var(--color-text-600); }
+/* 鼓励语：一句一行。行内是「输入框 + 计数 + 删除」，整块与右侧控件列对齐、上下留白由网格行自带 */
+.row-cheer { align-items: start; }
+.row-cheer > .row-label { padding-top: 7px; }
+.cheer-editor { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: 1 1 auto; min-width: 0; width: 100%; }
+.cheer-list { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+.cheer-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cheer-item > .inp { flex: 1 1 auto; width: auto; min-width: 0; }
+/* 删除钮只有一个符号：固定成方型，别让文字按钮的内边距把它拉成椭圆 */
+.cheer-remove { flex: none; min-width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: calc(15px * var(--fs-scale)); }
+.cheer-add { align-self: flex-start; }
+.para { margin: 0; font-size: calc(13px * var(--fs-scale)); line-height: calc(19px * var(--fs-scale)); color: var(--color-text-600); }
 .para b { color: var(--color-text-900); font-weight: 600; }
 .btn-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.warn-note { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: 12px; line-height: 18px; color: var(--state-lunch-fg); background: var(--state-lunch-bg); border-radius: var(--radius-full); padding: 2px 8px; }
+.warn-note { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: calc(12px * var(--fs-scale)); line-height: calc(18px * var(--fs-scale)); color: var(--warning-fg); background: var(--warning-bg); border-radius: var(--radius-full); padding: 2px 8px; }
 .warn-note .icon { width: 12px; height: 12px; flex: none; }
 /* 高级设置：卡头本身就是展开按钮（标题里放按钮，APG 手风琴） */
 .adv-heading { margin: 0; font: inherit; }
@@ -309,20 +481,26 @@ button, input, select { font: inherit; color: inherit; }
 .adv-head:hover { background: var(--color-brand-50); }
 .section-adv.is-open .adv-head { border-bottom: 1px solid var(--color-border-subtle); border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .chev { display: inline-block; width: 12px; text-align: center; color: var(--color-text-600); flex: none; }
-.adv-title { font-size: 15px; font-weight: 700; }
-.adv-sub, .adv-summary { font-size: 12px; font-weight: 400; color: var(--color-text-600); }
+.adv-title { font-size: calc(15px * var(--fs-scale)); font-weight: 700; }
+.adv-sub, .adv-summary { font-size: calc(12px * var(--fs-scale)); font-weight: 400; color: var(--color-text-600); }
 .adv-summary { margin-left: auto; text-align: right; }
 .adv-field { display: grid; gap: 6px; }
-.field-label { font-size: 14px; font-weight: 600; color: var(--color-text-900); }
+.field-label { font-size: calc(14px * var(--fs-scale)); font-weight: 600; color: var(--color-text-900); }
 .adv-field .inp { font-family: var(--font-num); }
 
-/* 矮视窗（≤ 640px，例如 1280×585 + 错误条 + 信息条）：收紧卡片的垂直留白，默认状态两栏仍不需要内部滚动 */
-@media (max-height: 640px) {
+/* 矮视窗保留紧凑版，避免预设内容出现内层滚动。 */
+@media (max-height: 800px) {
+  .set-grid { gap: var(--space-3); }
   .set-col { gap: 6px; }
-  .scard-head { padding-block: 4px; }
-  .scard-body { padding-block: 6px 7px; gap: 4px; }
-  .row { min-height: 30px; }
-  .para { line-height: 17px; }
+  .scard-head { padding: 3px 14px; row-gap: 1px; }
+  .scard-desc { font-size: calc(12px * var(--fs-scale)); line-height: calc(17px * var(--fs-scale)); }
+  .scard-body { padding: 5px 14px; gap: 2px; }
+  .row-hint, .row-msg { margin-top: 2px; font-size: calc(12px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); }
+  .license-block { gap: 2px; }
+  .group-sep { margin-block: 0; }
+  .inp, .sel { height: 28px; }
+  .row { min-height: 28px; }
+  .para { line-height: calc(17px * var(--fs-scale)); }
   .hstatus { min-height: 24px; }
   .adv-head { padding-block: 6px; min-height: 32px; }
 }
@@ -332,60 +510,62 @@ button, input, select { font: inherit; color: inherit; }
 @media (max-height: 640px) { .holiday-body { gap: 4px; } }
 .hstatus { display: flex; align-items: center; gap: 6px; min-height: 26px; }
 .hstatus-chips { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: var(--radius-full); font-size: 13px; font-weight: 500; white-space: nowrap; font-family: var(--font-num); }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: var(--radius-full); font-size: calc(13px * var(--fs-scale)); font-weight: 500; white-space: nowrap; font-family: var(--font-num); }
 .chip .icon { width: 12px; height: 12px; }
 .chip-ok { background: var(--state-working-bg); color: var(--state-working-fg); }
-.chip-miss { background: var(--state-lunch-bg); color: var(--state-lunch-fg); }
-.chip-note { margin-left: auto; font-size: 12px; color: var(--color-text-600); white-space: nowrap; font-family: var(--font-num); }
+.chip-miss { background: var(--warning-bg); color: var(--warning-fg); }
+.chip-note { margin-left: auto; font-size: calc(12px * var(--fs-scale)); color: var(--color-text-600); white-space: nowrap; font-family: var(--font-num); }
 .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .act { display: grid; gap: 3px; justify-items: start; align-content: start; min-width: 0; }
-.act-hint { margin: 0; font-size: 12px; line-height: 16px; color: var(--color-text-600); }
+.act-hint { margin: 0; font-size: calc(12px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); color: var(--color-text-600); }
 #btn-holiday-check[aria-disabled="true"] { background: var(--state-rest-bg); color: var(--color-text-600); cursor: progress; }
 .holiday-result {
-  margin: 0; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-size: 13px; line-height: 1.4;
+  margin: 0; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-size: calc(13px * var(--fs-scale)); line-height: 1.4;
   display: grid; gap: 2px; background: var(--state-rest-bg); color: var(--state-rest-fg); overflow-wrap: anywhere;
 }
 .holiday-result[data-tone="success"] { background: var(--state-working-bg); color: var(--state-working-fg); }
 .holiday-result[data-tone="info"] { background: var(--state-before-bg); color: var(--state-before-fg); }
-.holiday-result[data-tone="warn"] { background: var(--state-lunch-bg); color: var(--state-lunch-fg); }
+.holiday-result[data-tone="warn"] { background: var(--warning-bg); color: var(--warning-fg); }
 /* L7：结果行里的 ✓ 与胶囊 / 月历标记里的图示同尺寸 */
 .holiday-result-text .icon { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
 .holiday-result-detail { font-size: var(--fs-caption); }
 .holiday-result-detail:empty { display: none; }
-.disclosure { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; border: 0; background: none; padding: 2px 0; font-size: 13px; font-weight: 500; color: var(--color-brand-700); cursor: pointer; justify-self: start; }
+.disclosure { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; border: 0; background: none; padding: 2px 0; font-size: calc(13px * var(--fs-scale)); font-weight: 500; color: var(--color-brand-700); cursor: pointer; justify-self: start; }
 .disclosure .chev { color: inherit; }
 .disclosure:hover { text-decoration: underline; text-underline-offset: 2px; }
 .example { display: grid; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--color-bg); border: 1px solid var(--color-border-subtle); min-width: 0; }
-.example-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-600); }
+.example-head { display: flex; align-items: center; gap: 8px; font-size: calc(12px * var(--fs-scale)); color: var(--color-text-600); }
 .example-copy-state { margin-left: auto; color: var(--color-brand-700); }
 .example-copy-state:empty { display: none; }
 .example-head .btn-xs { margin-left: auto; flex: none; }
 .example-copy-state:not(:empty) + .btn-xs { margin-left: 0; }
-.code { margin: 0; padding: 6px 8px; border-radius: 4px; background: #fff; border: 1px solid #D1D5DB; font: 12px/16px ui-monospace, Consolas, "SF Mono", Menlo, monospace; color: var(--color-text-900); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+.code { margin: 0; padding: 6px 8px; border-radius: 4px; background: var(--color-surface); border: 1px solid var(--color-border-subtle); font-family: ui-monospace, Consolas, "SF Mono", Menlo, monospace; font-size: calc(12px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); color: var(--color-text-900); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .show-example { justify-self: start; }
 .adv-hint-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .adv-hint-row .act-hint { flex: 1 1 14em; }
-.ex-line { margin: 0; font-size: 12px; line-height: 17px; color: var(--color-text-600); }
-.mono { font: 12px/16px ui-monospace, Consolas, "SF Mono", Menlo, monospace; color: var(--color-text-900); background: #fff; border: 1px solid var(--color-border-subtle); border-radius: 3px; padding: 0 3px; user-select: all; overflow-wrap: anywhere; }
+.ex-line { margin: 0; font-size: calc(12px * var(--fs-scale)); line-height: calc(17px * var(--fs-scale)); color: var(--color-text-600); }
+.mono { font-family: ui-monospace, Consolas, "SF Mono", Menlo, monospace; font-size: calc(12px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); color: var(--color-text-900); background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: 3px; padding: 0 3px; user-select: all; overflow-wrap: anywhere; }
 
 /* Calendar（spec §13.3）：工具列 / 摘要行 / 图例各占一行且不换行，其余高度给格子（行高 minmax(40px, 1fr)） */
 .calendar { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
 .cal-toolbar { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; margin-bottom: 6px; flex: none; white-space: nowrap; }
-.cal-title { font-weight: 600; font-size: 15px; min-width: 7.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.cal-title { font-weight: 600; font-size: calc(15px * var(--fs-scale)); min-width: 7.5em; text-align: center; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .cal-toolbar { flex-wrap: wrap; } }
 /* 本月时是「安静」样式：边框仍用控件色（对白底 4.83:1，≥ 3:1），看得出能点、不像停用（M6） */
 .cal-today { color: var(--color-text-600); }
 .cal-today.is-away { background: var(--color-brand-100); border-color: var(--color-brand-600); color: var(--color-brand-700); font-weight: 600; }
 .cal-today.is-away:hover { background: var(--color-brand-50); }
-.cal-summary { display: flex; align-items: center; gap: 10px; min-height: 28px; margin-bottom: 2px; flex: none; white-space: nowrap; font-size: 13px; min-width: 0; }
+.cal-summary { display: flex; align-items: center; gap: 10px; min-height: 28px; margin-bottom: 2px; flex: none; white-space: nowrap; font-size: calc(13px * var(--fs-scale)); min-width: 0; }
 /* 较窄的视窗（< 1280px）：摘要行放不下时换行，不截断胶囊或缺表标签（round 3） */
 @media (max-width: 1279px) { .cal-summary { flex-wrap: wrap; row-gap: 2px; } .cal-note { flex: none; } }
+.cal-undo[aria-disabled="true"] { color: var(--color-text-600); cursor: default; opacity: .65; }
 .cal-summary-text { font-weight: 500; font-variant-numeric: tabular-nums; flex: none; }
 /* 情境胶囊（R36 / 决定 4）：有放假 = 实线灰底 + 旗子；有表且本月真的没有 = 纯灰字、无框（M10）；无表且没标出 = 虚线、不打 ✓。放不下时省略号，全文在 title */
 .cal-note {
   display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--radius-full);
-  font-size: 12px; white-space: nowrap; font-family: var(--font-num); min-width: 0; overflow: hidden; flex: 0 1 auto;
+  font-size: calc(12px * var(--fs-scale)); white-space: nowrap; font-family: var(--font-num); min-width: 0; overflow: hidden; flex: 0 1 auto;
 }
-.cal-note[data-tone="holiday"] { background: var(--cal-holiday-bg); color: var(--color-text-900); border: 1px solid #D1D5DB; }
+.cal-note[data-tone="holiday"] { background: var(--cal-holiday-bg); color: var(--color-text-900); border: 1px solid var(--color-border-subtle); }
 /* M10：本月确实没有法定假日——只是说明，不是状态，不给框、不给底；依据只放在 title 里 */
 .cal-note[data-tone="none"] { background: none; border: 0; padding: 0; color: var(--color-text-600); }
 /* 没有假期表、也还没标出假日：虚线框提醒「这里可以补」 */
@@ -395,17 +575,21 @@ button, input, select { font: inherit; color: inherit; }
 .cal-note-text { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .cal-year-tag { flex: none; }
 .cal-year-tag {
-  padding: 0 var(--space-2); border-radius: var(--radius-full); font: 500 var(--fs-caption)/20px var(--font-sans);
-  background: var(--state-lunch-bg); color: var(--state-lunch-fg);
+  padding: 0 var(--space-2); border-radius: var(--radius-full); font-family: var(--font-sans); font-weight: 500; line-height: calc(20px * var(--fs-scale));
+  background: var(--warning-bg); color: var(--warning-fg);
 }
 .cal-reset { margin-left: auto; }
-/* 图例：固定 7 项排成一行（右端的操作提示已移到工具栏，见 .legend-hint） */
+/* 图例在宽屏保持一行，窄屏按可用空间换行。 */
 .cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; height: 22px; margin-bottom: 6px; flex: none; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); color: var(--color-text-600); }
 .legend-title { font-weight: 600; flex: none; }
 .legend-items { display: flex; gap: 10px; align-items: center; flex: none; }
 .legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
+@media (max-width: 999px) {
+  .cal-legend { height: auto; overflow: visible; row-gap: 4px; }
+  .legend-items { flex: 1 1 0; min-width: 0; flex-wrap: wrap; gap: 4px 10px; }
+}
 /* M7：操作提示贴工具栏右端；空间不够时量测改短文案，再不够才隐藏（render / resize / 字体就绪都重算）。 */
-.legend-hint { margin-left: auto; flex: none; line-height: 22px; font-size: var(--fs-caption); color: var(--color-text-600); }
+.legend-hint { margin-left: auto; flex: none; line-height: calc(22px * var(--fs-scale)); font-size: var(--fs-caption); color: var(--color-text-600); }
 .legend-swatch {
   display: inline-flex; align-items: center; justify-content: center; position: relative;
   min-width: 24px; height: 18px; padding: 0 var(--space-1); border-radius: 4px;
@@ -418,12 +602,12 @@ button, input, select { font: inherit; color: inherit; }
 .cal-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto; grid-auto-rows: minmax(40px, 1fr); gap: var(--space-1); }
 @media (max-width: 999px) { .cal-grid { grid-auto-rows: minmax(48px, auto); } }
 .cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); min-height: 0; }
-.cal-colhead { text-align: center; font: 500 var(--fs-label)/18px var(--font-sans); color: var(--color-text-600); }
+.cal-colhead { text-align: center; font-family: var(--font-sans); font-weight: 500; line-height: calc(18px * var(--fs-scale)); color: var(--color-text-600); }
 .cal-cell { display: block; position: relative; min-width: 0; min-height: 0; container-type: inline-size; }
 .day {
   position: relative; width: 100%; height: 100%; min-height: 0; padding: 4px 6px 1px; text-align: left; cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm); background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm); background: var(--color-calendar-day);
   transition: background-color var(--dur-fast) var(--ease);
 }
 .day:hover { border-color: var(--color-border-control); }
@@ -431,18 +615,19 @@ button, input, select { font: inherit; color: inherit; }
    有标记的格子（法定假日/带薪假/无薪假/调休上班/手动改休息）已经有自己的底色，不去盖掉它 */
 .day.kind-workday:hover, .day.kind-weekend:hover { background: var(--color-brand-50); }
 .day:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
-/* 日期数字：固定在 20px 的方框里（今天 22px 的圆），用 grid 居中；今天的数字另按实际墨迹对齐。 */
-.day-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; height: 20px; line-height: 1; display: grid; place-items: center; border-radius: 50%; }
+/* 数字宽于圆时也以圆心为基准居中；今天另按实际墨迹对齐。 */
+.day-num { font-size: calc(13px * var(--fs-scale)); font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; height: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.day-num-ink { flex: none; }
 .day-date { display: flex; align-items: center; gap: 3px; max-width: 100%; }
-.day-lunar { font: 500 11px/1 var(--font-sans); color: var(--color-text-600); white-space: nowrap; }
+.day-lunar { font-family: var(--font-sans); font-weight: 500; font-size: calc(11px * var(--fs-scale)); line-height: 1; color: var(--color-text-600); white-space: nowrap; }
 @container (max-width: 74px) { .day-lunar { display: none; } }
-.day-label { display: flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); line-height: 14px; }
+.day-label { display: flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); line-height: calc(14px * var(--fs-scale)); }
 .day.is-manual .day-label { padding-right: 8px; }
-.day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 1px; flex: none; font-size: var(--fs-caption); line-height: 14px; }
+.day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 1px; flex: none; font-size: var(--fs-caption); line-height: calc(14px * var(--fs-scale)); }
 .day-tag .icon { width: 12px; height: 12px; }
 .day-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* 窄视窗（< 1240px，格子最窄约 78px）：标签字号 11px，让「班 劳动节」在 Windows 的微软雅黑下也有余量（mac 上实测 ≥ 6px） */
-@media (max-width: 1239px) { .day-label, .day-tag { font-size: 11px; } }
+@media (max-width: 1239px) { .day-label, .day-tag { font-size: calc(11px * var(--fs-scale)); } }
 /* 「班」与节日名之间 3px，免得读成一个词（班国庆）；最窄的格子（≤ 80px，1000px 宽的视窗）只留 1px，保住 ≥ 6px 的余量 */
 @container (max-width: 80px) { .day-label { gap: 1px; } }
 .day-dot { position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-600); display: inline-block; }
@@ -458,16 +643,13 @@ button, input, select { font: inherit; color: inherit; }
 }
 .kind-rest { background: var(--cal-rest-bg); }
 .day.is-today { border: 2px solid var(--color-brand-600); padding: 3px 5px 1px; }
-/* 今天的数字圆（C3）：22px 正圆，与普通格子的数字起点对齐，离 2px 的绿色边框 ≥ 3px。 */
-.day.is-today .day-num { width: 22px; height: 22px; background: var(--color-brand-600); color: #fff; }
-/* 大格子（≥ 140px 宽，1536×730 和 1920×950 的格子分别约 154px / 163px）：日期数字放大到 15px、内边距放宽，
-   免得整张月历像空表格。数字方框放大到 24px（2 位数墨迹两侧仍有 ≥ 3px）；今天的圆维持 22px 不变（M6 裁定），
-   只把内边距改成 5/7px，让圆与普通格子的数字起点仍然对齐（外缘 7px / 9px）。 */
+/* 今日圆圈随字级放大，M 以下维持原尺寸，避免大字贴住圆边。 */
+.day.is-today .day-num { width: max(22px, calc(22px * var(--fs-scale))); height: max(22px, calc(22px * var(--fs-scale))); flex: none; background: var(--color-brand-600); color: #fff; }
+/* 大格子放大日期并放宽内边距；今日圆圈仍随全局字级调整。 */
 @container (min-width: 140px) {
   .day { padding: 6px 8px 2px; }
   .day.is-today { padding: 5px 7px 1px; }
-  .day-num { width: 24px; height: 24px; font-size: 15px; }
-  .day.is-today .day-num { width: 22px; height: 22px; }
+  .day-num { width: 24px; height: 24px; font-size: calc(15px * var(--fs-scale)); }
 }
 
 /* Day menu（菜单）与提示：浮在月历之上；状态以文字 + 图示表达，不只靠颜色 */
@@ -504,7 +686,7 @@ button, input, select { font: inherit; color: inherit; }
   padding: 0 4px; text-align: center; border-radius: var(--radius-sm);
   border: 2px solid var(--tip-ring, var(--tip-fg));
   background: var(--tip-bg, var(--color-surface)); color: var(--color-text-900); box-shadow: 0 4px 12px rgb(16 24 40 / .14);
-  font: 400 12px/15px var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num); font-weight: 400; font-size: calc(12px * var(--fs-scale)); line-height: calc(15px * var(--fs-scale)); font-variant-numeric: tabular-nums;
 }
 .day-tooltip > span { flex: none; max-width: 100%; }
 .day-tooltip[data-kind="workday"] { --tip-fg: var(--state-working-fg); }
@@ -520,72 +702,78 @@ button, input, select { font: inherit; color: inherit; }
 .day-tooltip .tip-lunar { white-space: nowrap; color: var(--color-text-600); }
 @container (min-width: 74.01px) { .day-tooltip.is-no-lunar .tip-lunar { display: none; } }
 .day-tooltip .tip-status { font-weight: 500; color: var(--tip-fg); }
-.day-tooltip .tip-source { font-size: 11px; line-height: 14px; color: var(--color-text-600); }
-.day-tooltip .tip-pay { line-height: 22px; white-space: nowrap; }
+.day-tooltip .tip-source { font-size: calc(11px * var(--fs-scale)); line-height: calc(14px * var(--fs-scale)); color: var(--color-text-600); }
+.day-tooltip .tip-pay { line-height: calc(22px * var(--fs-scale)); white-space: nowrap; }
 .day-tooltip .pay-label, .day-tooltip .pay-amt { line-height: 1; } /* 一行里字号不同：行高由 .tip-pay 决定，不被大字撑高 */
-.day-tooltip .pay-label { font-size: 11px; color: var(--color-text-600); }
-.day-tooltip .pay-amt { font-size: 18px; font-weight: 700; color: var(--color-brand-700); letter-spacing: -0.2px; }
-.day-tooltip .tip-pay { font-size: 18px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+.day-tooltip .pay-label { font-size: calc(11px * var(--fs-scale)); color: var(--color-text-600); }
+.day-tooltip .pay-amt { font-size: calc(18px * var(--fs-scale)); font-weight: 700; color: var(--color-brand-700); letter-spacing: -0.2px; }
+.day-tooltip .tip-pay { font-size: calc(18px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
 .day-tooltip .tip-pay.is-zero .pay-amt { color: var(--color-text-600); }
 .day-tooltip.is-compact .tip-source { display: none; }
+.day-tooltip.is-no-pay-label .pay-label { display: none; }
+.day-tooltip.is-no-status-name .tip-status .u-detail { display: none; }
 .day-tooltip.is-no-wd .u-wd { display: none; } /* 倒数第二档：先藏「周X」（屏幕阅读器仍从 aria-describedby 读到），之后才是拿掉状态行 */
 .day-tooltip.is-lean .tip-status { display: none; }
-.day-tooltip.is-tight { font-size: 11px; line-height: 12px; }
-.day-tooltip.is-tight .tip-source { font-size: 10.5px; line-height: 12px; }
-.day-tooltip.is-tight .tip-pay { line-height: 20px; }
-.day-tooltip.is-tight .pay-label { font-size: 10.5px; }
-.day-tooltip.is-tight .pay-amt { font-size: 17px; }
-.day-tooltip.is-tight .tip-pay { font-size: 17px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
-.day-tooltip.is-mini { font-size: 10px; line-height: 11px; }
-.day-tooltip.is-mini .tip-pay { line-height: 15px; }
-.day-tooltip.is-mini .pay-label { font-size: 10px; }
-.day-tooltip.is-mini .pay-amt { font-size: 13px; }
-.day-tooltip.is-mini .tip-pay { font-size: 13px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+.day-tooltip.is-tight { font-size: calc(11px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
+.day-tooltip.is-tight .tip-source { font-size: calc(10.5px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
+.day-tooltip.is-tight .tip-pay { line-height: calc(20px * var(--fs-scale)); }
+.day-tooltip.is-tight .pay-label { font-size: calc(10.5px * var(--fs-scale)); }
+.day-tooltip.is-tight .pay-amt { font-size: calc(17px * var(--fs-scale)); }
+.day-tooltip.is-tight .tip-pay { font-size: calc(17px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+.day-tooltip.is-mini { font-size: calc(10px * var(--fs-scale)); line-height: calc(11px * var(--fs-scale)); }
+.day-tooltip.is-mini .tip-pay { line-height: calc(15px * var(--fs-scale)); }
+.day-tooltip.is-mini .pay-label { font-size: calc(10px * var(--fs-scale)); }
+.day-tooltip.is-mini .pay-amt { font-size: calc(13px * var(--fs-scale)); }
+.day-tooltip.is-mini .tip-pay { font-size: calc(13px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
 /* 窄格子（< 112px，约 1000–1200px 宽的视窗）：小一号字；「计薪」小字一行、金额一行（金额仍是主角）；放不下（矮格子）就回到一行 */
 @container (max-width: 112px) {
-  .day-tooltip { padding: 0 2px; font-size: 11px; line-height: 13px; }
-  .day-tooltip .tip-source { font-size: 10.5px; line-height: 13px; }
-  .day-tooltip .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: 12px; }
-  .day-tooltip .pay-label { font-size: 10.5px; line-height: 12px; }
-  .day-tooltip .pay-amt { font-size: 14px; line-height: 17px; letter-spacing: -0.3px; }
-  .day-tooltip .tip-pay { font-size: 14px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
-  .day-tooltip.is-inline .tip-pay { display: block; line-height: 17px; }
-  .day-tooltip.is-tight { padding: 0 1px; font-size: 10.5px; line-height: 12px; }
+  .day-tooltip { padding: 0 2px; font-size: calc(11px * var(--fs-scale)); line-height: calc(13px * var(--fs-scale)); }
+  .day-tooltip .tip-source { font-size: calc(10.5px * var(--fs-scale)); line-height: calc(13px * var(--fs-scale)); }
+  .day-tooltip .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: calc(12px * var(--fs-scale)); }
+  .day-tooltip .pay-label { font-size: calc(10.5px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
+  .day-tooltip .pay-amt { font-size: calc(14px * var(--fs-scale)); line-height: calc(17px * var(--fs-scale)); letter-spacing: -0.3px; }
+  .day-tooltip .tip-pay { font-size: calc(14px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-inline .tip-pay { display: block; line-height: calc(17px * var(--fs-scale)); }
+  .day-tooltip.is-tight { padding: 0 1px; font-size: calc(10.5px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
   .day-tooltip.is-tight .tip-title { letter-spacing: -0.2px; } /* 78px 宽的格子：「11月18日 周三」挤进一行 */
-  .day-tooltip.is-tight .tip-pay { line-height: 12px; }
-  .day-tooltip.is-tight .pay-label { line-height: 11px; }
-  .day-tooltip.is-tight .pay-amt { font-size: 13px; line-height: 16px; }
-  .day-tooltip.is-tight .tip-pay { font-size: 13px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
-  .day-tooltip.is-tight.is-inline .tip-pay { line-height: 16px; }
-  .day-tooltip.is-mini { font-size: 10px; line-height: 11px; }
-  .day-tooltip.is-mini.is-inline .tip-pay { line-height: 14px; }
+  .day-tooltip.is-tight .tip-pay { line-height: calc(12px * var(--fs-scale)); }
+  .day-tooltip.is-tight .pay-label { line-height: calc(11px * var(--fs-scale)); }
+  .day-tooltip.is-tight .pay-amt { font-size: calc(13px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); }
+  .day-tooltip.is-tight .tip-pay { font-size: calc(13px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-tight.is-inline .tip-pay { line-height: calc(16px * var(--fs-scale)); }
+  .day-tooltip.is-mini { font-size: calc(10px * var(--fs-scale)); line-height: calc(11px * var(--fs-scale)); }
+  .day-tooltip.is-mini.is-inline .tip-pay { line-height: calc(14px * var(--fs-scale)); }
   .day-tooltip.is-inline .pay-label, .day-tooltip.is-inline .pay-amt { line-height: 1; }
   .day-tooltip.is-mini .pay-label, .day-tooltip.is-mini .pay-amt { line-height: 1; }
-  .day-tooltip.is-mini .pay-label { font-size: 10px; }
-  .day-tooltip.is-mini .pay-amt { font-size: 11px; }
-  .day-tooltip.is-mini .tip-pay { font-size: 11px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-mini .pay-label { font-size: calc(10px * var(--fs-scale)); }
+  .day-tooltip.is-mini .pay-amt { font-size: calc(11px * var(--fs-scale)); }
+  .day-tooltip.is-mini .tip-pay { font-size: calc(11px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
 }
 @container (max-width: 74px) {
-  .day-tooltip.is-lean .tip-title, .day-tooltip.is-lean .tip-lunar { line-height: 10px; }
-  .day-tooltip.is-lean .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: 11px; }
+  .day-tooltip.is-lean .tip-title, .day-tooltip.is-lean .tip-lunar { line-height: calc(10px * var(--fs-scale)); }
+  .day-tooltip.is-lean .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: calc(11px * var(--fs-scale)); }
 }
 /* 大格子（≥ 140px，约 1536 / 1920 宽）：字跟着放大；行高不够（6 周月份）时收紧，金额仍 ≥ 日期字号的 1.5 倍 */
 @container (min-width: 140px) {
-  .day-tooltip { font-size: 13px; line-height: 18px; gap: 1px; }
-  .day-tooltip .tip-title { font-size: 14px; }
-  .day-tooltip .tip-source { font-size: 12px; line-height: 16px; }
-  .day-tooltip .tip-pay { line-height: 28px; }
-  .day-tooltip .pay-label { font-size: 12px; }
-  .day-tooltip .pay-amt { font-size: 22px; }
-  .day-tooltip .tip-pay { font-size: 22px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
-  .day-tooltip.is-tight { font-size: 13px; line-height: 16px; gap: 0; }
-  .day-tooltip.is-tight .tip-title { font-size: 13px; }
-  .day-tooltip.is-tight .tip-source { font-size: 12px; line-height: 14px; }
-  .day-tooltip.is-tight .tip-pay { line-height: 22px; }
-  .day-tooltip.is-tight .pay-label { font-size: 12px; }
-  .day-tooltip.is-tight .pay-amt { font-size: 20px; }
-  .day-tooltip.is-tight .tip-pay { font-size: 20px; } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip { font-size: calc(13px * var(--fs-scale)); line-height: calc(18px * var(--fs-scale)); gap: 1px; }
+  .day-tooltip .tip-title { font-size: calc(14px * var(--fs-scale)); }
+  .day-tooltip .tip-source { font-size: calc(12px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); }
+  .day-tooltip .tip-pay { line-height: calc(28px * var(--fs-scale)); }
+  .day-tooltip .pay-label { font-size: calc(12px * var(--fs-scale)); }
+  .day-tooltip .pay-amt { font-size: calc(22px * var(--fs-scale)); }
+  .day-tooltip .tip-pay { font-size: calc(22px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-tight { font-size: calc(13px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); gap: 0; }
+  .day-tooltip.is-tight .tip-title { font-size: calc(13px * var(--fs-scale)); }
+  .day-tooltip.is-tight .tip-source { font-size: calc(12px * var(--fs-scale)); line-height: calc(14px * var(--fs-scale)); }
+  .day-tooltip.is-tight .tip-pay { line-height: calc(22px * var(--fs-scale)); }
+  .day-tooltip.is-tight .pay-label { font-size: calc(12px * var(--fs-scale)); }
+  .day-tooltip.is-tight .pay-amt { font-size: calc(20px * var(--fs-scale)); }
+  .day-tooltip.is-tight .tip-pay { font-size: calc(20px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
 }
+/* Keep a readable amount and status when the NT$ prefix needs more width. */
+.day-tooltip.is-currency-fit .tip-title { font-size: calc(9px * var(--fs-scale)); }
+.day-tooltip.is-currency-fit .pay-amt { font-size: calc(14px * var(--fs-scale)); letter-spacing: -0.4px; }
+.day-tooltip.is-currency-fit .tip-pay { font-size: calc(14px * var(--fs-scale)); line-height: calc(15px * var(--fs-scale)); }
 
 /* Import report（H6 放到备份卡顶部；M19：不再是一层嵌套框，只用一条分隔线与卡片其余内容分开） */
 .import-report { display: grid; gap: var(--space-2); padding: 0 0 var(--space-2); border: 0; border-bottom: 1px solid var(--color-border-subtle); }
@@ -603,12 +791,12 @@ button, input, select { font: inherit; color: inherit; }
   display: flex; gap: var(--space-3); align-items: center; padding: var(--space-3) var(--space-4);
   background: var(--color-text-900); color: #fff; border-radius: var(--radius-md); box-shadow: var(--shadow-card);
 }
-.toast-action { border: 0; background: none; color: #BBF7D0; font-weight: 600; cursor: pointer; text-decoration: underline; min-height: 24px; }
+.toast-action { border: 0; background: none; color: var(--color-toast-action); font-weight: 600; cursor: pointer; text-decoration: underline; min-height: 24px; }
 /* 标签的角色：有金额的状态是小标签（14px 深色，V5）；已下班是 20px 状态色的收工句；
    休息日 / 法定假日 / 无薪假没有金额，标签就是这张卡的主角（32px），在标签与指标格之间的空白里居中（lg） */
 .status-card[data-tone="after"] .card-label { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); color: var(--tone-fg); }
 .status-card[data-tone="rest"] .card-label, .status-card[data-tone="holiday"] .card-label, .status-card[data-tone="unpaid"] .card-label {
-  font: 600 32px/1.15 var(--font-sans); color: var(--color-text-900);
+  font-family: var(--font-sans); font-weight: 600; font-size: calc(32px * var(--fs-scale)); line-height: 1.15; color: var(--color-text-900);
 }
 .status-card[data-size="lg"][data-tone="rest"] .card-label, .status-card[data-size="lg"][data-tone="holiday"] .card-label,
 .status-card[data-size="lg"][data-tone="unpaid"] .card-label { margin-top: auto; }
@@ -620,7 +808,7 @@ button, input, select { font: inherit; color: inherit; }
 .card-year {
   justify-self: start; align-self: start; padding: 2px var(--space-2); border-radius: var(--radius-full);
   font: 500 var(--fs-caption)/1.4 var(--font-sans);
-  background: var(--state-lunch-bg); color: var(--state-lunch-fg);
+  background: var(--warning-bg); color: var(--warning-fg);
 }
 
 /* Float (Document PiP)：状态卡正下方、同一栏满宽的主按钮（R38）；按钮下是说明（不支持的原因 / 悬浮时请保持本页开启） */
@@ -628,7 +816,7 @@ button, input, select { font: inherit; color: inherit; }
 .float-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
 .float-btn .icon { flex: none; }
 .float-note { margin: 0; text-wrap: pretty; font-size: var(--fs-caption); line-height: 1.45; color: var(--color-text-600); }
-.float-note.is-warn { color: var(--state-lunch-fg); }
+.float-note.is-warn { color: var(--warning-fg); }
 .pip-placeholder {
   display: flex; flex-direction: column; gap: var(--space-2); align-items: center; justify-content: center; width: 100%; min-height: 160px;
   padding: var(--space-5); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg);
@@ -643,9 +831,85 @@ button, input, select { font: inherit; color: inherit; }
 /* 小窗里卡片铺满窗口（L3）：内容少的状态垂直居中，不留白条；测量用的 measureSmallCard 在主文件里量，不受影响 */
 .pip-body .status-card { min-height: 100vh; align-content: center; }
 
+/* 状态卡区块开关（设置 › 显示）：card.js 用 hidden 收起来，这里再声明一次「关掉就真的不占位」。
+   两条路都留着 = 就算某个环节漏了 hidden（例如将来某块不是 show() 收起），版面也不会留下空洞。
+   日期开关只收 .card-date-group（日期 + 农历），状态徽章永远保留：看得到「为什么今天这样」。 */
+.status-card[data-show-progress="false"] .card-progress,
+.status-card[data-show-metrics="false"] .card-metrics,
+.status-card[data-show-date="false"] .card-date-group,
+.status-card[data-show-payday="false"] .card-payday,
+.status-card[data-show-cheer="false"] .card-cheer { display: none; }
+
 /* 会变化的数字统一用数字字体栈 + 等宽数字（放在最后，覆盖前面 font 简写里的字体族）。
    雅黑是否支持等宽数字未在 Windows 实测，所以数字不交给 --font-sans。 */
 .amount, .metric-value, .card-date, .card-progress-text, .card-countdown, .cd-ghost, .card-done, .card-payday,
 .day-num, .cal-title, .cal-summary-text, .day-menu-note, .day-tooltip, .cheer-count, .input-prefix > input {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
+
+/* 触屏 / 窄屏（< 1000px）：可点目标统一到 --tap-min（44px）。桌面（≥ 1000px）保持 24 / 28 / 32 / 36px 的紧凑密度，
+   所以这一节整段只在窄屏生效；只改高度、内边距与换行，不引入新颜色，全部沿用上面的 token。 */
+@media (max-width: 999px) {
+  /* 按钮：.btn(36) / .btn-s(28) / .btn-xs(24) 都抬到 44——导入/导出备份、导入假期表、检查更新、复制示例、月历翻页
+     都走这三类。选择器与上面的 .btn-s / .btn-xs 同优先级，本段在文件末尾，靠源码顺序覆盖；宽度、内边距与字号不动，
+     所以「复制示例」这类窄按钮只变高，不会挤到下一行。 */
+  .btn { min-height: var(--tap-min); }
+  .autosave { position: fixed; top: 12px; right: 12px; z-index: 10; padding: 4px 10px; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-full); box-shadow: var(--shadow-card); }
+
+  /* 鼓励语的删除钮：桌面 32px 方钮，窄屏抬到 --tap-min 的方型点击区（宽度也要抬，只抬高度会变成细长条）；
+     输入框仍是 flex:1 1 auto + min-width:0，行内其余元素不换行，320px 下不会挤出横向卷轴 */
+  .cheer-remove { min-width: var(--tap-min); min-height: var(--tap-min); }
+
+  /* 分页标签与折叠行（格式示例、高级设置）：整行可点，高度与按钮一致 */
+  .tab { height: var(--tap-min); }
+  .disclosure, .adv-head { min-height: var(--tap-min); }
+
+  /* 提示条：动作按钮与关闭钮变高后整条允许换行——文字放不下时动作退到第二行，而不是把正文挤成一列字。
+     正文仍用基础的 flex:0 1 auto，短文案配小按钮时依然排成一行 */
+  .banner { flex-wrap: wrap; row-gap: var(--space-1); padding-block: var(--space-1); }
+  .banner-actions { gap: var(--space-2); }
+  .banner-close { min-width: var(--tap-min); min-height: var(--tap-min); }
+
+  /* 开关：视觉仍是 40×24（描边与滑块不动），点击区用伪元素扩到 44×44；.row 同步到 44，避免相邻行点击区互相覆盖 */
+  .row { min-height: var(--tap-min); }
+  .switch::before { content: ""; position: absolute; inset: -10px -2px; }
+
+  /* 月历：日期菜单项 40 → 44（菜单高度由 JS 用 offsetHeight 量后重新定位，变高不会跑到视窗外的错误位置）。
+     工具栏 / 摘要行本身不改：里面的 .btn-s 变 44 会把行撑高，基础样式已有的 480px / 1279px 换行规则照旧生效。 */
+  .day-menu-item { min-height: var(--tap-min); }
+
+  /* 撤销（toast 里的动作）：44 高；整条限宽并允许换行，320px 下既不出横向卷轴，也不会把提示文字挤出屏幕 */
+  .toast { max-width: calc(100% - 2 * var(--space-4)); flex-wrap: wrap; row-gap: var(--space-1); }
+  .toast-text { min-width: 0; overflow-wrap: anywhere; }
+  .toast-action { min-height: var(--tap-min); padding-inline: var(--space-1); }
+
+  /* 导入结果的「导出报告 / 关闭」两颗按钮变高后，320px 下允许换行，不撑破卡片 */
+  .report-actions { flex-wrap: wrap; row-gap: var(--space-2); }
+}
+
+/* 单栏设置显示分区导航；窄视口的两栏也显示，并让导航占满整行。 */
+.settings-nav { display: none; align-items: center; gap: var(--space-2);
+    min-width: 0; max-width: 100%;
+    overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    /* 四边各留 4px：:focus-visible 的 2px 描边 + 2px 偏移刚好落在留白里，不被滚动容器裁掉 */
+    padding: var(--space-1); margin: 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    scrollbar-width: thin;
+}
+  .settings-nav-link {
+    flex: none; display: inline-flex; align-items: center; justify-content: center;
+    min-height: var(--tap-min); padding: 0 var(--space-4);
+    border: 1px solid var(--color-border-control); border-radius: var(--radius-full);
+    background: var(--color-surface); color: var(--color-text-900);
+    font-size: var(--fs-body); font-weight: 500; line-height: 1.2; white-space: nowrap; text-decoration: none;
+    cursor: pointer; scroll-snap-align: start;
+    transition: background-color var(--dur-fast) var(--ease);
+  }
+  .settings-nav-link:hover { background: var(--color-brand-50); color: var(--color-brand-700); }
+  /* 焦点环画在内侧（与 .inp / .sel 同一做法），横向滚动容器不会裁掉它 */
+  .settings-nav-link:focus-visible { outline-offset: 0; }
+  /* 容器宽于 760px 时设置区仍是两栏（约 ≥816px 视窗）：导航占满整行，不挤掉第一张卡；单栏时 1 / -1 等价于整行，无害 */
+  .set-grid > .settings-nav { grid-column: 1 / -1; }
+@container (max-width: 760px) { .settings-nav { display: flex; } }
+@media (max-width: 999px) { .settings-nav { display: flex; } }

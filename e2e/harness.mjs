@@ -44,9 +44,11 @@ export const isLocal = (u) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 全新储存、无自定义网址时，开页自动检查「应该」请求的网址（按北京时间的日期算，与页面一致）。
-export function expectedAutoUrls(iso) {
+export function expectedAutoUrls(iso, region = 'CN') {
+  if (region === 'TW') return [];
   const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date(iso)).split('-').map(Number);
-  return yearsToAutoCheck(new Date(y, m - 1, d, 12), HOLIDAYS_CN, null)
+  const now = new Date(y, m - 1, d, 12);
+  return yearsToAutoCheck(now, HOLIDAYS_CN, null)
     .flatMap((yr) => DEFAULT_HOLIDAY_SOURCES.map((s) => buildSourceUrl(s, yr)));
 }
 
@@ -151,6 +153,15 @@ export function pipStub(opts) {
         w.dispatchEvent(new Event('pagehide'));
         dp.window = null;
         f.remove();
+      };
+      // Document PiP 的 resizeTo 需要手势、浏览器可能拒绝；stub 里记录调用并把 iframe 调成该尺寸，
+      // 同时派发 resize（真实窗口大小改变也会派发），让「记住使用者拉动的尺寸」逻辑有东西可量。
+      entry.resizes = [];
+      w.resizeTo = (width, height) => {
+        entry.resizes.push({ width, height });
+        f.style.width = `${width}px`;
+        f.style.height = `${height}px`;
+        w.dispatchEvent(new Event('resize'));
       };
       reg.wins.push(entry);
       dp.window = w;

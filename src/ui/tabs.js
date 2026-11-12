@@ -1,12 +1,13 @@
 // 分页（WAI-ARIA APG Tabs，自动启用）：tablist / tab / tabpanel、aria-controls、aria-selected、
 // roving tabindex；←/→ 循环切换、Home / End 到首尾。非当前面板用 hidden（不可聚焦，DOM 与输入值保留）。
-import { h } from './dom.js';
+import { h, setText } from './dom.js';
 
 export function createTabs(doc, { tabs, initial, onChange, label }) {
   const btns = new Map();
   let cur = null;
+  let tabLabel = label; // 可随地区切换；按钮文字由 setProfile 传入的文字替换
 
-  const root = h(doc, 'div', { class: 'tablist', role: 'tablist', 'aria-label': label });
+  const root = h(doc, 'div', { class: 'tablist', role: 'tablist', 'aria-label': tabLabel });
   for (const tab of tabs) {
     const btn = h(doc, 'button', {
       type: 'button', role: 'tab', class: 'tab', id: `tab-${tab.id}`, 'aria-controls': `panel-${tab.id}`,
@@ -22,6 +23,7 @@ export function createTabs(doc, { tabs, initial, onChange, label }) {
     tab.panel.hidden = true;
   }
   const ids = tabs.map((x) => x.id);
+  const original = new Map(tabs.map((x) => [x.id, x.label])); // 字典缺项时保留建構时的文字，不猜
 
   function onKey(e, id) {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -47,6 +49,13 @@ export function createTabs(doc, { tabs, initial, onChange, label }) {
     if (changed) onChange?.(id);
   }
 
+  // 切换地区：只换文字与 aria-label（tablist 不重建，选中项、焦点与面板输入都保留）
+  function setProfile(t) {
+    tabLabel = t.tabs.label;
+    root.setAttribute('aria-label', tabLabel);
+    for (const tab of tabs) setText(btns.get(tab.id), t.tabs[tab.id] ?? original.get(tab.id));
+  }
+
   select(initial);
-  return { select, current: () => cur, root };
+  return { select, current: () => cur, root, setProfile };
 }

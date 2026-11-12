@@ -8,6 +8,19 @@ import { build } from 'esbuild';
 import { startServer, launch, openAt, expectedAutoUrls, pipStub, root } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
+
+// 本文件断言的是中国地区的数字格式（千分位、¥ 金额）：明确写入旧版（v1，无地区）设置，
+// 让应用走「旧数据一律归中国」的迁移路径，不依赖当前的新用户默认地区（台湾）。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
+// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+const seeded = (init) => {
+  if (init == null) return CN_SEED;
+  if (typeof init === 'string') return `${CN_SEED}\n${init}`;
+  if (typeof init === 'function') return `${CN_SEED}\n(${init.toString()})();`;
+  if (typeof init.content === 'string') return { ...init, content: `${CN_SEED}\n${init.content}` };
+  return init;
+};
 const GROUPS = [
   ['1,565.5456', '1,111.1111', '8,888.8888', '1,000.0000'],
   ['888.8888', '111.1111', '123.4567', '000.0000'],
@@ -32,7 +45,7 @@ after(async () => {
 });
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...opts, init: seeded(opts?.init) });
   try {
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);

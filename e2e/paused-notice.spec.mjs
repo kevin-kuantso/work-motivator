@@ -6,6 +6,22 @@ import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harnes
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 const NOTICE = '页面刚才被浏览器暂停了一段时间，数字已按当前时间校正';
+const TW_NOTICE = '頁面剛才被瀏覽器暫停了一段時間，數字已按目前時間校正';
+
+// 本文件断言的是中国地区文案（暂停提示、日期菜单、撤销 toast）：明确写入旧版（v1，无地区）设置，
+// 让应用走「旧数据一律归中国」的迁移路径，不依赖当前的新用户默认地区（台湾）。
+// 唯一例外是第一条测试：它断言「首次提示横幅还在」，而首次提示的前提就是 localStorage 里没有设置，
+// 所以那一条以 seed: false 明确保持全新用户的台湾默认（横幅文字随之不同）。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
+// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+const seeded = (init) => {
+  if (init == null) return CN_SEED;
+  if (typeof init === 'string') return `${CN_SEED}\n${init}`;
+  if (typeof init === 'function') return `${CN_SEED}\n(${init.toString()})();`;
+  if (typeof init.content === 'string') return { ...init, content: `${CN_SEED}\n${init.content}` };
+  return init;
+};
 
 let server;
 let browser;
@@ -19,7 +35,8 @@ after(async () => {
 });
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
+  const { seed = true, ...rest } = opts ?? {};
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...rest, init: seed ? seeded(rest.init) : rest.init });
   try {
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
@@ -48,7 +65,7 @@ const toastState = (page) => page.evaluate(() => {
   const el = document.querySelector('.toast');
   return { visible: !el.hidden, text: el.querySelector('.toast-text').textContent, undo: !el.querySelector('.toast-action').hidden };
 });
-const notices = async (page) => (await shown(page)).filter((s) => s === NOTICE).length;
+const notices = async (page) => (await shown(page)).filter((s) => s === NOTICE || s === TW_NOTICE).length;
 // 模拟分页隐藏 / 回来（headless 永远是 visible）
 const setVisibility = (page, state) => page.evaluate((s) => {
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
@@ -65,7 +82,7 @@ test('first tick and normal-pace ticks show nothing; one 60 s jump shows exactly
     const before = await page.locator('#status-card .card-amount').textContent();
     await page.clock.fastForward(60000);
     const s = await toastState(page);
-    assert.deepEqual(s, { visible: true, text: NOTICE, undo: false }, 'quiet toast, no action button');
+    assert.deepEqual(s, { visible: true, text: TW_NOTICE, undo: false }, 'quiet toast, no action button');
     assert.notEqual(await page.locator('#status-card .card-amount').textContent(), before, 'numbers re-derived from the clock');
     assert.equal(await notices(page), 1);
     await page.clock.runFor(5500);
@@ -79,8 +96,8 @@ test('first tick and normal-pace ticks show nothing; one 60 s jump shows exactly
     await page.clock.fastForward(60000);
     assert.equal(await notices(page), 2, 'again after 10 minutes');
     // 横幅不受影响（首次提示仍在）
-    assert.equal(await page.getByText('现在按默认月薪 ¥6,800、08:30–17:00 计算，请改成你自己的').isVisible(), true, 'banners untouched');
-  }));
+    assert.equal(await page.getByText('目前按預設月薪 NT$40,000、08:30–17:00 計算，請改成你自己的').isVisible(), true, 'banners untouched');
+  }, { seed: false })); // 例外：首次提示只在新用户（localStorage 没有设置）时出现，与「写入旧版中国设置」互斥
 
 test('the notice never replaces the calendar undo toast: it waits until the undo toast is gone', () =>
   withPage(T1412, async (page) => {

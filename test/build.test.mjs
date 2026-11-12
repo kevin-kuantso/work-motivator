@@ -19,14 +19,21 @@ export const URL_ALLOWLIST = Object.freeze([
   'https://www.gov.cn/',
   'https://example.com/{year}.json',
   'https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm',
+  'https://www.dgbas.gov.tw/News_Content.aspx?n=3602&s=235863',
+  'https://zhuanlan.zhihu.com/p/2015685656777609855',
+  'https://data.gov.tw/dataset/14718',
+  'https://data.gov.tw/license',
+  'https://www.dgpa.gov.tw/FileConversion?filename=dgpa/files/202506/a52331bd-a189-466b-b0f0-cae3062bbf74.csv&nfix=&name=115%e5%b9%b4%e4%b8%ad%e8%8f%af%e6%b0%91%e5%9c%8b%e6%94%bf%e5%ba%9c%e8%a1%8c%e6%94%bf%e6%a9%9f%e9%97%9c%e8%be%a6%e5%85%ac%e6%97%a5%e6%9b%86%e8%a1%a8.csv',
+  'https://www.dgpa.gov.tw/FileConversion?filename=dgpa/files/202607/f538b1ff-ba60-4c63-9477-10db8e6612d1.csv&nfix=&name=116%e5%b9%b4%e4%b8%ad%e8%8f%af%e6%b0%91%e5%9c%8b%e6%94%bf%e5%ba%9c%e8%a1%8c%e6%94%bf%e6%a9%9f%e9%97%9c%e8%be%a6%e5%85%ac%e6%97%a5%e6%9b%86%e8%a1%a8_utf8bom.csv',
 ]);
 // 不带主机名的 "https://" 只允许出现在这两个固定上下文里（R31），且成品里出现的次数固定（见下方 dist 测试）。
 // 其他任何裸 "https://"（例如 "https://" + host 的拼接）都会被当成 URL 报出来。
 export const BARE_SCHEME_CONTEXTS = Object.freeze([
   'var SCHEME = "https://";', // holiday-data.js：校验自定义网址的前缀
   '必须以 https:// 开头', // strings：自定义网址的错误提示 + 高级设置里常驻的格式提示（Task 14）
+  '必須以 https:// 開頭',
 ]);
-const BARE_SCHEME_COUNTS = Object.freeze({ 'var SCHEME = "https://";': 1, '必须以 https:// 开头': 2 });
+const BARE_SCHEME_COUNTS = Object.freeze({ 'var SCHEME = "https://";': 1, '必须以 https:// 开头': 2, '必須以 https:// 開頭': 2 });
 const BARE_SCHEME = /https?:\/\/(?![A-Za-z0-9])/gi;
 
 export function findExternalRefs(html) {

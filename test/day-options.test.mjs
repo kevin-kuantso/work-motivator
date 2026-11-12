@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { dayInfo } from '../src/calendar.js';
 import { HOLIDAYS_CN } from '../src/holidays-cn.js';
 import { DEFAULTS } from '../src/settings.js';
+import { CN_HOLIDAY_PROVIDER } from '../src/holiday-provider-cn.js';
+import { STRINGS as CN } from '../src/strings.zh-CN.js';
 import { ymd } from '../src/ui/format.js';
 import {
   dayOptions, applyOption, previewDailyWage, menuModel, dayTooltipModel, tooltipText,
 } from '../src/ui/day-options.js';
 
-const cfg = { ...DEFAULTS };
+// 历史 CN fixture：月薪 6800、11:30 开始午休；provider 显式写出（与 dayInfo 的 CN 默认是同一个对象）
+const cfg = { ...DEFAULTS, salary: 6800, lunchOn: true, lunchStart: '11:30', holidayProvider: CN_HOLIDAY_PROVIDER };
 const at = (m, d, y = 2026) => new Date(y, m - 1, d);
 const plain = (date, c = cfg, tables = HOLIDAYS_CN) => dayInfo(date, c, {}, tables);
 const ids = (opts) => opts.map((o) => o.id);
@@ -50,7 +53,7 @@ test('dayOptions: 2027 with the built-in table (元旦 1/1–1/3, 春节 调休 
   assert.deepEqual(ids(dayOptions(plain(at(1, 4, 2027)))), ['default', 'rest', 'paidLeave', 'unpaidLeave'], 'after 元旦 → work');
   assert.deepEqual(ids(dayOptions(plain(at(2, 9, 2027)))), ['default', 'work'], '春节 span');
   assert.deepEqual(ids(dayOptions(plain(at(2, 14, 2027)))), ['default', 'rest', 'paidLeave', 'unpaidLeave'], '调休上班 → work default');
-  assert.equal(menuModel(at(2, 14, 2027), cfg, {}, HOLIDAYS_CN).header, '2月14日 周日 · 调休上班（春节）');
+  assert.equal(menuModel(at(2, 14, 2027), cfg, {}, HOLIDAYS_CN, CN).header, '2月14日 周日 · 调休上班（春节）');
 });
 
 test('applyOption maps option ids to marks exactly and never mutates', () => {
@@ -74,14 +77,14 @@ test('previewDailyWage with the defaults (6800, Nov 2026 = 21 workdays)', () => 
 });
 
 test('menuModel: header, previews for denominator-changing options, footer', () => {
-  const sat = menuModel(at(11, 7), cfg, {}, HOLIDAYS_CN);
+  const sat = menuModel(at(11, 7), cfg, {}, HOLIDAYS_CN, CN);
   assert.equal(sat.header, '11月7日 周六 · 休息日');
   assert.deepEqual(sat.items.map((i) => [i.id, i.label, i.note, i.checked]), [
     ['default', '恢复为休息日', '', true],
     ['work', '改为上班（调休）', '日薪 ¥323.81 → ¥309.09', false],
   ]);
   assert.equal(sat.footer, '月薪固定，按当月上班天数平分');
-  const wd = menuModel(at(11, 3), cfg, {}, HOLIDAYS_CN);
+  const wd = menuModel(at(11, 3), cfg, {}, HOLIDAYS_CN, CN);
   assert.equal(wd.header, '11月3日 周二 · 工作日');
   assert.deepEqual(wd.items.map((i) => [i.id, i.label, i.note]), [
     ['default', '恢复为工作日', ''],
@@ -89,21 +92,21 @@ test('menuModel: header, previews for denominator-changing options, footer', () 
     ['paidLeave', '带薪假', '照常计薪'],
     ['unpaidLeave', '无薪假', '这天不计薪（本月少 ¥323.81）'],
   ]);
-  assert.equal(menuModel(at(10, 1), cfg, {}, HOLIDAYS_CN).header, '10月1日 周四 · 法定假日（国庆）');
-  assert.equal(menuModel(at(10, 10), cfg, {}, HOLIDAYS_CN).header, '10月10日 周六 · 调休上班（国庆）');
-  const marked = menuModel(at(11, 7), cfg, { '2026-11-07': 'work' }, HOLIDAYS_CN);
+  assert.equal(menuModel(at(10, 1), cfg, {}, HOLIDAYS_CN, CN).header, '10月1日 周四 · 法定假日（国庆）');
+  assert.equal(menuModel(at(10, 10), cfg, {}, HOLIDAYS_CN, CN).header, '10月10日 周六 · 调休上班（国庆）');
+  const marked = menuModel(at(11, 7), cfg, { '2026-11-07': 'work' }, HOLIDAYS_CN, CN);
   assert.equal(marked.header, '11月7日 周六 · 调休上班');
   assert.deepEqual(marked.items.map((i) => [i.id, i.note, i.checked]), [
     ['default', '日薪 ¥309.09 → ¥323.81', false],
     ['work', '', true],
   ]);
-  assert.equal(menuModel(at(11, 3), cfg, { '2026-11-03': 'paidLeave' }, HOLIDAYS_CN).header, '11月3日 周二 · 带薪假');
-  assert.equal(menuModel(at(11, 3), cfg, { '2026-11-03': 'rest' }, HOLIDAYS_CN).header, '11月3日 周二 · 休息日');
+  assert.equal(menuModel(at(11, 3), cfg, { '2026-11-03': 'paidLeave' }, HOLIDAYS_CN, CN).header, '11月3日 周二 · 带薪假');
+  assert.equal(menuModel(at(11, 3), cfg, { '2026-11-03': 'rest' }, HOLIDAYS_CN, CN).header, '11月3日 周二 · 休息日');
 });
 
 test('menu notes describe leave pay and handle changes around zero workdays', () => {
   const date = at(11, 3);
-  const notes = (marks) => Object.fromEntries(menuModel(date, cfg, marks, HOLIDAYS_CN).items.map(({ id, note }) => [id, note]));
+  const notes = (marks) => Object.fromEntries(menuModel(date, cfg, marks, HOLIDAYS_CN, CN).items.map(({ id, note }) => [id, note]));
   assert.equal(notes({}).paidLeave, '照常计薪');
   assert.equal(notes({}).unpaidLeave, '这天不计薪（本月少 ¥323.81）');
   assert.equal(notes({}).rest, '月薪不变，每天 ¥323.81 → ¥340.00');
@@ -111,7 +114,7 @@ test('menu notes describe leave pay and handle changes around zero workdays', ()
   assert.equal(notes({ '2026-11-03': 'paidLeave' }).paidLeave, '照常计薪');
   assert.equal(notes({ '2026-11-03': 'unpaidLeave' }).unpaidLeave, '这天不计薪（本月少 ¥323.81）');
 
-  const high = menuModel(date, { ...cfg, salary: 210000 }, { '2026-11-04': 'unpaidLeave' }, HOLIDAYS_CN);
+  const high = menuModel(date, { ...cfg, salary: 210000 }, { '2026-11-04': 'unpaidLeave' }, HOLIDAYS_CN, CN);
   assert.equal(high.items.find((item) => item.id === 'unpaidLeave').note, '这天不计薪（本月少 ¥10,000.00）');
   assert.equal(high.items.find((item) => item.id === 'rest').note, '月薪不变，每天 ¥10,000.00 → ¥10,500.00');
   const marks = {};
@@ -129,33 +132,44 @@ test('menu notes describe leave pay and handle changes around zero workdays', ()
     if (dayInfo(t, cfg, {}, HOLIDAYS_CN).base === 'work') onlySaturday[ymd(t)] = 'rest';
   }
   onlySaturday['2026-11-07'] = 'work';
-  assert.equal(menuModel(at(11, 7), cfg, onlySaturday, HOLIDAYS_CN).items.find((item) => item.id === 'default').note, '本月没有上班日，不计薪');
+  assert.equal(menuModel(at(11, 7), cfg, onlySaturday, HOLIDAYS_CN, CN).items.find((item) => item.id === 'default').note, '本月没有上班日，不计薪');
   assert.equal(notes(marks).default, '日薪 ¥0.00 → ¥6,800.00');
 });
 
 test('default option identifies the actual underlying day type', () => {
-  const label = (date, c = cfg, marks = {}, tables = HOLIDAYS_CN) => menuModel(date, c, marks, tables).items[0].label;
+  const label = (date, c = cfg, marks = {}, tables = HOLIDAYS_CN) => menuModel(date, c, marks, tables, CN).items[0].label;
   assert.equal(label(at(11, 3)), '恢复为工作日');
   assert.equal(label(at(11, 7)), '恢复为休息日');
   assert.equal(label(at(11, 7), { ...cfg, weekends: true }), '恢复为工作日');
   assert.equal(label(at(10, 1), cfg, { '2026-10-01': 'work' }), '恢复为法定假日');
   assert.equal(label(at(10, 10)), '恢复为工作日');
   assert.equal(label(at(1, 1, 2027)), '恢复为法定假日');
-  assert.equal(menuModel(at(11, 3), cfg, {}, HOLIDAYS_CN).items[0].note, '');
+  assert.equal(menuModel(at(11, 3), cfg, {}, HOLIDAYS_CN, CN).items[0].note, '');
 });
 
 test('dayTooltipModel: status, source label and pay for every day type', () => {
-  const tip = (date, marks = {}, tables = HOLIDAYS_CN, c = cfg) => dayTooltipModel(date, c, marks, tables, at(11, 3));
+  const tip = (date, marks = {}, tables = HOLIDAYS_CN, c = cfg) => dayTooltipModel(date, c, marks, tables, at(11, 3), CN);
   const wd = tip(at(11, 4));
   assert.deepEqual(wd, {
     lunar: '农历九月廿六',
     title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改',
     sourceLabel: '按默认规则', payShort: '计薪 ¥323.81', titleShort: '11月4日 周三', statusShort: '工作日',
+    // 结构化字段：让界面用地区字典重排时不必解析翻译后的空白/分隔符
+    titleDate: '11月4日', titleWeekday: '周三', titleSep: ' ',
+    payLabel: '计薪', payAmount: '¥323.81', paySep: ' ', payZero: false,
   });
   assert.equal(tip(at(11, 3)).title, '11月3日 周二（今天）');
   const sat = tip(at(11, 7));
   assert.equal(sat.status, '休息日');
   assert.equal(sat.pay, '当日计薪 ¥0.00');
+  // 结构化字段在其余日期也成立（不只 11-04 的 deepEqual）
+  assert.deepEqual(
+    [sat.titleDate, sat.titleWeekday, sat.titleSep, sat.payLabel, sat.payAmount, sat.paySep, sat.payZero],
+    ['11月7日', '周六', ' ', '计薪', '¥0.00', ' ', true],
+    'a rest day reports zero pay structurally instead of letting the UI parse 「¥0.00」',
+  );
+  assert.equal(`${sat.titleDate}${sat.titleSep}${sat.titleWeekday}`, sat.title, 'fields reassemble the title');
+  assert.equal(`${sat.payLabel}${sat.paySep}${sat.payAmount}`, sat.payShort, 'fields reassemble the short pay line');
   const hol = tip(at(10, 1));
   assert.equal(hol.status, '法定假日（国庆）');
   assert.equal(hol.source, '来源：内置·官方通知');
@@ -196,7 +210,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(fixed.source, '来源：法定日期（《放假办法》）');
   assert.equal(fixed.status, '法定假日（元旦）');
   assert.equal(fixed.pay, '当日计薪 ¥0.00');
-  assert.match(tooltipText(fixed), /来源：法定日期（《放假办法》）/);
+  assert.match(tooltipText(fixed, CN), /来源：法定日期（《放假办法》）/);
   assert.equal(tip(at(1, 1, 2027), { '2027-01-01': 'work' }).source, '来源：手动标记', 'user mark wins');
   assert.equal(tip(at(1, 2, 2027), {}, NO_2027).source, '来源：按周末规则', 'no table, Saturday → weekend rule');
   assert.equal(tip(at(11, 7), {}, HOLIDAYS_CN, { ...cfg, weekends: true }).source, '来源：按默认规则', 'weekend counted as workday');
@@ -211,13 +225,13 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
 });
 
 test('tooltipText joins the same lines used by the visual tooltip', () => {
-  const m = dayTooltipModel(at(11, 7), cfg, {}, HOLIDAYS_CN, at(11, 3));
-  assert.equal(tooltipText(m), '11月7日 周六，农历九月廿九，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
+  const m = dayTooltipModel(at(11, 7), cfg, {}, HOLIDAYS_CN, at(11, 3), CN);
+  assert.equal(tooltipText(m, CN), '11月7日 周六，农历九月廿九，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
 });
 
 // R50（fix round 1 · C2）：盖在格子上的提示用不带括号的短状态，「今天」放在状态行里而不是日期行
 test('R50: tooltip short status (法定假日·劳动节 / 调休上班·劳动节), 今天 in the status line, no （今天） on the date line', () => {
-  const tip = (date, marks = {}, tables = HOLIDAYS_CN, now = at(11, 3)) => dayTooltipModel(date, cfg, marks, tables, now);
+  const tip = (date, marks = {}, tables = HOLIDAYS_CN, now = at(11, 3)) => dayTooltipModel(date, cfg, marks, tables, now, CN);
   assert.equal(tip(at(5, 1)).statusShort, '法定假日·劳动节');
   assert.equal(tip(at(5, 9)).statusShort, '调休上班·劳动节');
   assert.equal(tip(at(11, 3)).titleShort, '11月3日 周二');

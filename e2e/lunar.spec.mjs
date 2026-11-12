@@ -2,12 +2,16 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt } from './harness.mjs';
 
+// 这些用例断言的是中国（简体、¥）地区的既有文案；应用默认地区已改为台湾，所以显式种入旧版（v1 = 中国）设置。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded','1'); }`;
+
 let server, browser;
 before(async () => { server = await startServer(); browser = await launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
 test('lunar display follows its saved setting in card, calendar and accessible description', async () => {
-  const { context, page, errors } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport: { width: 1093, height: 535 } });
+  const { context, page, errors } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport: { width: 1093, height: 535 }, init: CN_SEED });
   try {
     assert.equal(await page.locator('#status-card .card-lunar').textContent(), '农历九月廿五');
     const cell = page.locator('.day[data-key="2026-11-03"]');
@@ -34,7 +38,7 @@ test('lunar display follows its saved setting in card, calendar and accessible d
 
 test('lunar tooltip stays fully visible without clipping at the supported window sizes', async () => {
   for (const viewport of [{ width: 1093, height: 535 }, { width: 1280, height: 585 }, { width: 1093, height: 700 }, { width: 1280, height: 700 }]) {
-    const { context, page } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport });
+    const { context, page } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport, init: CN_SEED });
     try {
       await page.locator('.day[data-key="2026-11-03"]').focus();
       const tip = page.locator('.day-tooltip');
@@ -50,7 +54,7 @@ test('lunar tooltip stays fully visible without clipping at the supported window
 });
 
 test('lunar date remains in the tooltip when a narrow cell hides its label', async () => {
-  const { context, page } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport: { width: 590, height: 700 } });
+  const { context, page } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport: { width: 590, height: 700 }, init: CN_SEED });
   try {
     const cell = page.locator('.day[data-key="2026-11-03"]');
     assert.equal(await cell.locator('.day-lunar').isVisible(), false);

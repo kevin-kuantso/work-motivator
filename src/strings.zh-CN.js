@@ -21,6 +21,7 @@ export const STRINGS = {
     placeholderNote: '状态卡正显示在悬浮小窗里',
     keepOpen: '请保持本页开启：关闭本页，小窗也会一起关闭',
     failed: '小窗没能打开，请再试一次',
+    sizeLimited: '小窗没能自动调大（浏览器不允许程序改窗口大小）：内容可能要滚动才能看全，请手动把窗口拖大',
   },
 
   // 页面被浏览器暂停（后台节流、冻结、休眠）后恢复：数字会一下子按当前时间跳过去（R34）
@@ -43,6 +44,8 @@ export const STRINGS = {
     lunchOrder: '午休开始时间必须早于午休结束时间',
     switchValue: (label) => `${label}只能是开或关`,
     payday: '发薪日必须是 1 到 31 之间的整数，或者不设置',
+    theme: '请选择支持的主题色',
+    fontScale: '字号只能是 XS、S、M、L、XL 其中之一',
     cheerType: '鼓励语格式不正确',
     cheerTooLong: '鼓励语不能超过 40 个字',
     marksType: '月历标记的格式不正确',
@@ -52,9 +55,15 @@ export const STRINGS = {
     // 导入备份（M19）：说人话，不出现文件格式名
     notJson: '这不是本工具导出的备份文件',
     notObject: '文件内容的结构不正确',
+    region: '地区代码无法识别，仅支持台湾（TW）和中国大陆（CN）；已保留原值',
+    salariesType: '各地区月薪的数据结构不正确，已保留原有月薪',
+    futureVersion: '备份来自更新版本，无法导入；请更新本程序后重试',
     labels: {
       start: '上班时间', end: '下班时间', lunchStart: '午休开始时间', lunchEnd: '午休结束时间',
       lunchOn: '午休开关', weekends: '周末上班', showLunar: '显示农历',
+      fontScale: '字号',
+      showCardProgress: '显示进度条', showCardMetrics: '显示薪资明细', showCardDate: '显示日期',
+      showCardPayday: '显示发薪提醒', showCardCheer: '显示鼓励内容',
     },
   },
 
@@ -133,6 +142,8 @@ export const STRINGS = {
     importDone: (y, off, makeup) => `已导入 ${y} 年假期表（放假 ${off} 天，调休上班 ${makeup} 天）`,
     importNoYear: '文件里没有可用的年份和放假数据，未导入',
     importBuiltin: (y) => `${y} 年假期已内置，未采用导入的数据`,
+    // 写不进浏览器存储（配额、隐私模式、记录损坏）：本次会话仍可用，但关掉就没了，备份也不含假期表
+    sessionOnly: '这份假期表只留在当前页面，关掉就会消失（无法写入浏览器存储空间）；备份文件也不含假期表',
     customUrl: '自定义数据网址',
     customUrlExplain: '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空则使用默认来源。',
     customUrlPlaceholder: 'https://example.com/{year}.json',
@@ -233,9 +244,23 @@ export const STRINGS = {
   },
 
   settings: {
+    region: {
+      label: '地区',
+      options: { TW: '台湾', CN: '中国大陆' },
+      hint: '两地的月薪和月历标记分开保存，不做汇率换算。',
+      salaryNote: {
+        TW: { text: '示例月薪 NT$40,000 由主计总处 2025 年工业及服务业本国籍全时受雇员工每月经常性薪资中位数 39,890 元向上取整至千元，并非全体员工或总薪资中位数。请改成实际月薪。', sources: [{ label: '主计总处', href: 'https://www.dgbas.gov.tw/News_Content.aspx?n=3602&s=235863' }] },
+        CN: { text: '示例月薪 ¥5,000 取第三方对 2024 年全国雇员月薪中位数 5,000–5,150 元估计区间的下限，按百元向上取整；非官方统计，原文无法读取，范围与方法未独立核实。请改成实际月薪。', sources: [{ label: '第三方估计', href: 'https://zhuanlan.zhihu.com/p/2015685656777609855' }] },
+      },
+      sourcesLabel: '来源：',
+      lunchOffPay: '关闭后，午休时段仍计入工时和薪资。',
+    },
     autosaved: '已自动保存',
+    // 分区导航（窄面板 / 手机单栏才显示）：名字与卡片标题一致，跳到已有的卡片
+    navLabel: '跳到设置分区',
     sections: {
       pay: '工资与上班时间', holiday: '假期数据', backup: '数据与备份', advanced: '高级设置',
+      display: '画面设置',
     },
     payDesc: '用来计算每天、每秒赚多少，修改后自动保存',
     // M12：只说卡里有什么，一行放得下（联网更新 / 导入的说明已写在按钮下方）
@@ -246,6 +271,10 @@ export const STRINGS = {
     chevronClosed: '▸',
     chevronOpen: '▾',
     salaryUnit: '元 / 月',
+    // 示例月薪的口径与出处较长：默认收起，这句是输入框旁展开钮的文字
+    salaryNoteToggle: '说明',
+    // 读屏用全名；不含「月薪」二字，避免与输入框的 getByLabel 定位冲突
+    salaryNoteToggleAria: '示例说明与来源',
     workTime: '上下班时间',
     lunchTime: '午休时间',
     to: '至',
@@ -257,6 +286,8 @@ export const STRINGS = {
     end: '下班时间',
     lunchOn: '午休',
     showLunar: '显示农历',
+    theme: '主题色',
+    themeOptions: { green: '自然绿', blue: '海洋蓝', orange: '暖橙', teal: '湖水青', rose: '莓果红', slate: '沉稳灰', rainbow: '柔光彩虹' },
     lunarSource: '农历数据来源：香港天文台《公历与农历日期对照表》（2020–2060）。2057 年部分日期因历法边界不确定而不显示。',
     lunchOffHint: '关闭后，午休时段也计为工时',
     lunchStart: '午休开始时间',
@@ -265,20 +296,47 @@ export const STRINGS = {
     cheerPlaceholder: '写一句给自己的话',
     cheerHint: '会显示在左侧状态卡上',
     cheerCount: (n, max) => `${n}/${max}`,
+    cheerAdd: '再加一句',
+    cheerItemLabel: (n) => `第 ${n} 句鼓励的话`,
+    cheerRemoveAria: (n) => `删除第 ${n} 句`,
     weekends: '周末上班',
     weekendsHint: '打开后，周六、周日也算工作日；个别调休上班日请在月历上标记',
     payday: '发薪日',
     paydayNone: '未设置',
     paydayHint: '设置后，状态卡会显示「距离发薪日 N 天」',
     paydayOption: (d) => `每月 ${d} 号`,
+    // ---- 画面设置：只管状态卡显示什么，不改变任何计算 ----
+    // 导入报告按字段名查标签（import-model 的 t.settings[field]）：这些键在 settings 顶层也放一份，
+    // 报告才不会显示成生字段名。界面上的标签仍然用下面的 display.*（措辞为避开同名控件的歧义）。
+    fontScale: '字号',
+    showCardProgress: '显示进度条', showCardMetrics: '显示薪资明细', showCardDate: '显示日期',
+    showCardPayday: '显示发薪提醒', showCardCheer: '显示鼓励内容',
+    display: {
+      desc: '状态卡显示哪些内容、字号多大；只影响显示，不改变任何计算',
+      fontScale: '字号',
+      fontScaleOptions: { xs: 'XS（特小）', s: 'S（小）', m: 'M（标准）', l: 'L（大）', xl: 'XL（特大）' },
+      fontScaleHint: '默认中号，悬浮成小窗时也一样。',
+      scope: '下面五个开关只决定状态卡显示什么，不会改变工时、薪资或月历的计算。',
+      progress: '进度条',
+      progressHint: '显示今天的进度与百分比。',
+      metrics: '薪资明细',
+      metricsHint: '显示本月累计、时薪等信息；不影响上方主要金额。',
+      date: '日期',
+      dateHint: '关闭后，农历日期也一起隐藏。',
+      // 开关标签不能与「发薪日」「鼓励语」两个输入框的标签同名：读屏与 getByLabel 都按子串匹配，
+      // 同名会让「发薪日」一次命中两个控件。这里用「提醒 / 文字」区分「显示的是什么」，提示语里再写全称。
+      payday: '发薪提醒',
+      paydayHint: '没设置发薪日时本来就不显示。',
+      cheer: '鼓励内容',
+      cheerHint: '那句鼓励语仍保存在设置里。',
+      statusNote: '「上班中」「午休」「已下班」这些状态标签不受开关影响，始终显示。',
+    },
     backup: {
       export: '导出备份',
       import: '导入备份',
       note: '备份文件含月薪，请妥善保管',
-      exportLead: '导出备份：',
-      exportText: '把月薪、上下班时间、月历标记保存成文件。换电脑或清除浏览数据前，请先导出。',
-      importLead: '导入备份：',
-      importText: '用之前导出的文件恢复这些设置。',
+      // 一段说清「备份里有什么、什么时候用、怎么恢复」；按钮就在下面，不再各写一段导语
+      summary: '备份文件含月薪、上下班时间、主题色和月历标记。换电脑或清除浏览数据前导出，之后用「导入备份」恢复。',
       // 只是说明现状（备份内容不变，Kevin 2026-11-04）
       scope: '备份不含联网取得或导入的假期表和自定义数据网址。',
     },
@@ -320,6 +378,7 @@ export const STRINGS = {
       },
     },
     reset: '重置本月标记',
+    undoMark: '撤销上次标记',
     legend: '图例',
     weekHeads: ['一', '二', '三', '四', '五', '六', '日'],
     kinds: {
@@ -342,6 +401,12 @@ export const STRINGS = {
     cleared: (md) => `${md} 已恢复默认`,
     resetDone: '已重置本月标记',
     undo: '撤销',
+    // 撤销后（按钮仍只写「撤销」，不提示快捷键）
+    undoDone: '已撤销上一次标记',
+    undoPartial: (done, skipped) => `已撤销 ${done} 天，另有 ${skipped} 天已在别处改过，保持不变`,
+    undoStale: '上一次标记已在别处改过，没有撤销',
+    // 标记没写进储存：仍然给撤销按钮，但不谎称已保存
+    unsaved: (msg) => `${msg}（未能保存，请先导出备份）`,
     dayTitle: (month, day, weekday) => `${month}月${day}日 ${weekday}`,
     todaySuffix: '（今天）',
     // 日期的状态文字（菜单标题与提示共用）
