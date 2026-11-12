@@ -1,6 +1,7 @@
 // 中国大陆法定节假日，日期为本地 'YYYY-MM-DD'。
 // 2026：国办发明电〔2025〕7号；2027：国办发明电〔2026〕10号。
-//   https://www.gov.cn/zhengce/content/202611/content_7085101.htm
+//   2026：https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm
+//   2027：https://www.gov.cn/zhengce/content/202611/content_7085101.htm
 // 没有内置表的年份仍按 R39 / R40 的回退规则（STRINGS + statutory-dates.js）显示，见 calendar.js。
 // Official China calendar labels are provider data, not the active UI language.
 const H = Object.freeze({
