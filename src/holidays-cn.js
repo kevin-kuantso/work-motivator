@@ -1,8 +1,8 @@
-// 中国大陆法定节假日，日期为本地 'YYYY-MM-DD'。
-// 2026：国办发明电〔2025〕7号；2027：国办发明电〔2026〕10号。
+// 中國大陸法定節假日，日期為本地 'YYYY-MM-DD'。
+// 2026：國辦發明電〔2025〕7號；2027：國辦發明電〔2026〕10號。
 //   2026：https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm
 //   2027：https://www.gov.cn/zhengce/content/202611/content_7085101.htm
-// 没有内置表的年份仍按 R39 / R40 的回退规则（STRINGS + statutory-dates.js）显示，见 calendar.js。
+// 沒有內建表的年份仍按 R39 / R40 的回退規則（STRINGS + statutory-dates.js）顯示，見 calendar.js。
 // Official China calendar labels are provider data, not the active UI language.
 const H = Object.freeze({
   newYear: '元旦', spring: '春节', qingming: '清明', labour: '劳动节',
@@ -67,8 +67,8 @@ export const HOLIDAYS_CN = {
   ),
 };
 
-// R39：《全国年节及纪念日放假办法》（2025 年修订）固定日期的法定假日；用于没有假期表的年份（2025 起）。
-// 春节 / 清明 / 端午 / 中秋、调休上班日与补假日要等年度通知，这里不猜。
+// R39：《全國年節及紀念日放假辦法》（2025 年修訂）固定日期的法定假日；用於沒有假期表的年份（2025 起）。
+// 春節 / 清明 / 端午 / 中秋、調休上班日與補假日要等年度通知，這裡不猜。
 export const STATUTORY_FIXED_FROM_YEAR = 2025;
 export const STATUTORY_FIXED = {
   '01-01': H.newYear,

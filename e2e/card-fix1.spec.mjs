@@ -1,4 +1,4 @@
-// Task 19 fix round 1：指标格同一个 y、悬浮按钮不跳、运行时量「上班中」卡高、倒数不左右跳、已下班进度头、V4–V6。
+// Task 19 fix round 1：指標格同一個 y、懸浮按鈕不跳、執行時量「上班中」卡高、倒數不左右跳、已下班進度頭、V4–V6。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt } from './harness.mjs';
@@ -122,8 +122,8 @@ test('V2: 已下班 — 「✓ 今天工作满 7小时」 in the head row (right
   });
 });
 
-// V4：午休的进度填色要能从轨道里分辨出来（≥ 3:1），也要在轨道上读得清（≥ 4.5:1 对白）。
-// 颜色本身随主题走（变量 --state-lunch-fill），所以断言拿当前主题解析出的变量值比对，不写死某一轮的色号。
+// V4：午休的進度填色要能從軌道里分辨出來（≥ 3:1），也要在軌道上讀得清（≥ 4.5:1 對白）。
+// 顏色本身隨主題走（變數 --state-lunch-fill），所以斷言拿當前主題解析出的變數值比對，不寫死某一輪的色號。
 const rgb = (s) => (/^rgba?\(([^)]+)\)$/.exec(s.trim())?.[1] ?? '').split(/[,\s/]+/).filter(Boolean).slice(0, 3).map(Number);
 const contrast = (a, b) => {
   const lum = (c) => {
@@ -178,7 +178,7 @@ test('今日满勤可得 is hidden on 休息日 / 法定假日 / 无薪假 and s
 });
 
 test('F1: no-table years — the card says exactly what is marked (2025 fixed, 2028 lunar)', async () => {
-  // 2027 已有内置表（gov.cn 2026-11 通知），缺表年的 lunar 用例改用第一个无表的 2028。
+  // 2027 已有內建表（gov.cn 2026-11 通知），缺表年的 lunar 用例改用第一個無表的 2028。
   for (const [iso, want] of [['2025-11-04T10:00:00+08:00', '2025 年只标了元旦、劳动节、国庆'], ['2028-01-04T10:00:00+08:00', '2028 年只标了法定假日，补假和调休未标出']]) {
     const { context, page } = await openAt(browser, server.url, iso, { viewport: { width: 1280, height: 585 }, init: seed({}) });
     try {

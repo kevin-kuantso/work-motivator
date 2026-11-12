@@ -1,7 +1,7 @@
-// 联网更新假期 / 导入假期表文件（spec §12.3、§13.5–13.7）。
-// 上半部是纯函数（状态行、结果模型、差异计数），下半部是流程编排（不碰 DOM；界面在 holiday-panel.js）。
-// 规则：内置年份永不被覆盖；联网 / 导入的数据都走 validateHolidayYear；自动检查失败时静默，手动检查才显示原因；
-// 同一时间只显示一个结果；自动与手动检查排队依次执行，不并发。
+// 聯網更新假期 / 匯入假期表文件（spec §12.3、§13.5–13.7）。
+// 上半部是純函式（狀態行、結果模型、差異計數），下半部是流程編排（不碰 DOM；介面在 holiday-panel.js）。
+// 規則：內建年份永不被覆蓋；聯網 / 匯入的資料都走 validateHolidayYear；自動檢查失敗時靜默，手動檢查才顯示原因；
+// 同一時間只顯示一個結果；自動與手動檢查排隊依次執行，不併發。
 import {
   fetchHolidayYear, mergeTables, validateHolidayYear, yearsToAutoCheck, sourcesWith, validateCustomUrl, buildSourceUrl, renderReason,
 } from '../holiday-data.js';
@@ -12,17 +12,17 @@ import { STRINGS } from '../strings.zh-CN.js';
 
 export { FILE_SOURCE };
 
-// 受保护的年份（R30）：内置表与用户导入的文件，联网数据只比较、从不覆盖；只有联网年份可被联网新数据替换。
+// 受保護的年份（R30）：內建表與使用者匯入的檔案，聯網資料只比較、從不覆蓋；只有聯網年份可被聯網新資料替換。
 const isProtected = (tb) => tb?.source === 'builtin' || tb?.source === 'file';
 
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const pad2 = (n) => String(n).padStart(2, '0');
 
-// 某一天在表里的类型：'off'（放假）、'makeup'（调休上班）或 null
+// 某一天在表裡的型別：'off'（放假）、'makeup'（調休上班）或 null
 const kindOf = (table, date) => (has(table.off, date) ? 'off' : has(table.makeup, date) ? 'makeup' : null);
 
-// 两份表有几个日期的类型不同。只比日期与类型，不比节日名（内置「清明」与联网「清明节」不算不同，spec §13.7）。
+// 兩份表有幾個日期的型別不同。只比日期與型別，不比節日名（內建「清明」與聯網「清明節」不算不同，spec §13.7）。
 export function diffCount(a, b) {
   const dates = new Set([a.off, a.makeup, b.off, b.makeup].flatMap((x) => Object.keys(x ?? {})));
   let n = 0;
@@ -30,7 +30,7 @@ export function diffCount(a, b) {
   return n;
 }
 
-// 连节日名都相同（用来判断联网年份是否有新版本）
+// 連節日名都相同（用來判斷聯網年份是否有新版本）
 function sameTable(a, b) {
   const norm = (x) => JSON.stringify(Object.entries(x ?? {}).sort(([p], [q]) => (p < q ? -1 : 1)));
   return norm(a.off) === norm(b.off) && norm(a.makeup) === norm(b.makeup);
@@ -40,9 +40,9 @@ export function dayCounts(table) {
   return { off: Object.keys(table.off ?? {}).length, makeup: Object.keys(table.makeup ?? {}).length };
 }
 
-// 状态（假期数据卡的年份胶囊）：当年；11 月起（或已经有下一年的表时）再加下一年；检查过才附「上次检查 MM/DD」。
-// 导入的年份只写「已导入文件」，不声称来源（文件可能来自任何地方，R30）。
-// kind：builtin / online / file / missing（界面按 kind 上色：内置与联网 / 导入 = 有表，missing = 黄色）
+// 狀態（假期資料卡的年份膠囊）：當年；11 月起（或已經有下一年的表時）再加下一年；檢查過才附「上次檢查 MM/DD」。
+// 匯入的年份只寫「已匯入檔案」，不聲稱來源（檔案可能來自任何地方，R30）。
+// kind：builtin / online / file / missing（介面按 kind 上色：內建與聯網 / 匯入 = 有表，missing = 黃色）
 export function statusModel(now, tables, lastCheckMs, t) {
   const U = t.holidayUpdate;
   const y = now.getFullYear();
@@ -62,14 +62,14 @@ export function statusModel(now, tables, lastCheckMs, t) {
   return { chips, lastCheck };
 }
 
-// 同一状态的一行文字（「2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/04」）：测试与无障碍名称用
+// 同一狀態的一行文字（「2026 年 · 內建 · 2027 年 · 未內建 · 上次檢查 11/04」）：測試與無障礙名稱用
 export function statusLine(now, tables, lastCheckMs, t) {
   const m = statusModel(now, tables, lastCheckMs, t);
   return [...m.chips.map((c) => c.text), ...(m.lastCheck ? [m.lastCheck] : [])].join(t.holidayUpdate.sep);
 }
 
-// 多个年份的检查结果 → 只显示一个。未受保护的年份优先（那才是用户要的）；受保护年份（内置 / 导入文件）只会「相同」或「失败」，
-// 与之不同的（diff）不套用，由页面级提示另行告知，这里按「已是最新」处理。
+// 多個年份的檢查結果 → 只顯示一個。未受保護的年份優先（那才是使用者要的）；受保護年份（內建 / 匯入檔案）只會「相同」或「失敗」，
+// 與之不同的（diff）不套用，由頁面級提示另行告知，這裡按「已是最新」處理。
 const ORDER_OTHER = ['added', 'refreshed', 'invalid', 'network', 'unpublished', 'same'];
 const ORDER_BUILTIN = ['invalid', 'network', 'same'];
 export function pickResult(results) {
@@ -82,9 +82,9 @@ export function pickResult(results) {
   return null;
 }
 
-// tone：success（绿，「已是最新」也是成功，不是停用状态 L7）/ info（蓝，「暂未发布」不是错误）/ warn（黄）
-// check：只在「已是最新」的结果前加装饰性 ✓（L7）；其余结果保持原样
-// formatHelp：被拒绝的原因是格式 / 内容不合格时展开既有示例；连不上 / 超时 / 过大不展开
+// tone：success（綠，「已是最新」也是成功，不是停用狀態 L7）/ info（藍，「暫未釋出」不是錯誤）/ warn（黃）
+// check：只在「已是最新」的結果前加裝飾性 ✓（L7）；其餘結果保持原樣
+// formatHelp：被拒絕的原因是格式 / 內容不合格時展開既有示例；連不上 / 超時 / 過大不展開
 export function resultView(res, t) {
   if (!res) return null;
   const U = t.holidayUpdate;
@@ -96,10 +96,10 @@ export function resultView(res, t) {
     case 'unpublished': return { tone: 'info', text: U.unpublished(res.years[0]), detail: null };
     case 'network': return { tone: 'warn', text: U.network, detail: null };
     case 'invalid': return { tone: 'warn', text: U.invalid, detail, formatHelp: res.format === true };
-    // 「已是最新」（L7）：绿底 + 文字前的 ✓，不是停用状态。内置表有差异时由页面级提示另行告知，
-    // pickResult 已把受保护年份的 diff 归一成 same，所以这里只需要 same
+    // 「已是最新」（L7）：綠底 + 文字前的 ✓，不是停用狀態。內建表有差異時由頁面級提示另行告知，
+    // pickResult 已把受保護年份的 diff 歸一成 same，所以這裡只需要 same
     case 'same': return { tone: 'success', text: U.same, detail: null, check: true };
-    // 未知结果不冒充成功：保持原来的灰底「已是最新」文字
+    // 未知結果不冒充成功：保持原來的灰底「已是最新」文字
     default: return { tone: 'muted', text: U.same, detail: null };
   }
 }
@@ -109,11 +109,11 @@ export function customUrlSummary(url, t) {
   let host = null;
   try {
     host = new URL(buildSourceUrl(url, 2000)).host;
-  } catch { /* 已校验过，理论上不会发生 */ }
+  } catch { /* 已校驗過，理論上不會發生 */ }
   return t.holidayUpdate.customUrlSummary(host);
 }
 
-// ---- 流程编排 ----
+// ---- 流程編排 ----
 // ctx: { storage, clock, fetchImpl?, getTables, onTables, notify(msg, kind:'info'|'success', against?:'builtin'|'file'), onStatus(status) }
 // status: { checking, line, status:{chips,lastCheck}, result:{tone,text,detail}|null, customUrl, customSummary }
 export function startHolidayUpdate(ctx) {
@@ -122,10 +122,10 @@ export function startHolidayUpdate(ctx) {
   const U = new Proxy({}, { get: (_, key) => getT().holidayUpdate[key] });
   const { storage, clock, getTables, onTables, notify, onStatus } = ctx;
   let result = null;
-  // 结果区一次只显示一个，最新的用户操作优先（R32）：每次手动检查 / 导入把 seq 加一；
-  // 检查结束时若期间已有更新的用户操作，不覆盖它的结果；后台自动检查从不覆盖用户操作的结果。
+  // 結果區一次只顯示一個，最新的使用者操作優先（R32）：每次手動檢查 / 匯入把 seq 加一；
+  // 檢查結束時若期間已有更新的使用者操作，不覆蓋它的結果；後臺自動檢查從不覆蓋使用者操作的結果。
   let seq = 0;
-  let pending = 0; // 排队中 + 执行中的检查数
+  let pending = 0; // 排隊中 + 執行中的檢查數
   let chain = Promise.resolve();
 
   function emit() {
@@ -144,7 +144,7 @@ export function startHolidayUpdate(ctx) {
 
   const builtinOnly = () => Object.fromEntries(Object.entries(getTables()).filter(([, v]) => v && v.source === 'builtin'));
 
-  // 从储存重新读取联网 / 导入的表（开页、其他分页改了假期数据）；只读不写。
+  // 從儲存重新讀取聯網 / 匯入的表（開頁、其他分頁改了假期資料）；只讀不寫。
   function reload() {
     if (!current()) return;
     const l = loadOnlineTables(storage);
@@ -152,19 +152,19 @@ export function startHolidayUpdate(ctx) {
     emit();
   }
 
-  // source：联网时为下载网址，导入时为 FILE_SOURCE。内置年份永不覆盖；联网数据也不覆盖导入的文件。
+  // source：聯網時為下載網址，匯入時為 FILE_SOURCE。內建年份永不覆蓋；聯網資料也不覆蓋匯入的檔案。
   function apply(year, table, papers, source) {
     if (!current()) return;
     const cur = getTables()[year];
     const fromFile = source === FILE_SOURCE;
     if (cur?.source === 'builtin' || (!fromFile && cur?.source === 'file')) return;
     const fetchedAt = clock().getTime();
-    saveOnlineYear(storage, year, { table, papers, source, fetchedAt }); // 储存失败也先在本次会话里生效
+    saveOnlineYear(storage, year, { table, papers, source, fetchedAt }); // 儲存失敗也先在本次會話裡生效
     onTables({ ...getTables(), [year]: { off: table.off, makeup: table.makeup, source: fromFile ? 'file' : 'online' } });
   }
 
   async function checkYears(years) {
-    saveLastCheck(storage, clock().getTime()); // 每次尝试都记录（成功或失败），保证每天最多自动一次
+    saveLastCheck(storage, clock().getTime()); // 每次嘗試都記錄（成功或失敗），保證每天最多自動一次
     const sources = sourcesWith(loadCustomUrl(storage));
     const out = [];
     for (const year of years) {
@@ -190,7 +190,7 @@ export function startHolidayUpdate(ctx) {
     return out;
   }
 
-  // 自动与手动检查排队依次执行，不会同时下载、也不会重复套用同一年
+  // 自動與手動檢查排隊依次執行，不會同時下載、也不會重複套用同一年
   function serial(fn) {
     pending++;
     emit();
@@ -219,10 +219,10 @@ export function startHolidayUpdate(ctx) {
       if (!current()) return;
       const got = out.filter((o) => o.outcome === 'added' || o.outcome === 'refreshed').map((o) => o.year);
       if (got.length) {
-        notify((strings) => strings.holidayUpdate.fetched(got), 'success'); // 不打扰的提示，不带「查看」（spec §13.7）
+        notify((strings) => strings.holidayUpdate.fetched(got), 'success'); // 不打擾的提示，不帶「檢視」（spec §13.7）
         return;
       }
-      // 「暂未发布」不是失败：在假期数据区安静地说明；连不上 / 数据不合格则静默
+      // 「暫未釋出」不是失敗：在假期資料區安靜地說明；連不上 / 資料不合格則靜默
       const unp = out.find((o) => o.outcome === 'unpublished');
       if (unp && seq === mine && result === null) result = (t) => resultView({ outcome: 'unpublished', years: [unp.year] }, t);
     });
@@ -240,7 +240,7 @@ export function startHolidayUpdate(ctx) {
         const picked = pickResult(out);
         result = (t) => resultView(picked, t);
       }
-      // 与受保护年份不同：页面级提示，内置与导入文件分别说明（两者都不会被覆盖）
+      // 與受保護年份不同：頁面級提示，內建與匯入檔案分別說明（兩者都不會被覆蓋）
       if (!current() || seq !== mine) return;
       for (const against of ['builtin', 'file']) {
         const n = out.reduce((sum, o) => sum + (o.outcome === 'diff' && o.against === against ? o.n : 0), 0);
@@ -252,7 +252,7 @@ export function startHolidayUpdate(ctx) {
   function importFile(text) {
     if (!current()) return { ok: false };
     seq++;
-    // format：文件格式 / 内容不合格（不是 JSON、没有年份、validateHolidayYear 不通过）→ 附「查看格式示例」；「已内置」不是格式问题
+    // format：檔案格式 / 內容不合格（不是 JSON、沒有年份、validateHolidayYear 不通過）→ 附「檢視格式示例」；「已內建」不是格式問題
     const fail = (reason, year, format = true) => {
       result = (t) => ({ tone: 'warn', text: renderReason(reason, reason.domain === 'update' ? t.holidayUpdate : t.holidayData), detail: null, formatHelp: format });
       emit();
@@ -264,7 +264,7 @@ export function startHolidayUpdate(ctx) {
     } catch {
       json = undefined;
     }
-    // 目标年份 = 文件自己的 year 字段（不按当前查看的月份猜）
+    // 目標年份 = 檔案自己的 year 欄位（不按當前檢視的月份猜）
     const year = isPlainObject(json) ? json.year : undefined;
     if (!Number.isInteger(year) || year < 1000 || year > 9999) return fail({ code: 'importNoYear', domain: 'update' });
     if (getTables()[year]?.source === 'builtin') return fail({ code: 'importBuiltin', params: year, domain: 'update' }, year, false);
@@ -277,7 +277,7 @@ export function startHolidayUpdate(ctx) {
     return { ok: true, year };
   }
 
-  // 空字符串 = 清除；不合格的不保存，返回具体原因
+  // 空字串 = 清除；不合格的不儲存，返回具體原因
   function setCustomUrl(value) {
     if (!current()) return { ok: false };
     if (value === '') {

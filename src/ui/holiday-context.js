@@ -1,34 +1,34 @@
-// 纯函数：月历摘要行的情境胶囊（R36 / 决定 4）与缺假期表标签（R41）。
-// 胶囊的放假区间、调休上班日取自 dayInfo（= 该月实际使用的表，或该地区在无表年份仍标出的法定假日），
-// 「依据」按该年的数据来源如实写：内置 / 联网 / 导入文件 / 无表（不声称任何官方来源）。
-// 地区差异只在 provider：CN 无表年份按《放假办法》标出法定假日，TW 无表年份什么都不标（只用周末 + 手动标记）。
+// 純函式：月曆摘要行的情境膠囊（R36 / 決定 4）與缺假期表標籤（R41）。
+// 膠囊的放假區間、調休上班日取自 dayInfo（= 該月實際使用的表，或該地區在無表年份仍標出的法定假日），
+// 「依據」按該年的資料來源如實寫：內建 / 聯網 / 匯入檔案 / 無表（不聲稱任何官方來源）。
+// 地區差異只在 provider：CN 無表年份按《放假辦法》標出法定假日，TW 無表年份什麼都不標（只用週末 + 手動標記）。
 import { dayInfo } from '../calendar.js';
 import { CN_HOLIDAY_PROVIDER } from '../holiday-provider-cn.js';
 
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
-// 只有物件才算 provider（`[2024,…].map(noTableKind)` 之类会把索引传进来：一律按 CN 处理，不误判成「没有回退」）
+// 只有物件才算 provider（`[2024,…].map(noTableKind)` 之類會把索引傳進來：一律按 CN 處理，不誤判成「沒有回退」）
 const providerOf = (provider) => (provider && typeof provider === 'object' ? provider : CN_HOLIDAY_PROVIDER);
 // A provider without missing-year metadata has no statutory fallback.
-// 法定假日 / 调休与周末开关无关；provider 决定无表年份的回退
+// 法定假日 / 調休與週末開關無關；provider 決定無表年份的回退
 const plainCfg = (provider) => ({ weekends: false, holidayProvider: providerOf(provider) });
 
-// 无表年份实际标出了什么：'lunar'（2028–2035：固定日期 + 春节 / 清明 / 端午 / 中秋）、
-// 'fixed'（其他 ≥ 2025：六个固定日期）、'none'（< 2025，或该地区没有法定日期回退）
+// 無表年份實際標出了什麼：'lunar'（2028–2035：固定日期 + 春節 / 清明 / 端午 / 中秋）、
+// 'fixed'（其他 ≥ 2025：六個固定日期）、'none'（< 2025，或該地區沒有法定日期回退）
 export function noTableKind(year, provider) {
   const p = providerOf(provider);
   return typeof p.missingYearKind === 'function' ? p.missingYearKind(year) : 'none';
 }
 
-// 该年无表时「标出了哪些固定日期」的节日名（CN 是《放假办法》的六个固定日期；其他地区由 provider 提供）
+// 該年無表時「標出了哪些固定日期」的節日名（CN 是《放假辦法》的六個固定日期；其他地區由 provider 提供）
 function fixedNames(provider) {
   return [...new Set(Object.values(providerOf(provider).fixedNames ?? {}))];
 }
 
-// 缺表标签：只在「当年」与之后的年份显示（当年取自可注入的 clock，不是真实 Date）；过去的年份不显示、不声称任何事。
-// 有表（内置 / 联网 / 导入）→ null。措辞全部取自当前地区的字典，两边共用同一批 key。
+// 缺表標籤：只在「當年」與之後的年份顯示（當年取自可注入的 clock，不是真實 Date）；過去的年份不顯示、不聲稱任何事。
+// 有表（內建 / 聯網 / 匯入）→ null。措辭全部取自當前地區的字典，兩邊共用同一批 key。
 export function missingTableTag(year, today, tables, t, provider) {
   if (has(tables, year) && tables[year]) return null;
-  // round 3：过去的无表年份也显示（不再「过去不显示」，R41 修订）——三种措辞都只说 app 标了什么，对过去同样成立
+  // round 3：過去的無表年份也顯示（不再「過去不顯示」，R41 修訂）——三種措辭都只說 app 標了什麼，對過去同樣成立
   if (!(today instanceof Date)) return null;
   const c = t.card;
   switch (noTableKind(year, provider)) {
@@ -38,7 +38,7 @@ export function missingTableTag(year, today, tables, t, provider) {
   }
 }
 
-// 把同名、日期相连的日子合并成区间：[{ name, days:[d…] }] → 「10/1–10/7」「2/14、2/28」
+// 把同名、日期相連的日子合併成區間：[{ name, days:[d…] }] → 「10/1–10/7」「2/14、2/28」
 function groupRuns(days) {
   const runs = [];
   for (const x of days) {
@@ -49,7 +49,7 @@ function groupRuns(days) {
   return runs;
 }
 
-// 月份内的法定假日与调休上班日（不含手动标记）：{ off:[{name,day}], makeup:[{name,day}] }，按日期排序
+// 月份內的法定假日與調休上班日（不含手動標記）：{ off:[{name,day}], makeup:[{name,day}] }，按日期排序
 export function monthHolidays(year, monthIndex, tables, provider) {
   const n = new Date(year, monthIndex + 1, 0).getDate();
   const cfg = plainCfg(provider);
@@ -63,9 +63,9 @@ export function monthHolidays(year, monthIndex, tables, provider) {
   return { off, makeup };
 }
 
-// 胶囊模型：{ tone:'none'|'holiday'|'unknown', check:boolean, text, sub:string|null, title }
-// tone none = 有表且本月真的没有（虚线 + ✓）；holiday = 本月有放假 / 调休；unknown = 无表且本月没有标出任何日子（虚线，不打 ✓）
-// 缺表标签已在同一行显示时（当年 / 之后的无表年份），标签已说明只标了哪些日子，胶囊的「依据」改放 title，避免一行放不下
+// 膠囊模型：{ tone:'none'|'holiday'|'unknown', check:boolean, text, sub:string|null, title }
+// tone none = 有表且本月真的沒有（虛線 + ✓）；holiday = 本月有放假 / 調休；unknown = 無表且本月沒有標出任何日子（虛線，不打 ✓）
+// 缺表標籤已在同一行顯示時（當年 / 之後的無表年份），標籤已說明只標了哪些日子，膠囊的「依據」改放 title，避免一行放不下
 export function monthContext(year, monthIndex, tables, today, t, provider) {
   const C = t.calendar.context;
   const m = monthIndex + 1;
@@ -73,7 +73,7 @@ export function monthContext(year, monthIndex, tables, today, t, provider) {
   const table = has(tables, year) ? tables[year] : null;
   const { off, makeup } = monthHolidays(year, monthIndex, tables, provider);
 
-  // 按节日分组；组内「放假」在前、「调休上班」在后；各组按自己最早的日期排序
+  // 按節日分組；組內「放假」在前、「調休上班」在後；各組按自己最早的日期排序
   const groups = new Map();
   const groupOf = (name) => {
     if (!groups.has(name)) groups.set(name, { name, first: Infinity, off: [], makeup: [] });
@@ -95,16 +95,16 @@ export function monthContext(year, monthIndex, tables, today, t, provider) {
 
   const kind = noTableKind(year, provider);
   let basis;
-  if (table) basis = typeof C.basis[table.source] === 'function' ? C.basis[table.source](year) : null; // 来源不明：不写依据
+  if (table) basis = typeof C.basis[table.source] === 'function' ? C.basis[table.source](year) : null; // 來源不明：不寫依據
   else if (kind === 'none') basis = null;
-  else basis = kind === 'lunar' ? C.basis.lunar : C.basis.fixed; // R49：说 app 标了什么，过去 / 将来同一句
+  else basis = kind === 'lunar' ? C.basis.lunar : C.basis.fixed; // R49：說 app 標了什麼，過去 / 將來同一句
 
   if (!table && kind === 'none') {
-    // 同一行已有「{年} 年未标法定假日」标签：胶囊只写本月的事实，长说明放 title（round 3，窄视窗不截断）
+    // 同一行已有「{年} 年未標法定假日」標籤：膠囊只寫本月的事實，長說明放 title（round 3，窄視窗不截斷）
     return { tone: 'unknown', check: false, text: C.noneMarked, title: C.noData(year) };
   }
   const text = marked ? C.join(parts) : table ? C.noHoliday : C.noneMarked;
-  // 「依据」只放 title（M10）：本月没有假日的胶囊是纯说明文字，不再在后面接一段小字
+  // 「依據」只放 title（M10）：本月沒有假日的膠囊是純說明文字，不再在後面接一段小字
   return {
     tone: marked ? 'holiday' : table ? 'none' : 'unknown',
     check: Boolean(table) && !marked && basis !== null,

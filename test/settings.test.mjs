@@ -16,7 +16,7 @@ const fakeStorage = (init = {}) => {
     _writes: writes,
   };
 };
-// 规范状态：cfg 不含 salary，月薪按地区放在 salaries，标记按地区放在 marksByRegion。
+// 規範狀態：cfg 不含 salary，月薪按地區放在 salaries，標記按地區放在 marksByRegion。
 const canonical = (over = {}) => ({
   region: 'CN',
   cfg: { ...DEFAULTS },
@@ -38,12 +38,12 @@ test('version 4 契约：键名不变、地区列表、共享设置不含月薪'
     'showCardCheer', 'showCardDate', 'showCardMetrics', 'showCardPayday', 'showCardProgress',
     'showLunar', 'start', 'theme', 'weekends',
   ]);
-  // 画面设置默认中号 + 全部显示：与旧版画面一致，旧存档缺这些键时看得到的卡片不变。
+  // 畫面設定預設中號 + 全部顯示：與舊版畫面一致，舊存檔缺這些鍵時看得到的卡片不變。
   assert.equal(DEFAULTS.fontScale, 'm');
   for (const f of ['showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer']) {
     assert.equal(DEFAULTS[f], true, `${f} defaults to visible`);
   }
-  // 默认午休关闭（不预先把某个休息时段当成所有人的作息），但保留 12:00–13:00 的预填值。
+  // 預設午休關閉（不預先把某個休息時段當成所有人的作息），但保留 12:00–13:00 的預填值。
   assert.equal(DEFAULTS.lunchOn, false);
   assert.equal(DEFAULTS.lunchStart, '12:00');
   assert.equal(DEFAULTS.lunchEnd, '13:00');
@@ -224,7 +224,7 @@ test('exportState: v4 结构，两地月薪与标记都在，没有活动月薪/
   assert.deepEqual(o.salaries, { TW: 8888.8888, CN: 6800 }, '不四舍五入使用者输入');
   assert.deepEqual(o.marksByRegion, { TW: { '2026-05-04': 'work' }, CN: { '2026-05-05': 'rest' } });
   for (const k of Object.keys(DEFAULTS)) assert.ok(k in o, `共享设置 ${k} 在备份里`);
-  // 已经按旧形状拼错（cfg 里带 salary）也不会把活动月薪写进备份
+  // 已經按舊形狀拼錯（cfg 裡帶 salary）也不會把活動月薪寫進備份
   const stray = JSON.parse(exportState({ ...canonical(), cfg: { ...DEFAULTS, salary: 12 } }));
   assert.equal(stray.salary, undefined);
   assert.equal(stray.salaries.TW, 40000);
@@ -269,7 +269,7 @@ test('exportState: 坏掉的共享设置与标记写回默认/剔除，产物零
 });
 
 test('exportState: 时段与午休合起来不成立时逐级让步，产物零丢弃地读得回来', () => {
-  // 午休落在上下班时间之外：先关午休，上下班时间不动。
+  // 午休落在上下班時間之外：先關午休，上下班時間不動。
   const lunchOutside = {
     ...canonical(),
     cfg: { ...DEFAULTS, lunchOn: true, lunchStart: '20:00', lunchEnd: '21:00' },
@@ -280,7 +280,7 @@ test('exportState: 时段与午休合起来不成立时逐级让步，产物零�
   assert.equal(a.lunchOn, false);
   assert.equal(loadState(fakeStorage({ [KEY]: exportState(lunchOutside) })).dropped.length, 0);
 
-  // 午休顺序倒挂但开关本来就是关的：时段仍然原样保留。
+  // 午休順序倒掛但開關本來就是關的：時段仍然原樣保留。
   const offReversed = {
     ...canonical(),
     cfg: { ...DEFAULTS, lunchOn: false, lunchStart: '13:00', lunchEnd: '12:00' },
@@ -291,7 +291,7 @@ test('exportState: 时段与午休合起来不成立时逐级让步，产物零�
   assert.equal(b.lunchEnd, '12:00');
   assert.deepEqual(loadState(fakeStorage({ [KEY]: exportState(offReversed) })).dropped, []);
 
-  // 上下班时间本身倒挂：整组时段退回默认。
+  // 上下班時間本身倒掛：整組時段退回預設。
   const badShift = { ...canonical(), cfg: { ...DEFAULTS, start: '18:00', end: '09:00' } };
   const c = JSON.parse(exportState(badShift));
   assert.equal(c.start, DEFAULTS.start);
@@ -300,13 +300,13 @@ test('exportState: 时段与午休合起来不成立时逐级让步，产物零�
 });
 
 test('load: 两套键按版本分流，过时键回报未知而不套用', () => {
-  // v3 里出现顶层 salary / marks：属于过时键，不并入任何地区。
+  // v3 裡出現頂層 salary / marks：屬於過時鍵，不併入任何地區。
   const v3 = loadState(fakeStorage({ [KEY]: legacyRaw({ version: 3, salary: 9000, marks: { '2026-05-04': 'rest' } }) }));
   assert.equal(v3.corrupt, false);
   assert.deepEqual(v3.dropped, []);
   assert.deepEqual(v3.state.salaries, { TW: 40000, CN: 5000 });
   assert.deepEqual(v3.state.marksByRegion, { TW: {}, CN: {} });
-  // 旧版里出现地区键：没有地区概念，不能当成 CN 或 TW 的资料。
+  // 舊版裡出現地區鍵：沒有地區概念，不能當成 CN 或 TW 的資料。
   const old = loadState(fakeStorage({ [KEY]: legacyRaw({ version: 2, salaries: { CN: 9000 }, marksByRegion: { CN: { '2026-05-04': 'rest' } } }) }));
   assert.equal(old.corrupt, false);
   assert.deepEqual(old.dropped, []);
@@ -438,7 +438,7 @@ test('import: 未知栏位回报，不套用', () => {
   assert.deepEqual(r.unknown, ['foo']);
   assert.equal(r.state.cfg.foo, undefined);
   assert.equal(r.state.salaries.CN, 7000);
-  // 旧版备份里的地区键同属无法识别的过时键：不套用、不污染其他地区。
+  // 舊版備份裡的地區鍵同屬無法識別的過時鍵：不套用、不汙染其他地區。
   const legacy = importState('{"salaries":{"TW":1},"marksByRegion":{"TW":{}}}', tw());
   assert.deepEqual(legacy.unknown.sort(), ['marksByRegion', 'salaries']);
   assert.deepEqual(legacy.state, tw());
@@ -510,7 +510,7 @@ test('import (R7): 时间合起来不成立时一并丢弃，用旧午休 fixtur
   const current = canonical({
     cfg: { ...DEFAULTS, lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00' },
   });
-  const r = importState('{"start":"18:00","end":"19:00"}', current); // 旧午休 11:30–13:00 落在这段时间之外
+  const r = importState('{"start":"18:00","end":"19:00"}', current); // 舊午休 11:30–13:00 落在這段時間之外
   assert.equal(r.state.cfg.start, '08:30');
   assert.equal(r.state.cfg.end, '17:00');
   assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['end', 'start']);

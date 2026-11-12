@@ -1,5 +1,5 @@
-// Task 14：全部界面文案（含本次新增的说明、胶囊、标签、格式示例）的繁体字 / 台湾用语扫描。
-// 函数型文案用样本参数展开后再扫；与 e2e 的页面扫描互补（页面只扫得到当前状态显示出来的文字）。
+// Task 14：全部介面文案（含本次新增的說明、膠囊、標籤、格式示例）的繁體字 / 臺灣用語掃描。
+// 函式型文案用樣本引數展開後再掃；與 e2e 的頁面掃描互補（頁面只掃得到當前狀態顯示出來的文字）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STRINGS } from '../src/strings.zh-CN.js';
@@ -18,7 +18,7 @@ function collect(v, path, out) {
       try {
         const r = v(...args);
         if (typeof r === 'string') out.push([`${path}(${args.length})`, r]);
-      } catch { /* 参数形状不合：换下一组 */ }
+      } catch { /* 引數形狀不合：換下一組 */ }
     }
   } else if (Array.isArray(v)) v.forEach((x, i) => collect(x, `${path}[${i}]`, out));
   else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) collect(x, `${path}.${k}`, out);

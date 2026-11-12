@@ -1,14 +1,14 @@
 import { dayInfo, workdaysInMonth, nextWorkdayInDays } from './calendar.js';
 
-// 校验原因只回传稳定的 code（必要时附参数），绝不写死任何一种语言的句子：
-// 显示端（设置面板、导入报告、小窗提示）在真正要显示时用当时的字典翻成文字。
+// 校驗原因只回傳穩定的 code（必要時附引數），絕不寫死任何一種語言的句子：
+// 顯示端（設定面板、匯入報告、小窗提示）在真正要顯示時用當時的字典翻成文字。
 export function reason(code, params) {
   return params ? { code, params } : { code };
 }
 
 
-// { code, params } → 当前字典的一句话。键缺失回传 ''，不回退到别的语言（翻译缺失必须看得见）。
-// params.field 是字典 labels 的键（start / lunchStart …），不是字段路径。
+// { code, params } → 當前字典的一句話。鍵缺失回傳 ''，不回退到別的語言（翻譯缺失必須看得見）。
+// params.field 是字典 labels 的鍵（start / lunchStart …），不是欄位路徑。
 export function reasonText(r, t) {
   const table = t && t.reasons;
   if (!table || !r || typeof r.code !== 'string') return '';
@@ -20,7 +20,7 @@ export function reasonText(r, t) {
   return entry(label) ?? '';
 }
 
-// 'HH:MM' -> 当日秒数；格式不合法返回 NaN
+// 'HH:MM' -> 當日秒數；格式不合法返回 NaN
 function parseHM(s) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(typeof s === 'string' ? s.trim() : '');
   if (!m) return NaN;
@@ -33,9 +33,9 @@ function parseHM(s) {
 const validSalary = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
 const overlap = (a1, a2, b1, b2) => Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
 
-// 回传 { ok:false, field, code, params }：field 是要挂错误的字段，params.field 是字典 labels 的键
-//（时间类原因要说出是哪个时间）；两者通常一致，因为 cfg 的字段名就是 labels 的键。
-// 已翻译的句子不出现在这里：settings-panel 按 { code, params } 用当时的字典重译。
+// 回傳 { ok:false, field, code, params }：field 是要掛錯誤的欄位，params.field 是字典 labels 的鍵
+//（時間類原因要說出是哪個時間）；兩者通常一致，因為 cfg 的欄位名就是 labels 的鍵。
+// 已翻譯的句子不出現在這裡：settings-panel 按 { code, params } 用當時的字典重譯。
 export function validateSchedule(cfg) {
   const fail = (field, code, label = field) => ({ ok: false, field, code, params: { field: label } });
   if (!validSalary(cfg.salary)) return fail('salary', 'salary');
@@ -69,11 +69,11 @@ function paydayIn(now, payday) {
   const mo = now.getMonth();
   const target = (yy, mm) => new Date(yy, mm, Math.min(payday, new Date(yy, mm + 1, 0).getDate()));
   let t = target(y, mo);
-  if (dayDiff(now, t) < 0) t = target(y, mo + 1); // Date 构造会处理 12 月进位
+  if (dayDiff(now, t) < 0) t = target(y, mo + 1); // Date 構造會處理 12 月進位
   return dayDiff(now, t);
 }
 
-// 日薪 = 月薪 ÷ 当月应出勤天数（spec §5）。状态卡、月历摘要行与菜单预览共用这一份公式。
+// 日薪 = 月薪 ÷ 當月應出勤天數（spec §5）。狀態卡、月曆摘要行與選單預覽共用這一份公式。
 export function monthWage(year, monthIndex, cfg, marks, tables) {
   const workdays = workdaysInMonth(year, monthIndex, cfg, marks, tables);
   return { workdays, dailyWage: validSalary(cfg.salary) && workdays > 0 ? cfg.salary / workdays : 0 };
@@ -119,7 +119,7 @@ export function snapshot(now, cfg, marks, tables) {
   } else if (info.leave === 'unpaid') {
     status = 'unpaidLeave';
   } else if (!scheduleOk) {
-    status = 'beforeWork'; // 时间配置无效：无法计时，金额保持 0
+    status = 'beforeWork'; // 時間配置無效：無法計時，金額保持 0
   } else if (sod < s) {
     status = 'beforeWork';
     remainSec = s - sod;
@@ -137,7 +137,7 @@ export function snapshot(now, cfg, marks, tables) {
     if (inLunch) resumeInSec = le - sod;
   }
 
-  // 本月已过各日金额
+  // 本月已過各日金額
   let past = 0;
   if (dailyWage > 0) {
     for (let d = 1; d < now.getDate(); d++) {

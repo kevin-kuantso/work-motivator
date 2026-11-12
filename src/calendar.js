@@ -1,7 +1,7 @@
 import { CN_HOLIDAY_PROVIDER } from './holiday-provider-cn.js';
 
 const pad = (n) => String(n).padStart(2, '0');
-// 本地时间 key，禁止 toISOString（UTC 会偏移日期）
+// 本地時間 key，禁止 toISOString（UTC 會偏移日期）
 const keyOf = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 export function dayInfo(date, cfg, marks, tables = CN_HOLIDAY_PROVIDER.tables) {

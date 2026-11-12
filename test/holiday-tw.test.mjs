@@ -1,5 +1,5 @@
-// 台湾办公日历 provider（holiday-data-tw.js / holidays-tw.js）：内建年表与官方 CSV 逐日对照、
-// 严格 CSV 验证、内建表合并。全部离線：只读本机 fixture，不连网（线上检查已移除）。
+// 臺灣辦公日曆 provider（holiday-data-tw.js / holidays-tw.js）：內建年表與官方 CSV 逐日對照、
+// 嚴格 CSV 驗證、內建表合併。全部離線：只讀本機 fixture，不連網（線上檢查已移除）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ import {
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
 const fixtureText = (name) => fixture(name).toString('utf8');
 
-// ---- 内建静态年表 ----
+// ---- 內建靜態年表 ----
 
 test('builtin tables: 2026 and 2027 only, frozen, flat date->name maps, empty makeup', () => {
   assert.deepEqual([...TW_BUILTIN_YEARS], [2026, 2027]);
@@ -112,7 +112,7 @@ test('parseTwCsv: official CSV with BOM and CRLF is accepted; tables are year-ke
 
 test('parseTwCsv: multiple years in one file are accepted, each must be complete', () => {
   const rows2026 = fixtureLines('tw-2026-official.csv').filter(Boolean);
-  const rows2027 = fixtureLines('tw-2027-official.csv').filter(Boolean).slice(1); // 去掉重复的表头
+  const rows2027 = fixtureLines('tw-2027-official.csv').filter(Boolean).slice(1); // 去掉重複的表頭
   const text = joinLines([...rows2026, ...rows2027]) + '\r\n';
   const r = parseTwCsv(text);
   assert.equal(r.ok, true, `parse failed: ${r.code}`);
@@ -146,10 +146,10 @@ test('parseTwCsv: quoted remarks keep commas and line breaks (CRLF normalized to
 test('weekend/status semantics: unnamed weekend off stays out, weekend work becomes makeup, weekday off gets the label', () => {
   // 2028-01-01 是星期六、2028-01-02 是星期日、2028-01-03 是星期一。
   const text = fullYearCsv(2028, (key) => {
-    if (key === '2028-01-01') return { status: '2' }; // 无名称且是周末 → 交给周末规则，不进表
-    if (key === '2028-01-02') return { status: '0' }; // 周末上班 → 补班
-    if (key === '2028-01-03') return { status: '2' }; // 平日放假、无名称 → 一般文字
-    if (key === '2028-01-04') return { status: '0', remark: '補行上班' }; // 平日上班 → 不进表
+    if (key === '2028-01-01') return { status: '2' }; // 無名稱且是週末 → 交給週末規則，不進表
+    if (key === '2028-01-02') return { status: '0' }; // 週末上班 → 補班
+    if (key === '2028-01-03') return { status: '2' }; // 平日放假、無名稱 → 一般文字
+    if (key === '2028-01-04') return { status: '0', remark: '補行上班' }; // 平日上班 → 不進表
     return null;
   });
   const r = parseTwCsv(text, { labels: { off: '放假囉', makeup: '要上班' } });
@@ -160,7 +160,7 @@ test('weekend/status semantics: unnamed weekend off stays out, weekend work beco
 
 test('parseTwCsv rejects broken files with stable codes (never throws)', () => {
   const good = fixtureLines('tw-2026-official.csv');
-  const body = good.slice(0, -2); // 去掉最后一行数据与结尾空行
+  const body = good.slice(0, -2); // 去掉最後一行資料與結尾空行
 
   const missing = parseTwCsv(joinLines([...body, '']));
   assert.equal(missing.ok, false);
@@ -245,7 +245,7 @@ test('validateTwYear reports the storage-compatible codes', () => {
   assert.equal(code(2026, { off: {}, makeup: { '2026-01-03': '補班' } }), 'emptyOff');
 });
 
-// ---- 合并 ----
+// ---- 合併 ----
 
 test('mergeTwTables: builtin wins, stored tables validated one by one, builtin objects never mutated', () => {
   const before = JSON.stringify(TW_BUILTIN_TABLES);
@@ -274,7 +274,7 @@ test('mergeTwTables: builtin wins, stored tables validated one by one, builtin o
   assert.equal(Object.hasOwn(merged, 'abc'), false);
   assert.equal(Object.hasOwn(merged, '2032'), false);
   assert.equal(JSON.stringify(TW_BUILTIN_TABLES), before, 'builtin tables untouched');
-  // 合并结果里的 map 是副本，改它不会改到内建表
+  // 合併結果裡的 map 是副本，改它不會改到內建表
   merged[2026].off['2026-12-31'] = '改壞';
   assert.equal(Object.hasOwn(TW_BUILTIN_TABLES[2026].off, '2026-12-31'), false);
 });

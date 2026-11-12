@@ -3,27 +3,27 @@ import { validateSchedule, reason } from './calc.js';
 export const STORAGE_KEY = 'work-motivator-v1';
 export const STATE_VERSION = 4;
 
-// 地区 ID 是稳定契约（TW / CN）：语言、币种、假日 provider 都由 profile 决定，这里只存 ID。
+// 地區 ID 是穩定契約（TW / CN）：語言、幣種、假日 provider 都由 profile 決定，這裡只存 ID。
 export const REGIONS = Object.freeze(['TW', 'CN']);
 export const DEFAULT_REGION = 'TW';
 
-// 共享设置（不含月薪）：月薪按地区放在 salaries 里，避免同一份值存两处互相矛盾。
+// 共享設定（不含月薪）：月薪按地區放在 salaries 裡，避免同一份值存兩處互相矛盾。
 export const DEFAULTS = Object.freeze({
   start: '08:30', end: '17:00', lunchOn: false, lunchStart: '12:00', lunchEnd: '13:00',
   weekends: false, payday: null, cheers: Object.freeze(['']), showLunar: true, theme: 'rainbow',
-  // 画面设置：全局字号作用于状态卡的讯息显示；五个开关决定卡片上「可见信息」的范围。
-  // 默认值与旧版画面一致（中号、全部都显示），所以旧存档缺这些键时画面不会变。
+  // 畫面設定：全域性字號作用於狀態卡的訊息顯示；五個開關決定卡片上「可見資訊」的範圍。
+  // 預設值與舊版畫面一致（中號、全部都顯示），所以舊存檔缺這些鍵時畫面不會變。
   fontScale: 'm',
   showCardProgress: true, showCardMetrics: true, showCardDate: true,
   showCardPayday: true, showCardCheer: true,
 });
 
-// 字号档位：稳定 ID（存盘用）对应 CSS 的 px 级距由显示端决定，这里只负责取值白名单。
+// 字號檔位：穩定 ID（存檔用）對應 CSS 的 px 級距由顯示端決定，這裡只負責取值白名單。
 export const FONT_SCALES = Object.freeze(['xs', 's', 'm', 'l', 'xl']);
 
-// 示例默认月薪（只对新用户套用一次，绝不改写已保存的值）：
-// TW 40000 = 主计总处 2025 年工业及服务业「本国籍全时受雇员工」每月经常性薪资中位数 39,890 元向上取整到千元；
-// CN 5000 = 第三方推估 2024 年全国雇员月薪中位数 5,000–5,150 元取区间下限。两者样本与时期不同，不作比较。
+// 示例預設月薪（只對新使用者套用一次，絕不改寫已儲存的值）：
+// TW 40000 = 主計總處 2025 年工業及服務業「本國籍全時受僱員工」每月經常性薪資中位數 39,890 元向上取整到千元；
+// CN 5000 = 第三方推估 2024 年全國僱員月薪中位數 5,000–5,150 元取區間下限。兩者樣本與時期不同，不作比較。
 export const SALARY_DEFAULTS = Object.freeze({ TW: 40000, CN: 5000 });
 
 const MARKS = ['work', 'rest', 'paidLeave', 'unpaidLeave'];
@@ -32,9 +32,9 @@ const isTime = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const salaryDefault = (region) => SALARY_DEFAULTS[region] ?? SALARY_DEFAULTS[DEFAULT_REGION];
 
-// 每个 cfg 字段：返回 null 表示合格，否则返回 { code, params } 原因（不是译文，显示端才翻）。
-// 严格校验，绝不转型。月薪单独按地区校验（salaryReason）。
-// 时间 / 开关类原因的 params.field 是字典 labels 的键（与 cfg 字段名同名）。
+// 每個 cfg 欄位：返回 null 表示合格，否則返回 { code, params } 原因（不是譯文，顯示端才翻）。
+// 嚴格校驗，絕不轉型。月薪單獨按地區校驗（salaryReason）。
+// 時間 / 開關類原因的 params.field 是字典 labels 的鍵（與 cfg 欄位名同名）。
 const timeRule = (label) => (v) => (isTime(v) ? null : reason('timeFormat', { field: label }));
 const boolRule = (label) => (v) => (typeof v === 'boolean' ? null : reason('switchValue', { field: label }));
 const CFG_RULES = {
@@ -60,7 +60,7 @@ const CFG_RULES = {
 };
 
 const salaryReason = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? null : reason('salary'));
-// 认不出的地区 ID 是对「地区的取值」不合法：结构本身没问题，别用「文件内容的结构不正确」硬套。
+// 認不出的地區 ID 是對「地區的取值」不合法：結構本身沒問題，別用「檔案內容的結構不正確」硬套。
 const regionReason = () => reason('region');
 
 function markKeyReason(key) {
@@ -72,12 +72,12 @@ function markKeyReason(key) {
   return real ? null : reason('markNotReal');
 }
 
-// 给定地区的一套完整默认值（共享设置 + 该地区示例月薪）。cfg 仍是共享结构，salary 只在调用边界附加。
+// 給定地區的一套完整預設值（共享設定 + 該地區示例月薪）。cfg 仍是共享結構，salary 只在呼叫邊界附加。
 export function defaultsFor(region) {
   return { ...DEFAULTS, cheers: [...DEFAULTS.cheers], salary: salaryDefault(region) };
 }
 
-// 规范状态：{ region, cfg（共享设置，不含 salary）, salaries:{TW,CN}, marksByRegion:{TW,CN} }
+// 規範狀態：{ region, cfg（共享設定，不含 salary）, salaries:{TW,CN}, marksByRegion:{TW,CN} }
 export function defaultState() {
   return {
     region: DEFAULT_REGION,
@@ -87,13 +87,13 @@ export function defaultState() {
   };
 }
 
-// 保守回退：储存读不到 / 内容损坏 / 未来版本时用 CN（沿用旧版行为），不覆写原始数据。
+// 保守回退：儲存讀不到 / 內容損壞 / 未來版本時用 CN（沿用舊版行為），不覆寫原始資料。
 export function conservativeState() {
   return { ...defaultState(), region: 'CN' };
 }
 
-// 复制成规范形状：cfg 只留 DEFAULTS 的键（外部传进来的杂键、活动 salary 一律不复制），
-// salaries / marksByRegion 只留两地；认不出的 region 落到 DEFAULT_REGION（调用方另有保守回退时以它为准）。
+// 複製成規範形狀：cfg 只留 DEFAULTS 的鍵（外部傳進來的雜鍵、活動 salary 一律不復制），
+// salaries / marksByRegion 只留兩地；認不出的 region 落到 DEFAULT_REGION（呼叫方另有保守回退時以它為準）。
 const cloneState = (state) => {
   const source = state ?? {};
   const shared = isPlainObject(source.cfg) ? source.cfg : {};
@@ -103,7 +103,7 @@ const cloneState = (state) => {
   }
   if (Array.isArray(cfg.cheers)) cfg.cheers = [...cfg.cheers];
   const salaries = { ...SALARY_DEFAULTS };
-  // 与校验同一把尺：不合法的子项回到该地区示例默认，不带进后续计算。
+  // 與校驗同一把尺：不合法的子項回到該地區示例預設，不帶進後續計算。
   for (const rid of REGIONS) {
     const v = source.salaries?.[rid];
     if (!salaryReason(v)) salaries[rid] = v;
@@ -113,21 +113,21 @@ const cloneState = (state) => {
   return { region: REGIONS.includes(source.region) ? source.region : DEFAULT_REGION, cfg, salaries, marksByRegion };
 };
 
-// v3 引入地区；v4 引入多句鼓励语。未知版本必须拒绝，避免旧版覆盖新数据。
+// v3 引入地區；v4 引入多句鼓勵語。未知版本必須拒絕，避免舊版覆蓋新資料。
 const KNOWN_VERSIONS = [1, 2, 3, STATE_VERSION];
 function fileVersion(obj) {
   if (!Object.prototype.hasOwnProperty.call(obj, 'version')) return 1;
   return KNOWN_VERSIONS.includes(obj.version) ? obj.version : null;
 }
 
-// 共用的验证核心：load 与 import 皆走此处。
-// 合并规则：共享设置逐字段；salaries 按地区逐字段；marksByRegion 按地区逐日；未提供者保留现值。
-// 两套键按备份版本分流，互不越界：
-// - 旧备份（无版本 / 1 / 2）的 salary / marks 一律并入 CN，不切换当前地区；地区键属过时键，回报未知。
-// - v3 的 region / salaries / marksByRegion 才生效；顶层 salary / marks 属过时键，回报未知，不并入任何地区。
+// 共用的驗證核心：load 與 import 皆走此處。
+// 合併規則：共享設定逐欄位；salaries 按地區逐欄位；marksByRegion 按地區逐日；未提供者保留現值。
+// 兩套鍵按備份版本分流，互不越界：
+// - 舊備份（無版本 / 1 / 2）的 salary / marks 一律併入 CN，不切換當前地區；地區鍵屬過時鍵，回報未知。
+// - v3 的 region / salaries / marksByRegion 才生效；頂層 salary / marks 屬過時鍵，回報未知，不併入任何地區。
 function applyParsed(obj, current, version) {
   const isV3 = version >= 3;
-  // cloneState 只认两地：current 的 region 认不出来时已是 DEFAULT_REGION，调用方要别的回退就传别的 base。
+  // cloneState 只認兩地：current 的 region 認不出來時已是 DEFAULT_REGION，呼叫方要別的回退就傳別的 base。
   const state = cloneState(current);
   const dropped = [];
   const unknown = [];
@@ -154,7 +154,7 @@ function applyParsed(obj, current, version) {
     const v = obj[key];
     if (key === 'version') continue;
     if (key === 'cheer') {
-      // 旧版单句迁移；新格式优先，避免两者同时存在时依键顺序覆盖。
+      // 舊版單句遷移；新格式優先，避免兩者同時存在時依鍵順序覆蓋。
       if (!Object.prototype.hasOwnProperty.call(obj, 'cheers')) {
         const bad = CFG_RULES.cheers([v]);
         if (bad) dropped.push({ field: 'cheer', reason: bad });
@@ -185,7 +185,7 @@ function applyParsed(obj, current, version) {
 
     if (key === 'salaries') {
       if (!isPlainObject(v)) {
-        // 整块不是对象：别拿「月薪必须是大于 0 的数字」这种具体规则去描述类型错误。
+        // 整塊不是物件：別拿「月薪必須是大於 0 的數字」這種具體規則去描述型別錯誤。
         dropped.push({ field: 'salaries', reason: reason('salariesType') });
         continue;
       }
@@ -223,7 +223,7 @@ function applyParsed(obj, current, version) {
       continue;
     }
 
-    // 旧版备份（无地区概念）：月薪与标记一律并入 CN，当前地区不变。
+    // 舊版備份（無地區概念）：月薪與標記一律併入 CN，當前地區不變。
     if (key === 'salary') {
       const bad = salaryReason(v);
       if (bad) dropped.push({ field: 'salaries.CN', reason: bad });
@@ -259,12 +259,12 @@ function applyParsed(obj, current, version) {
     unknown.push(key);
   }
 
-  // R7 跨字段：单独合格但合起来不成立的时间字段一并丢弃，保留现值。
-  // 月薪缺陷已在 salaries.* 上报，这里的探针只用来让跨字段检查跑完。
+  // R7 跨欄位：單獨合格但合起來不成立的時間欄位一併丟棄，保留現值。
+  // 月薪缺陷已在 salaries.* 上報，這裡的探針只用來讓跨欄位檢查跑完。
   const activeSalary = state.salaries[state.region];
   const probeSalary = salaryReason(activeSalary) ? 1 : activeSalary;
   const checkWith = () => validateSchedule({ ...state.cfg, salary: probeSalary });
-  // validateSchedule 只回传 { code, params }：把原因整理成 dropped 的语义形状，不在这里翻成文字。
+  // validateSchedule 只回傳 { code, params }：把原因整理成 dropped 的語義形狀，不在這裡翻成文字。
   const causeOf = (check) => reason(check.code, check.params);
   const revertTime = (f, check) => {
     state.cfg[f] = current.cfg?.[f] ?? DEFAULTS[f];
@@ -275,10 +275,10 @@ function applyParsed(obj, current, version) {
     dropped.push({ field: f, reason: causeOf(check) });
   };
   let check = checkWith();
-  // 先只退被点名的那个字段（它确实来自备份时），尽量保住同一份备份里其他合格的值。
+  // 先只退被點名的那個欄位（它確實來自備份時），儘量保住同一份備份裡其他合格的值。
   while (!check.ok && appliedTimes.length) {
     const lone = appliedTimes.length === 1 ? appliedTimes[0] : appliedTimes.includes(check.field) ? check.field : null;
-    if (!lone) break; // 冲突指向存档里原有的值：整组候选时间一起退回去
+    if (!lone) break; // 衝突指向存檔裡原有的值：整組候選時間一起退回去
     revertTime(lone, check);
     check = checkWith();
   }
@@ -315,14 +315,14 @@ export function exportState(state) {
     region: REGIONS.includes(source.region) ? source.region : DEFAULT_REGION,
   };
   for (const key of Object.keys(DEFAULTS)) {
-    // 与载入/汇入同一套校验：坏值写成默认，备份一定读得回来。
+    // 與載入/匯入同一套校驗：壞值寫成預設，備份一定讀得回來。
     const v = Object.prototype.hasOwnProperty.call(shared, key) ? shared[key] : DEFAULTS[key];
     out[key] = CFG_RULES[key](v) ? DEFAULTS[key] : v;
   }
   out.salaries = {};
   out.marksByRegion = {};
   for (const rid of REGIONS) {
-    // 与载入/汇入同一套校验：不合法的月薪写成该地区示例默认，避免产出自己读不回来的备份。
+    // 與載入/匯入同一套校驗：不合法的月薪寫成該地區示例預設，避免產出自己讀不回來的備份。
     const salary = source.salaries?.[rid];
     out.salaries[rid] = salaryReason(salary) ? salaryDefault(rid) : salary;
     const marks = source.marksByRegion?.[rid];
@@ -333,15 +333,15 @@ export function exportState(state) {
       }
     }
   }
-  // 跨字段（R7）也要立得住：备份读回来才不会被判成部分无效。
-  // 逐级让步，尽量保住用户实际填过的值：先关午休，再把午休时间退回默认。上下班时间不动（它们决定工时本身）。
+  // 跨欄位（R7）也要立得住：備份讀回來才不會被判成部分無效。
+  // 逐級讓步，儘量保住使用者實際填過的值：先關午休，再把午休時間退回預設。上下班時間不動（它們決定工時本身）。
   const valid = () => validateSchedule({ ...out, salary: out.salaries[out.region] }).ok;
   if (!valid() && out.lunchOn) out.lunchOn = DEFAULTS.lunchOn;
   if (!valid()) {
     out.lunchStart = DEFAULTS.lunchStart;
     out.lunchEnd = DEFAULTS.lunchEnd;
   }
-  // 仍不成立（例如存档里的上下班时间本身倒挂）：整组时段退回默认，保证产物可以被自己读回。
+  // 仍不成立（例如存檔裡的上下班時間本身倒掛）：整組時段退回預設，保證產物可以被自己讀回。
   if (!valid()) {
     for (const key of [...TIME_FIELDS, 'lunchOn']) out[key] = DEFAULTS[key];
   }
@@ -352,13 +352,13 @@ export function importState(text, current) {
   const p = parseObject(text);
   if (p.error) return { error: p.error };
   const version = fileVersion(p.obj);
-  // 认不出版本（含未来版本）的备份整份拒绝：不能当成旧版误读。
+  // 認不出版本（含未來版本）的備份整份拒絕：不能當成舊版誤讀。
   if (version === null) return { error: reason('futureVersion') };
   const base = cloneState(current ?? defaultState());
   return applyParsed(p.obj, base, version);
 }
 
-// 读取只做校验与合并，绝不写回：迁移结果等下一次用户正常保存才落盘。
+// 讀取只做校驗與合併，絕不寫回：遷移結果等下一次使用者正常儲存才落盤。
 export function loadState(storage) {
   let raw;
   try {
@@ -366,16 +366,16 @@ export function loadState(storage) {
   } catch {
     return { state: conservativeState(), storageOk: false, dropped: [], corrupt: false };
   }
-  // 键不存在（Web Storage 回 null）且读取成功：只有这种情况才算新用户，套用 TW 默认值。
-  // 其他非字串回传代表储存实作异常，按损坏读取，不当成全新用户。
+  // 鍵不存在（Web Storage 回 null）且讀取成功：只有這種情況才算新使用者，套用 TW 預設值。
+  // 其他非字串回傳代表儲存實作異常，按損壞讀取，不當成全新使用者。
   if (raw === null) return { state: defaultState(), storageOk: true, dropped: [], corrupt: false };
   if (typeof raw !== 'string') return { state: conservativeState(), storageOk: false, dropped: [], corrupt: true };
   const p = parseObject(raw);
   if (p.error) return { state: conservativeState(), storageOk: true, dropped: [], corrupt: true };
   const version = fileVersion(p.obj);
   if (version === null) return { state: conservativeState(), storageOk: true, dropped: [], corrupt: true };
-  // 旧版（无版本 / 1 / 2）按 CN 保守回退读取，不覆写原始数据。
-  // 已有存档若没有主题字段，维持旧默认绿；明确保存的主题照常载入。
+  // 舊版（無版本 / 1 / 2）按 CN 保守回退讀取，不覆寫原始資料。
+  // 已有存檔若沒有主題欄位，維持舊預設綠；明確儲存的主題照常載入。
   const base = conservativeState();
   base.cfg.theme = 'green';
   const r = applyParsed(p.obj, base, version);

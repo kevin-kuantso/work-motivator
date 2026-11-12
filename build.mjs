@@ -14,7 +14,7 @@ const js = await build({
   write: false,
   loader: { '.png': 'dataurl' },
   legalComments: 'none',
-  charset: 'utf8', // 保留原始中文，不转成 \uXXXX（否则 dist 扫描形同虚设）
+  charset: 'utf8', // 保留原始中文，不轉成 \uXXXX（否則 dist 掃描形同虛設）
 });
 const css = await transform(read('src/style.css'), {
   loader: 'css',

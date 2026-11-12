@@ -1,7 +1,7 @@
-// 状态卡 StatusCard：主分页与 PiP 共用。只用 root.ownerDocument 建立节点（不依赖全域 document）。
-// 结构只建一次（按 root 记住），之后每次 tick 只更新文字，避免闪烁与焦点丢失。
-// 每 tick 变化的数字（主金额、本月累计、进度、倒数）画成固定宽度数字格（digits.js，R33）：
-// 数字格本身 aria-hidden，旁边一个看不见的 .sr-text 放完整文字给读屏（不会逐个数字念）。
+// 狀態卡 StatusCard：主分頁與 PiP 共用。只用 root.ownerDocument 建立節點（不依賴全域 document）。
+// 結構只建一次（按 root 記住），之後每次 tick 只更新文字，避免閃爍與焦點丟失。
+// 每 tick 變化的數字（主金額、本月累計、進度、倒數）畫成固定寬度數字格（digits.js，R33）：
+// 數字格本身 aria-hidden，旁邊一個看不見的 .sr-text 放完整文字給讀屏（不會逐個數字念）。
 import { h, setText, show } from './dom.js';
 import { icon } from './icons.js';
 import { cardModel } from './card-model.js';
@@ -9,12 +9,12 @@ import { dateLine, lunarText } from './format.js';
 import { renderDigits } from './digits.js';
 
 const built = new WeakMap();
-// 币别与数字之间留一个空格（设计与 e2e 的「¥ 323.81」）；各地区符号本身的间距由 profile 决定
+// 幣別與數字之間留一個空格（設計與 e2e 的「¥ 323.81」）；各地區符號本身的間距由 profile 決定
 const cardCurrency = (t) => `${t.currency} `;
-const CELEBRATE_MS = 1200; // 与 style.css 的 .is-celebrating 动画时长一致
-const CELEBRATE_GAP_MS = 5000; // 距上次绘制超过这么久（睡眠 / 后台暂停）就不算「当场收工」
-// 多句鼓励语轮播：每句停留约 8 秒，切换时柔和淡出 → 换字 → 淡入（Web Animations API，不改样式表）。
-// 卡片上永远只有一个 .card-cheer 文字节点，且样式是单行省略，所以句子长短不影响卡片 / 小窗高度。
+const CELEBRATE_MS = 1200; // 與 style.css 的 .is-celebrating 動畫時長一致
+const CELEBRATE_GAP_MS = 5000; // 距上次繪製超過這麼久（睡眠 / 後臺暫停）就不算「當場收工」
+// 多句鼓勵語輪播：每句停留約 8 秒，切換時柔和淡出 → 換字 → 淡入（Web Animations API，不改樣式表）。
+// 卡片上永遠只有一個 .card-cheer 文位元組點，且樣式是單行省略，所以句子長短不影響卡片 / 小窗高度。
 const CHEER_ROTATE_MS = 8000;
 const CHEER_FADE_OUT_MS = 260;
 const CHEER_FADE_IN_MS = 420;
@@ -22,26 +22,26 @@ const CHEER_FADE_IN_MS = 420;
 const cheerHost = (root) => root.ownerDocument.defaultView ?? null;
 const cheerReduced = (root) => Boolean(cheerHost(root)?.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
-// 计时器一律挂在「当前所在文档」的 window 上（卡片会搬进 / 搬出 PiP），并记住是哪个 window 排的，
-// 清理时用同一个 window 取消，避免搬家后留下孤儿计时器。
+// 計時器一律掛在「當前所在文件」的 window 上（卡片會搬進 / 搬出 PiP），並記住是哪個 window 排的，
+// 清理時用同一個 window 取消，避免搬家後留下孤兒計時器。
 function clearCheerTimer(r) {
   if (r.cheerTimer !== null && r.cheerTimer !== undefined) {
-    try { r.cheerTimerWin?.clearTimeout(r.cheerTimer); } catch { /* 旧文档已销毁 */ }
+    try { r.cheerTimerWin?.clearTimeout(r.cheerTimer); } catch { /* 舊文件已銷燬 */ }
     r.cheerTimer = null;
     r.cheerTimerWin = null;
   }
 }
 
-// 取消正在跑的淡入淡出：cancel() 会去掉 fill 的效果，opacity 自动回到样式默认的 1，不会卡在中间值。
+// 取消正在跑的淡入淡出：cancel() 會去掉 fill 的效果，opacity 自動回到樣式預設的 1，不會卡在中間值。
 function cancelCheerAnim(r) {
   if (r.cheerAnim) {
-    try { r.cheerAnim.cancel(); } catch { /* 旧文档已销毁 */ }
+    try { r.cheerAnim.cancel(); } catch { /* 舊文件已銷燬 */ }
     r.cheerAnim = null;
   }
 }
 
-// 停掉轮播：世代 +1 让所有在途回调失效（含已排队但还没跑的），再清计时器与动画。
-// 本来就没在跑时不动世代号，避免每秒重画都把计数推高。
+// 停掉輪播：世代 +1 讓所有在途回撥失效（含已排隊但還沒跑的），再清計時器與動畫。
+// 本來就沒在跑時不動世代號，避免每秒重畫都把計數推高。
 function stopCheer(r) {
   if (r.cheerTimer === null && r.cheerTimerWin === null && !r.cheerAnim) return;
   r.cheerGen = (r.cheerGen ?? 0) + 1;
@@ -58,7 +58,7 @@ function afterCheer(root, r, ms, fn) {
   r.cheerTimer = win.setTimeout(() => {
     r.cheerTimer = null;
     r.cheerTimerWin = null;
-    if (gen !== (r.cheerGen ?? 0)) return; // 已停 / 已换文档：旧结果直接丢弃
+    if (gen !== (r.cheerGen ?? 0)) return; // 已停 / 已換文件：舊結果直接丟棄
     fn();
   }, ms);
 }
@@ -69,13 +69,13 @@ function paintCheer(r) {
   if (r.cheer.title !== text) r.cheer.title = text;
 }
 
-// 淡入 / 淡出一律走这里：浏览器不支持 WAAPI（或 animate 抛错）时回传 null，调用方退回「直接换字」。
+// 淡入 / 淡出一律走這裡：瀏覽器不支援 WAAPI（或 animate 拋錯）時回傳 null，呼叫方退回「直接換字」。
 function fadeCheer(el, from, to, ms, easing) {
   if (typeof el.animate !== 'function') return null;
   try {
     return el.animate([{ opacity: from }, { opacity: to }], { duration: ms, easing, fill: 'forwards' });
   } catch {
-    return null; // 旧文档已销毁 / 动画被禁用：不做动画，字照样换
+    return null; // 舊文件已銷燬 / 動畫被停用：不做動畫，字照樣換
   }
 }
 
@@ -83,15 +83,15 @@ function rotateCheer(root, r) {
   const lines = r.cheerLines;
   if (!lines || lines.length < 2 || r.cheer.hidden) return;
   if (!root.isConnected) { stopCheer(r); return; }
-  // 页面在后台不推进，也不再排下一轮：后台里浏览器本来就会节流计时器，重排只是白醒。
-  // 回到前台后由下一次绘制重新排队（armCheer 的前台条件），节奏从那时重新起算。
+  // 頁面在後臺不推進，也不再排下一輪：後臺裡瀏覽器本來就會節流計時器，重排只是白醒。
+  // 回到前臺後由下一次繪製重新排隊（armCheer 的前臺條件），節奏從那時重新起算。
   if (root.ownerDocument.visibilityState === 'hidden') return;
   const next = (r.cheerIndex + 1) % lines.length;
   const settle = () => {
     cancelCheerAnim(r);
     afterCheer(root, r, CHEER_ROTATE_MS - CHEER_FADE_OUT_MS - CHEER_FADE_IN_MS, () => rotateCheer(root, r));
   };
-  // 没有动画可做（减少动态 / 不支持 / 抛错）：直接换句，节奏不变
+  // 沒有動畫可做（減少動態 / 不支援 / 拋錯）：直接換句，節奏不變
   const swap = () => {
     r.cheerIndex = next;
     paintCheer(r);
@@ -102,23 +102,23 @@ function rotateCheer(root, r) {
   r.cheerAnim = fadeCheer(r.cheer, 1, 0, CHEER_FADE_OUT_MS, 'ease-in');
   if (!r.cheerAnim) { swap(); return; }
   afterCheer(root, r, CHEER_FADE_OUT_MS, () => {
-    // 计时器排队之后卡片可能被移除（PiP 收回 / 整卡替换）：先确认还在文档里，
-    // 否则会在一个已经拿掉的节点上继续换字并排下一轮，永远停不下来。
+    // 計時器排隊之後卡片可能被移除（PiP 收回 / 整卡替換）：先確認還在文件裡，
+    // 否則會在一個已經拿掉的節點上繼續換字並排下一輪，永遠停不下來。
     if (!root.isConnected) { stopCheer(r); return; }
-    // 先换字再决定下一步：淡出已在 0，取消旧动画也不会闪一帧全亮
+    // 先換字再決定下一步：淡出已在 0，取消舊動畫也不會閃一幀全亮
     const out = r.cheerAnim;
     r.cheerAnim = null;
     r.cheerIndex = next;
     paintCheer(r);
-    // 淡出途中用户改成「减少动态」：这一句直接定住，不再淡入
+    // 淡出途中使用者改成「減少動態」：這一句直接定住，不再淡入
     if (cheerReduced(root)) {
-      if (out) { try { out.cancel(); } catch { /* 旧文档已销毁 */ } }
+      if (out) { try { out.cancel(); } catch { /* 舊文件已銷燬 */ } }
       afterCheer(root, r, CHEER_ROTATE_MS - CHEER_FADE_OUT_MS, () => rotateCheer(root, r));
       return;
     }
     const anim = fadeCheer(r.cheer, 0, 1, CHEER_FADE_IN_MS, 'ease-out');
-    if (out) { try { out.cancel(); } catch { /* 旧文档已销毁 */ } }
-    // 淡入动画建不起来：此时 opacity 已回到 1（旧动画被取消），直接按「已淡入」收尾
+    if (out) { try { out.cancel(); } catch { /* 舊文件已銷燬 */ } }
+    // 淡入動畫建不起來：此時 opacity 已回到 1（舊動畫被取消），直接按「已淡入」收尾
     if (!anim) {
       afterCheer(root, r, CHEER_ROTATE_MS - CHEER_FADE_OUT_MS, () => rotateCheer(root, r));
       return;
@@ -131,8 +131,8 @@ function rotateCheer(root, r) {
   });
 }
 
-// 每次绘制都调：只有「该轮播、确实没跑、且页面在前台」时才排一轮，所以每秒重画不会重置节奏，
-// 后台也不会每隔 8 秒白醒一次（回前台后的第一次绘制再排）。
+// 每次繪製都調：只有「該輪播、確實沒跑、且頁面在前臺」時才排一輪，所以每秒重畫不會重置節奏，
+// 後臺也不會每隔 8 秒白醒一次（回前臺後的第一次繪製再排）。
 function armCheer(root, r) {
   const needed = !r.cheer.hidden && (r.cheerLines?.length ?? 0) > 1 && root.isConnected
     && root.ownerDocument.visibilityState !== 'hidden';
@@ -141,19 +141,19 @@ function armCheer(root, r) {
   afterCheer(root, r, CHEER_ROTATE_MS, () => rotateCheer(root, r));
 }
 
-// 每 100 ms 都会进这里：不做字符串拼接，逐项比较就够（句子最多几十个）。
+// 每 100 ms 都會進這裡：不做字串拼接，逐項比較就夠（句子最多幾十個）。
 function sameLines(a, b) {
   if (!a || !b || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
-// 每次绘制都调：句子集合、显示开关或所在窗口变了才重排；否则只保证计时器仍在跑（每秒重画不会重置节奏）。
+// 每次繪製都調：句子集合、顯示開關或所在視窗變了才重排；否則只保證計時器仍在跑（每秒重畫不會重置節奏）。
 function syncCheer(root, r, on, lines) {
   const win = cheerHost(root);
   if (r.cheerWin !== win) {
-    // 卡片被搬进 / 搬出 PiP：旧窗口的计时器必须先停，否则会在原窗口继续跑；
-    // 新文档里的节点要重画一遍文字，所以把它当成「状态未知」。
+    // 卡片被搬進 / 搬出 PiP：舊視窗的計時器必須先停，否則會在原視窗繼續跑；
+    // 新文件裡的節點要重畫一遍文字，所以把它當成「狀態未知」。
     stopCheer(r);
     r.cheerWin = win;
     r.cheerIndex = 0;
@@ -201,25 +201,25 @@ function build(root, t) {
       r.gear),
     (r.label = h(doc, 'div', { class: 'card-label' })),
     (r.amount = h(doc, 'div', { class: 'card-amount amount', 'aria-hidden': 'true' },
-      // 币别单独一个文字节点：切换地区时只改这一段，不动数字格（digits.js 的节点保持不变）
+      // 幣別單獨一個文位元組點：切換地區時只改這一段，不動數字格（digits.js 的節點保持不變）
       (r.cur = doc.createTextNode(cardCurrency(t))),
       (r.head = h(doc, 'span', { class: 'amount-head digits' })),
       (r.tail = h(doc, 'span', { class: 'amount-tail digits' })))),
     (r.amountSr = sr()),
     (r.cheer = h(doc, 'div', { class: 'card-cheer', hidden: true })),
     (r.progress = h(doc, 'div', { class: 'card-progress' },
-      // 头一行：左「工时进度」，右倒数（M4）；没有进度条的状态，倒数 / 说明单独一行放在 countdownSlot
+      // 頭一行：左「工時進度」，右倒數（M4）；沒有進度條的狀態，倒數 / 說明單獨一行放在 countdownSlot
       (r.progressHead = h(doc, 'div', { class: 'card-progress-head' },
         (r.progressTitle = h(doc, 'span', { class: 'card-progress-title', text: c.progressLabel })),
         (r.headSlot = h(doc, 'span', { class: 'card-progress-aside' },
-          // 已下班：✓ 今天工作满 7小时（进度头一行右侧）
+          // 已下班：✓ 今天工作滿 7小時（進度頭一行右側）
           (r.done = h(doc, 'span', { class: 'card-done', hidden: true }, icon(doc, 'check'), (r.doneText = h(doc, 'span', { class: 'card-done-text' })))))))),
       r.bar,
       (r.progressText = h(doc, 'div', { class: 'card-progress-text digits', 'aria-hidden': 'true' })),
       (r.progressSr = sr()))),
     (r.countdownSlot = h(doc, 'div', { class: 'card-countdown-slot' },
-      // 倒数外面一层：隐藏的「占位文本」（分、秒补成 88）与真实文字叠在同一格，真实文字靠左。
-      // 格子宽度恒定 = 最宽形态，「距下班」不会在 10秒→9秒、0秒→59秒 时左右跳（R33）
+      // 倒數外面一層：隱藏的「佔位文本」（分、秒補成 88）與真實文字疊在同一格，真實文字靠左。
+      // 格子寬度恆定 = 最寬形態，「距下班」不會在 10秒→9秒、0秒→59秒 時左右跳（R33）
       (r.cdWrap = h(doc, 'span', { class: 'cd-wrap' },
         (r.cdGhost = h(doc, 'span', { class: 'cd-ghost digits', 'aria-hidden': 'true' })),
         (r.countdown = h(doc, 'div', { class: 'card-countdown digits', 'aria-hidden': 'true' })),
@@ -235,7 +235,7 @@ function build(root, t) {
   root.classList.add('status-card');
   r.iconTone = null;
   r.t = t;
-  // 轮播状态：计时器 / 动画 / 世代都随卡片节点存续，切 PiP 只换它们所属的 window
+  // 輪播狀態：計時器 / 動畫 / 世代都隨卡片節點存續，切 PiP 只換它們所屬的 window
   r.cheerWin = cheerHost(root);
   r.cheerLines = null;
   r.cheerOn = null;
@@ -248,8 +248,8 @@ function build(root, t) {
   return r;
 }
 
-// 收工当下（直播状态由上班中 / 午休转入已下班）金额淡绿高亮一次：不是载入时就已下班，也不是睡眠醒来；
-// 减少动态时完全不加类。用每次绘制时的时钟判断何时移除（不依赖计时器，主窗 / PiP 都适用）。
+// 收工當下（直播狀態由上班中 / 午休轉入已下班）金額淡綠高亮一次：不是載入時就已下班，也不是睡眠醒來；
+// 減少動態時完全不加類。用每次繪製時的時鐘判斷何時移除（不依賴計時器，主窗 / PiP 都適用）。
 function celebrate(root, r, snap, m) {
   const nowMs = snap.now instanceof Date ? snap.now.getTime() : NaN;
   const prev = r.prevStatus ?? null;
@@ -268,8 +268,8 @@ function celebrate(root, r, snap, m) {
   }
 }
 
-// 不随 tick 变化的静态文字（币别、按钮与进度条的 aria-label、指标格标题）：切换地区时原地更新，
-// 不重建卡片（重建会丢焦点、动到数字格状态，PiP 里的也是同一个节点）
+// 不隨 tick 變化的靜態文字（幣別、按鈕與進度條的 aria-label、指標格標題）：切換地區時原地更新，
+// 不重建卡片（重建會丟焦點、動到數字格狀態，PiP 裡的也是同一個節點）
 function applyStatic(r, t) {
   const c = t.card;
   if (r.cur.data !== cardCurrency(t)) r.cur.data = cardCurrency(t);
@@ -284,16 +284,16 @@ function applyStatic(r, t) {
   r.t = t;
 }
 
-// 主金额放不下时缩一点（CSS 只有 --hero-fit 这一个扣扳机）：字号档位、容器宽度与金额形状一起定，量一次就够。
-// 签名把数字全换成 0 —— 数字格等宽，金额每 tick 跳动（194.28→194.29）形状没变，不必重量；
-// 位数变了、换了地区（币别不同）、视窗或字号档位变了才重新量。
-// 数字格的宽是 digits.js 量出来的 px（--digit-w），所以缩放比例一改就得重画一次数字格，
-// 否则格子还是旧字号的宽度，金额既不会真的变窄、也会看起来字距过大。
+// 主金額放不下時縮一點（CSS 只有 --hero-fit 這一個扣扳機）：字號檔位、容器寬度與金額形狀一起定，量一次就夠。
+// 簽名把數字全換成 0 —— 數字格等寬，金額每 tick 跳動（194.28→194.29）形狀沒變，不必重量；
+// 位數變了、換了地區（幣別不同）、視窗或字號檔位變了才重新量。
+// 數字格的寬是 digits.js 量出來的 px（--digit-w），所以縮放比例一改就得重畫一次數字格，
+// 否則格子還是舊字號的寬度，金額既不會真的變窄、也會看起來字距過大。
 function fitHero(r, cfg, redraw) {
   const el = r.amount;
   if (!el || el.hidden) return;
   const rects = el.getClientRects?.();
-  if (!rects || rects.length === 0) return; // 还没排版 / 卡片在别处：下一次 tick 再量
+  if (!rects || rects.length === 0) return; // 還沒排版 / 卡片在別處：下一次 tick 再量
   const avail = el.clientWidth;
   if (!avail) return;
   const sig = `${el.textContent.replace(/[0-9]/g, '0')}|${avail}|${cfg.fontScale ?? 'm'}`;
@@ -303,7 +303,7 @@ function fitHero(r, cfg, redraw) {
     if (v === null) el.style.removeProperty('--hero-fit');
     else el.style.setProperty('--hero-fit', String(v));
   };
-  // 留 2% 余量：数字格取整后常会差不到 1px，贴着边反而更容易溢出
+  // 留 2% 餘量：數字格取整後常會差不到 1px，貼著邊反而更容易溢位
   const shrink = (ratio) => Math.max(0.6, Math.round(ratio * 100 - 2) / 100);
   set(null);
   redraw();
@@ -313,13 +313,13 @@ function fitHero(r, cfg, redraw) {
     redraw();
     const after = el.scrollWidth;
     if (after > avail + 0.5) {
-      // 数字格按新字号重新取整后仍差一点：按实测量的比例再收一次（只影响字形宽度，一次就够）
+      // 數字格按新字號重新取整後仍差一點：按實測量的比例再收一次（隻影響字形寬度，一次就夠）
       set(shrink((r.heroFit * avail) / after));
       redraw();
     }
   }
-  // 只有实际量到放得下才记住签名；仍溢出（字体或数字格宽度可能尚未稳定）就清掉，让下一次 tick 重量，
-  // 否则错误的缩放会被签名锁住，直到文字位数或视窗变化才重算
+  // 只有實際量到放得下才記住簽名；仍溢位（字型或數字格寬度可能尚未穩定）就清掉，讓下一次 tick 重量，
+  // 否則錯誤的縮放會被簽名鎖住，直到文字位數或視窗變化才重算
   r.heroFitSig = el.scrollWidth <= avail + 0.5 ? sig : null;
 }
 
@@ -329,8 +329,8 @@ export function renderCard(root, snap, cfg, t) {
   const m = cardModel(snap, cfg, t);
   const doc = root.ownerDocument;
 
-  // 显示开关（画面设置）：只有明确的 false 才隐藏——旧备份缺这些字段时保持原来的样子。
-  // 同时写进 data-show-* 属性，样式与 e2e 都能直接读，不必靠隐藏后的高度去猜。
+  // 顯示開關（畫面設定）：只有明確的 false 才隱藏——舊備份缺這些欄位時保持原來的樣子。
+  // 同時寫進 data-show-* 屬性，樣式與 e2e 都能直接讀，不必靠隱藏後的高度去猜。
   const flags = {
     progress: cfg.showCardProgress !== false,
     metrics: cfg.showCardMetrics !== false,
@@ -348,7 +348,7 @@ export function renderCard(root, snap, cfg, t) {
   if (root.dataset.tone !== m.tone) root.dataset.tone = m.tone;
   root.classList.toggle('is-settled', m.settled);
 
-  // 「日期」只藏日期与农历这一组；状态标签（上班中 / 午休 / 已下班）永远在
+  // 「日期」只藏日期與農曆這一組；狀態標籤（上班中 / 午休 / 已下班）永遠在
   show(r.dateGroup, flags.date && snap.now instanceof Date);
   if (snap.now instanceof Date) setText(r.date, dateLine(snap.now, t));
   const lunar = flags.date && cfg.showLunar && snap.now instanceof Date ? lunarText(snap.now, t) : null;
@@ -369,12 +369,12 @@ export function renderCard(root, snap, cfg, t) {
   renderDigits(r.tail, m.hero.tail);
   setText(r.amountSr, m.amountSrText);
 
-  // 多句鼓励语：只有在「显示开关打开 + 至少一句非空白」时才占位，隐藏时把节点整个收起（不留固定高度 / 空白行）。
+  // 多句鼓勵語：只有在「顯示開關開啟 + 至少一句非空白」時才佔位，隱藏時把節點整個收起（不留固定高度 / 空白行）。
   const cheerOn = flags.cheer && m.cheers.length > 0;
   show(r.cheer, cheerOn);
   syncCheer(root, r, cheerOn, m.cheers);
 
-  // 进度条关掉时倒数仍要显示：把它挪到独立的 countdownSlot，而不是留在空的进度头里
+  // 進度條關掉時倒數仍要顯示：把它挪到獨立的 countdownSlot，而不是留在空的進度頭裡
   const progressVisible = flags.progress && m.showProgress;
   show(r.progress, progressVisible);
   r.fill.style.width = `${m.progressPct}%`;
@@ -385,7 +385,7 @@ export function renderCard(root, snap, cfg, t) {
   setText(r.progressSr, m.progressText);
   show(r.done, m.progressInHead);
   setText(r.doneText, m.progressInHead ? m.progressText : '');
-  // 有进度条：倒数在头一行右侧；没有：单独一行（同一个节点搬家，数字格状态不变）
+  // 有進度條：倒數在頭一行右側；沒有：單獨一行（同一個節點搬家，數字格狀態不變）
   const home = progressVisible ? r.headSlot : r.countdownSlot;
   if (r.cdWrap.parentNode !== home) home.append(r.cdWrap);
   show(r.countdownSlot, !progressVisible && m.secondary !== '');
@@ -410,7 +410,7 @@ export function renderCard(root, snap, cfg, t) {
   show(r.year, m.yearNote !== null);
   setText(r.year, m.yearNote ?? '');
   r.year.title = m.yearTitle;
-  // 主金额放不下就缩一点：数字格宽度随字号变，所以缩放后要重画（见 fitHero）
+  // 主金額放不下就縮一點：數字格寬度隨字號變，所以縮放後要重畫（見 fitHero）
   fitHero(r, cfg, () => {
     renderDigits(r.head, m.hero.head);
     renderDigits(r.tail, m.hero.tail);
@@ -419,9 +419,9 @@ export function renderCard(root, snap, cfg, t) {
   return m;
 }
 
-// 大卡片的最小高度 = 「上班中」那张卡的高度（M11 / V1），在运行时用真实字体量出，不写死像素：
-// 在状态卡旁边放一张看不见的复本，用「上班中」的内容（无鼓励语、发薪日、缺表标签）画一遍，量高度，写成 --card-ref-h。
-// 载入、视窗尺寸改变（含跨过 640px 矮视窗断点）与字体载入后各量一次（app.js 控制时机）；卡片在小窗里（sm）时不量。
+// 大卡片的最小高度 = 「上班中」那張卡的高度（M11 / V1），在執行時用真實字型量出，不寫死畫素：
+// 在狀態卡旁邊放一張看不見的複本，用「上班中」的內容（無鼓勵語、發薪日、缺表標籤）畫一遍，量高度，寫成 --card-ref-h。
+// 載入、視窗尺寸改變（含跨過 640px 矮視窗斷點）與字型載入後各量一次（app.js 控制時機）；卡片在小窗裡（sm）時不量。
 const ghosts = new WeakMap();
 export function syncReferenceHeight(root, snap, cfg, t) {
   const parent = root.parentNode;

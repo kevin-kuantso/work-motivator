@@ -1,4 +1,4 @@
-// 建立节点的小工具：文字一律走 textContent / Text 节点，从不使用 innerHTML。
+// 建立節點的小工具：文字一律走 textContent / Text 節點，從不使用 innerHTML。
 export function h(doc, tag, props = {}, ...children) {
   const el = doc.createElement(tag);
   for (const [k, v] of Object.entries(props)) {

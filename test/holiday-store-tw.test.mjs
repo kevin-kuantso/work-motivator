@@ -1,5 +1,5 @@
-// 台湾假期表储存（holiday-store-tw.js）：独立键、独立 years / lastCheck、载入逐字段重校验、损坏时保守处理。
-// 大陆键 work-motivator-v1-holidays 在这里只是「别人的键」：本模块从不读、从不写。
+// 臺灣假期表儲存（holiday-store-tw.js）：獨立鍵、獨立 years / lastCheck、載入逐欄位重校驗、損壞時保守處理。
+// 大陸鍵 work-motivator-v1-holidays 在這裡只是「別人的鍵」：本模組從不讀、從不寫。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -19,7 +19,7 @@ const throwingStore = () => ({
   setItem() { throw new Error('blocked'); },
 });
 
-// 虚构的台湾表（非官方安排）：2026 有放假与补班，2027 只有放假——官方 115/116 年表本来就没有补班日。
+// 虛構的臺灣表（非官方安排）：2026 有放假與補班，2027 只有放假——官方 115/116 年表本來就沒有補班日。
 const table2026 = () => ({
   off: {
     '2026-01-01': '中华民国开国纪念日',
@@ -75,10 +75,10 @@ test('validateTwTable: rejects bad shapes, dates, years, names and overlaps', ()
   rej(2026, { off: { '2026-01-01': 'a\tb' }, makeup: {} }, 'name', '2026-01-01');
   rej(2026, { off: { '2026-01-01': 'a\r\nb' }, makeup: {} }, 'name', '2026-01-01');
   rej(2026, { off: {}, makeup: { '2026-01-01': 'x' } }, 'emptyOff');
-  // 闰年 2 月 29 日是真的，平年不是
+  // 閏年 2 月 29 日是真的，平年不是
   assert.equal(validateTwTable(2028, { off: { '2028-02-29': 'x' }, makeup: {} }).ok, true);
   rej(2027, { off: { '2027-02-29': 'x' }, makeup: {} }, 'dateNotReal', '2027-02-29');
-  // 平日补班不在这里禁止（周末/状态的语义由 CSV 层负责）
+  // 平日補班不在這裡禁止（週末/狀態的語義由 CSV 層負責）
   assert.equal(validateTwTable(2026, { off: { '2026-01-01': 'x' }, makeup: { '2026-02-11': '补班' } }).ok, true);
 });
 
@@ -182,7 +182,7 @@ test('corrupt record: empty load, corrupt:true, every write refused, bytes untou
     assert.deepEqual(saveTwLastCheck(s, 5), { ok: false, reason: 'corrupt' }, raw);
     assert.equal(s.m[TW_HOLIDAYS_STORAGE_KEY], raw, 'never overwritten');
   }
-  // 显式重建是唯一出路；重建后可以正常写
+  // 顯式重建是唯一齣路；重建後可以正常寫
   const s = memStore({ [TW_HOLIDAYS_STORAGE_KEY]: 'garbage' });
   assert.deepEqual(resetTwStore(s), { ok: true });
   assert.deepEqual(JSON.parse(s.m[TW_HOLIDAYS_STORAGE_KEY]), { version: 1, years: {}, lastCheck: null });
@@ -200,7 +200,7 @@ test('unreadable / unwritable storage: no throw, storageOk:false, writes refused
   assert.deepEqual(saveTwYear(bad, 2026, rec()), { ok: false, reason: 'storage' });
   assert.deepEqual(saveTwLastCheck(bad, 1), { ok: false, reason: 'storage' });
   assert.deepEqual(resetTwStore(bad), { ok: false, reason: 'storage' });
-  // 读得到、写不进（quota）：返回 storage，不当成功，内容不变
+  // 讀得到、寫不進（quota）：返回 storage，不當成功，內容不變
   const full = memStore();
   const before = full.m[TW_HOLIDAYS_STORAGE_KEY];
   full.setItem = () => { throw new Error('QuotaExceededError'); };
@@ -277,7 +277,7 @@ test('load: entry without optional fields still yields sane meta defaults', () =
   assert.deepEqual(l.meta[2026], { source: 'file', origin: 'file', papers: [], fetchedAt: 9 });
   assert.equal('resourceUpdatedAt' in l.meta[2026], false);
   assert.equal(TW_STORE_VERSION, 1);
-  // 版本不符的记录一定被当成损坏，不会被误读成 v1
+  // 版本不符的記錄一定被當成損壞，不會被誤讀成 v1
   const v2 = memStore({ [TW_HOLIDAYS_STORAGE_KEY]: JSON.stringify({ version: 2, lastCheck: 3, years: {} }) });
   assert.equal(loadTwTables(v2).corrupt, true);
   assert.deepEqual(loadTwTables(v2).tables, {});

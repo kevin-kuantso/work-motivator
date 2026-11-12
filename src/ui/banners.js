@@ -1,14 +1,14 @@
-// 页面顶部的提示条（spec §13.2）：两条通道。
-// 错误通道（储存失败、已保存设置损坏 / 部分无效）：永远显示、不被信息条压掉；同时发生就合并成一条，用「·」分隔。
-// 信息通道（首次提示、联网数据与内置表不同、备份建议）：同一时间只显示一条，首次提示优先；其余排队，前一条关闭后才显示，不丢弃。
+// 頁面頂部的提示條（spec §13.2）：兩條通道。
+// 錯誤通道（儲存失敗、已儲存設定損壞 / 部分無效）：永遠顯示、不被資訊條壓掉；同時發生就合併成一條，用「·」分隔。
+// 資訊通道（首次提示、聯網資料與內建表不同、備份建議）：同一時間只顯示一條，首次提示優先；其餘排隊，前一條關閉後才顯示，不丟棄。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
 
 const ERROR_ORDER = ['storageFail', 'loadIssue'];
-// 联网数据与内置表不同的提示是用户按「检查更新」的直接结果，排在备份建议之前
+// 聯網資料與內建表不同的提示是使用者按「檢查更新」的直接結果，排在備份建議之前
 const INFO_ORDER = ['firstRun', 'holidayDiff', 'holidayDiffFile', 'backupNudge'];
 
-// 纯函数：errors = Map<id, { content, dismissible, actions:[{key,label,...}] }> → 合并后的一条（或 null）
+// 純函式：errors = Map<id, { content, dismissible, actions:[{key,label,...}] }> → 合併後的一條（或 null）
 export function mergeErrors(errors, sep) {
   const ids = ERROR_ORDER.filter((id) => errors.has(id));
   if (!ids.length) return null;
@@ -23,7 +23,7 @@ export function mergeErrors(errors, sep) {
   };
 }
 
-// 纯函数：queue = Set<id> → 现在该显示的那一条（或 null）
+// 純函式：queue = Set<id> → 現在該顯示的那一條（或 null）
 export function pickInfo(queue) {
   return INFO_ORDER.find((id) => queue.has(id)) ?? null;
 }
@@ -35,19 +35,19 @@ export function createBanners(doc, t) {
   const infos = new Map();
   const queue = new Set();
 
-  // M13：提示条里的动作按钮统一成 xs 描边按钮（不再有下划线链接款式）
+  // M13：提示條裡的動作按鈕統一成 xs 描邊按鈕（不再有下劃線連結款式）
   const actionButtons = (actions) => actions.map((a) =>
     h(doc, 'button', { type: 'button', class: 'btn btn-xs btn-secondary', 'data-action': a.key, text: resolve(a.label), onclick: a.onClick }));
   const closeButton = (onclick) =>
     h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': b.dismiss, title: b.dismiss, text: b.closeGlyph, onclick });
 
-  // M13：错误条正文前加一个 12px 图示（文字本身仍说明问题，图示只是让它更容易被扫到）
+  // M13：錯誤條正文前加一個 12px 圖示（文字本身仍說明問題，圖示只是讓它更容易被掃到）
   const errorIcon = icon(doc, 'unpaid');
   errorIcon.classList.add('banner-icon');
   const errorText = h(doc, 'span', { class: 'banner-text' });
   const errorActions = h(doc, 'span', { class: 'banner-actions' });
   const errorClose = closeButton(dismissErrors);
-  // 关闭钮是横幅的直接子项：动作与正文相邻，关闭钮靠右（.banner-close 的 margin-left:auto 才推得动）
+  // 關閉鈕是橫幅的直接子項：動作與正文相鄰，關閉鈕靠右（.banner-close 的 margin-left:auto 才推得動）
   const errorBar = h(doc, 'div', { class: 'banner banner-error', role: 'alert', hidden: true }, errorIcon, errorText, errorActions, errorClose);
   const infoText = h(doc, 'span', { class: 'banner-text' });
   const infoActions = h(doc, 'span', { class: 'banner-actions' });
@@ -64,8 +64,8 @@ export function createBanners(doc, t) {
     renderErrors();
   }
 
-  // 错误条的按钮只在「按钮组合」改变时才重建：焦点停在「导出备份」等按钮上时，
-  // 保存 / 其他分页的事件触发重画不会把焦点丢到 body（R27）。按钮点击时才查当下的处理函数。
+  // 錯誤條的按鈕只在「按鈕組合」改變時才重建：焦點停在「匯出備份」等按鈕上時，
+  // 儲存 / 其他分頁的事件觸發重畫不會把焦點丟到 body（R27）。按鈕點選時才查當下的處理函式。
   const errHandlers = new Map();
   let errKeys = null;
   function renderErrors() {
@@ -83,7 +83,7 @@ export function createBanners(doc, t) {
     }
     errKeys = keys;
     const buttons = m ? actionButtons(m.actions.map((a) => ({ ...a, onClick: (e) => errHandlers.get(a.key)?.(e) }))) : [];
-    // 关闭钮常驻 DOM（直接子项才能靠右），只在可关闭时显示；errKeys 缓存保证它在焦点里时不重建
+    // 關閉鈕常駐 DOM（直接子項才能靠右），只在可關閉時顯示；errKeys 快取保證它在焦點裡時不重建
     errorClose.hidden = !m?.dismissible;
     errorActions.replaceChildren(...buttons);
   }
@@ -110,7 +110,7 @@ export function createBanners(doc, t) {
   function queueInfo(id, content, opts = {}) {
     infos.set(id, { content, actions: opts.actions, closable: opts.closable, onDismiss: opts.onDismiss });
     queue.add(id);
-    if (shownInfo === id) shownInfo = undefined; // 内容可能变了：重画
+    if (shownInfo === id) shownInfo = undefined; // 內容可能變了：重畫
     renderInfo();
   }
 

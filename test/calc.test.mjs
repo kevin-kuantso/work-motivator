@@ -158,7 +158,7 @@ test('validateSchedule', () => {
   assert.equal(bad({ lunchEnd: '17:30' }).field, 'lunchEnd');
   assert.equal(bad({ lunchStart: '13:00', lunchEnd: '13:00' }).ok, false);
   assert.equal(bad({ lunchStart: '14:00', lunchEnd: '13:00' }).ok, false);
-  // 原因回传稳定 code + 参数，绝不是某种语言的句子：显示端才用当时的字典翻译
+  // 原因回傳穩定 code + 引數，絕不是某種語言的句子：顯示端才用當時的字典翻譯
   assert.deepEqual(bad({ salary: 0 }).code, 'salary');
   assert.deepEqual(bad({ start: 'abc' }).code, 'timeFormat');
   assert.deepEqual(bad({ start: 'abc' }).params, { field: 'start' });
@@ -174,7 +174,7 @@ test('validateSchedule', () => {
 test('reasonText: 同一份校验结果跟着字典换语言（新增地区只需注册字典）', async () => {
   const { reasonText } = await import('../src/calc.js');
   const { STRINGS: cn } = await import('../src/strings.zh-CN.js');
-  // 合成的第二本字典：只要形状对（reasons + labels），不依赖 strings.zh-TW.js 是否已存在
+  // 合成的第二本字典：只要形狀對（reasons + labels），不依賴 strings.zh-TW.js 是否已存在
   const other = { reasons: {
     salary: 'SALARY-TEXT',
     timeFormat: (label) => `TIME(${label})`,
@@ -184,12 +184,12 @@ test('reasonText: 同一份校验结果跟着字典换语言（新增地区只�
     labels: { start: 'START-LABEL', lunchEnd: 'LUNCH-END-LABEL' },
   } };
   const v = bad => validateSchedule({ ...cfg, ...bad });
-  // 渲染器只认 { code, params }：validateSchedule 的扁平结果与 dropped/error 的 { code, params } 都能直接用
+  // 渲染器只認 { code, params }：validateSchedule 的扁平結果與 dropped/error 的 { code, params } 都能直接用
   assert.equal(reasonText(v({ salary: 0 }), cn), cn.reasons.salary);
   assert.equal(reasonText(v({ start: 'abc' }), other), 'TIME(START-LABEL)');
   assert.equal(reasonText(v({ end: '08:00' }), other), 'END-AFTER-START');
   assert.equal(reasonText(v({ lunchEnd: '18:00' }), other), 'LUNCH-IN(LUNCH-END-LABEL)');
-  // 缺键 / 未知 code / 旧形态：回传空字串，不回退到别的语言
+  // 缺鍵 / 未知 code / 舊形態：回傳空字串，不回退到別的語言
   assert.equal(reasonText({ code: 'nope' }, other), '');
   assert.equal(reasonText({ code: 'salary' }, { reasons: {} }), '');
   assert.equal(reasonText('旧式已翻译字串', other), '');
@@ -208,7 +208,7 @@ test('monthWage: shared daily-wage helper used by snapshot and the calendar prev
   assert.equal(monthWage(2026, 9, cfg, {}).workdays, 18);
 });
 
-// 2027 现在有内置表；无表路径用显式注入的不含 2027 的表集合覆盖（R39 / R40 回退语义照旧）
+// 2027 現在有內建表；無表路徑用顯式注入的不含 2027 的表集合覆蓋（R39 / R40 回退語義照舊）
 const NO_2027 = { 2026: { off: { '2026-01-01': '元旦' }, makeup: {}, source: 'builtin' } };
 
 test('R39: 2027-01-04 10:00 (no table): Jan 1 is a statutory rest day -> 20 workdays, daily wage 340', () => {
@@ -228,13 +228,13 @@ test('R39: 2027 with the built-in table: Jan 1-3 rest, Jan 4 work -> 21 workdays
   near(s.dailyWage, 6800 / 21, 1e-9);
   near(s.dailyWage, 323.81, 0.005);
   near(s.earned, 6800 / 21 * 5400 / 25200, 1e-6);
-  // 春节 2/14 调休上班：当月 15 个工作日
+  // 春節 2/14 調休上班：當月 15 個工作日
   near(monthWage(2027, 1, cfg, {}).dailyWage, 453.33, 0.005);
   assert.equal(monthWage(2027, 1, cfg, {}).workdays, 15);
 });
 
 test('R40: 2027 daily wages with the lunar / solar-term legal days (no table)', () => {
-  const expected = { 0: 20, 1: 20, 5: 22, 9: 20 }; // month index -> workdays（只剩固定日 + 周末）
+  const expected = { 0: 20, 1: 20, 5: 22, 9: 20 }; // month index -> workdays（只剩固定日 + 週末）
   for (const [m, n] of Object.entries(expected)) {
     const w = monthWage(2027, Number(m), cfg, {}, NO_2027);
     assert.equal(w.workdays, n, `month index ${m}`);

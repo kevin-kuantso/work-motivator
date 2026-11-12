@@ -1,4 +1,4 @@
-// 全部界面文案（中国大陆简体）。其他源文件不得写死界面文案。
+// 全部介面文案（中國大陸簡體）。其他原始檔不得寫死介面文案。
 export const STRINGS = {
   appTitle: '上班鼓励器',
 
@@ -6,14 +6,14 @@ export const STRINGS = {
     float: '悬浮成小窗',
   },
 
-  // 右侧分页
+  // 右側分頁
   tabs: {
     label: '主要内容',
     calendar: '月历',
     settings: '基本设置',
   },
 
-  // 悬浮小窗（Document PiP）
+  // 懸浮小窗（Document PiP）
   float: {
     recall: '收回小窗',
     placeholder: '已悬浮 · 点此收回',
@@ -24,18 +24,18 @@ export const STRINGS = {
     sizeLimited: '小窗没能自动调大（浏览器不允许程序改窗口大小）：内容可能要滚动才能看全，请手动把窗口拖大',
   },
 
-  // 页面被浏览器暂停（后台节流、冻结、休眠）后恢复：数字会一下子按当前时间跳过去（R34）
+  // 頁面被瀏覽器暫停（後臺節流、凍結、休眠）後恢復：數字會一下子按當前時間跳過去（R34）
   notice: {
     paused: '页面刚才被浏览器暂停了一段时间，数字已按当前时间校正',
   },
 
-  // 法定节假日名称（holidays-cn.js 引用）
+  // 法定節假日名稱（holidays-cn.js 引用）
   holidays: {
     newYear: '元旦', spring: '春节', qingming: '清明', labour: '劳动节',
     dragonBoat: '端午', midAutumn: '中秋', national: '国庆',
   },
 
-  // 校验原因（calc.js / settings.js 引用；用户看得懂的描述，不出现字段键名或枚举值）
+  // 校驗原因（calc.js / settings.js 引用；使用者看得懂的描述，不出現欄位鍵名或列舉值）
   reasons: {
     salary: '月薪必须是大于 0 的数字',
     timeFormat: (label) => `${label}格式不正确，应为 24 小时制的「时:分」，例如 08:30`,
@@ -52,7 +52,7 @@ export const STRINGS = {
     markDate: '日期格式不正确',
     markNotReal: '不是真实存在的日期',
     markValue: '标记类型无法识别',
-    // 导入备份（M19）：说人话，不出现文件格式名
+    // 匯入備份（M19）：說人話，不出現檔案格式名
     notJson: '这不是本工具导出的备份文件',
     notObject: '文件内容的结构不正确',
     region: '地区代码无法识别，仅支持台湾（TW）和中国大陆（CN）；已保留原值',
@@ -67,7 +67,7 @@ export const STRINGS = {
     },
   },
 
-  // 联网获取的假期数据校验原因 / 抓取结果
+  // 聯網獲取的假期資料校驗原因 / 抓取結果
   holidayData: {
     notObject: '假期数据的结构不正确',
     yearMismatch: (year) => `假期数据不是 ${year} 年的`,
@@ -93,9 +93,9 @@ export const STRINGS = {
     allFailed: (last) => `所有数据源都获取失败：${last}`,
   },
 
-  // 「检查更新」/「导入假期表文件」/ 自定义网址（基本设置 › 假期数据、高级设置）
+  // 「檢查更新」/「匯入假期表文件」/ 自定義網址（基本設定 › 假期資料、進階設定）
   holidayUpdate: {
-    // 状态胶囊（假期数据卡）：每个年份一枚
+    // 狀態膠囊（假期資料卡）：每個年份一枚
     builtin: (y) => `${y} 年 · 内置`,
     online: (y) => `${y} 年 · 联网更新`,
     importedYear: (y) => `${y} 年 · 已导入文件`,
@@ -109,8 +109,8 @@ export const STRINGS = {
     importFile: '导入假期表文件',
     checkHint: '联网获取新公布的放假安排',
     importHint: '连不上网时，用文件导入',
-    // 「查看导入文件的格式示例」（R47）：示例是一份完整、能通过校验的最小文件，内容取自 2026 年真实数据
-    // （出处链接 = holiday-cn 2026.json 的 papers；01-01 元旦放假、01-04 周日调休上班）；复制的就是显示的这份
+    // 「檢視匯入檔案的格式示例」（R47）：示例是一份完整、能通過校驗的最小檔案，內容取自 2026 年真實資料
+    // （出處連結 = holiday-cn 2026.json 的 papers；01-01 元旦放假、01-04 週日調休上班）；複製的就是顯示的這份
     exampleShow: '查看导入文件的格式示例',
     exampleHide: '收起导入文件的格式示例',
     exampleHead: '文件内容示例（取自 2026 年真实数据，只列两天）',
@@ -135,14 +135,14 @@ export const STRINGS = {
     network: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」',
     invalid: '来源数据不完整，已拒绝，未采用',
     detail: (reason) => `原因：${reason}`,
-    // M15：说清楚差别在哪、现在按什么算；不写「内置表」「未采用」这类内部说法，也不说「按国务院通知」（联网数据同样是通知，见 R49）
+    // M15：說清楚差別在哪、現在按什麼算；不寫「內建表」「未採用」這類內部說法，也不說「按國務院通知」（聯網資料同樣是通知，見 R49）
     diff: (n) => `网上的放假安排与本机内置的有 ${n} 天不同，暂按内置的计算`,
     diffFile: (n) => `网上的放假安排与你导入的文件有 ${n} 天不同，暂按导入的文件计算`,
     fetched: (years) => `已获取 ${years.join('、')} 年假期表`,
     importDone: (y, off, makeup) => `已导入 ${y} 年假期表（放假 ${off} 天，调休上班 ${makeup} 天）`,
     importNoYear: '文件里没有可用的年份和放假数据，未导入',
     importBuiltin: (y) => `${y} 年假期已内置，未采用导入的数据`,
-    // 写不进浏览器存储（配额、隐私模式、记录损坏）：本次会话仍可用，但关掉就没了，备份也不含假期表
+    // 寫不進瀏覽器儲存（配額、隱私模式、記錄損壞）：本次會話仍可用，但關掉就沒了，備份也不含假期表
     sessionOnly: '这份假期表只留在当前页面，关掉就会消失（无法写入浏览器存储空间）；备份文件也不含假期表',
     customUrl: '自定义数据网址',
     customUrlExplain: '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空则使用默认来源。',
@@ -157,7 +157,7 @@ export const STRINGS = {
   },
 
   banner: {
-    // 首次打开（H1）：说清楚现在用的是哪些默认值（数字取自真实默认设置，不写死）
+    // 首次開啟（H1）：說清楚現在用的是哪些預設值（數字取自真實預設設定，不寫死）
     firstRun: (salary, start, end) => `现在按默认月薪 ${salary}、${start}–${end} 计算，请改成你自己的`,
     goFix: '去修改',
     sep: ' · ',
@@ -167,7 +167,7 @@ export const STRINGS = {
     ok: '知道了',
     storageFail: '无法保存设置，关闭页面后会丢失。请先导出备份',
     loadCorrupt: '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。',
-    // 最多列 3 项，其余写「…等 N 项」（R27：保证错误条最坏情况仍有余量）
+    // 最多列 3 項，其餘寫「…等 N 項」（R27：保證錯誤條最壞情況仍有餘量）
     loadPartial: (labels) => `已保存的设置中有部分项目无法使用，以下项目已改用默认值：${labels.slice(0, 3).join('、')}${labels.length > 3 ? `…等 ${labels.length} 项` : ''}`,
   },
 
@@ -186,10 +186,10 @@ export const STRINGS = {
   card: {
     earnedNow: '今天已经赚了',
     notStarted: '今天还没开始',
-    // 未上班：金额是 0.00，标签说明几点开始计薪（时间取自设置）
+    // 未上班：金額是 0.00，標籤說明幾點開始計薪（時間取自設定）
     startPay: (hhmm) => `${hhmm} 开始计薪`,
     earnedTotal: '今天一共赚了',
-    // 已下班（排定的工作日收工后）的正反馈：换掉标签与「当前赚钱速度」格，不加行
+    // 已下班（排定的工作日收工後）的正反饋：換掉標籤與「當前賺錢速度」格，不加行
     dayDone: '今天辛苦了，收工！',
     monthProgress: '已赚占月薪',
     monthProgressValue: (pct) => `${pct}%`,
@@ -200,9 +200,9 @@ export const STRINGS = {
     resumeIn: (n) => `${n} 分钟后继续上班`,
     nextWorkday: (n) => `距下个工作日 ${n} 天`,
     paidNote: '今天按全天计薪',
-    // 无薪假：不显示金额，标签就是结论
+    // 無薪假：不顯示金額，標籤就是結論
     unpaidLabel: '今天不计薪',
-    // 工时：已工作 2小时0分 / 共 7小时（小时、分钟由 format.js 拆出，单位写在这里）
+    // 工時：已工作 2小時0分 / 共 7小時（小時、分鐘由 format.js 拆出，單位寫在這裡）
     worked: (a, b) => `已工作 ${a} / 共 ${b}`,
     spanHM: (h, m) => (h > 0 ? `${h}小时${m}分` : `${m}分`),
     spanH: (h, m) => (m === 0 ? `${h}小时` : h > 0 ? `${h}小时${m}分` : `${m}分`),
@@ -216,12 +216,12 @@ export const STRINGS = {
     dailyFull: '今日满勤可得',
     payIn: (n) => `距发薪日 ${n} 天`,
     payToday: '今天发薪',
-    // 缺假期表的标签（R41）：只在当年与之后的年份显示；措辞按该年实际标出的日子
-    // lunar：2028–2035（含春节 / 清明 / 端午 / 中秋）；fixed：其他 ≥ 2025 的年份（只有六个固定日期）；none：< 2025（什么都没标）
+    // 缺假期表的標籤（R41）：只在當年與之後的年份顯示；措辭按該年實際標出的日子
+    // lunar：2028–2035（含春節 / 清明 / 端午 / 中秋）；fixed：其他 ≥ 2025 的年份（只有六個固定日期）；none：< 2025（什麼都沒標）
     yearMissing: (year) => `${year} 年只标了法定假日，补假和调休未标出`,
-    // R49：只说 app 知道什么（未内置 / 未标出），不断言放假安排是否已公布
+    // R49：只說 app 知道什麼（未內建 / 未標出），不斷言放假安排是否已公佈
     yearMissingLong: (year) => `${year} 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出`,
-    // names = 实际标出的固定日期节日名（由 holidays-cn.js 的 STATUTORY_FIXED 取得，不在这里写死）
+    // names = 實際標出的固定日期節日名（由 holidays-cn.js 的 STATUTORY_FIXED 取得，不在這裡寫死）
     yearMissingFixed: (year, names) => `${year} 年只标了${names.join('、')}`,
     yearMissingFixedLong: (year) => `${year} 年假期表未内置：只按《放假办法》标出固定日期的法定假日（元旦、劳动节、国庆）；其余假日和补假、调休未标出`,
     yearMissingNone: (year) => `${year} 年未标法定假日`,
@@ -231,7 +231,7 @@ export const STRINGS = {
   },
 
   currency: '¥',
-  // 倒数占位文本：分、秒的数字补成两位最宽（88），用来固定倒数格的宽度（card.js）
+  // 倒數佔位文本：分、秒的數字補成兩位最寬（88），用來固定倒數格的寬度（card.js）
   durationWidest: (text) => text.replace(/\d+(?=[分秒])/g, '88'),
   duration: (h, m, s) => (h > 0 ? `${h}小时${m}分${s}秒` : `${m}分${s}秒`),
   weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
@@ -256,24 +256,24 @@ export const STRINGS = {
       lunchOffPay: '关闭后，午休时段仍计入工时和薪资。',
     },
     autosaved: '已自动保存',
-    // 分区导航（窄面板 / 手机单栏才显示）：名字与卡片标题一致，跳到已有的卡片
+    // 分割槽導航（窄面板 / 手機單欄才顯示）：名字與卡片標題一致，跳到已有的卡片
     navLabel: '跳到设置分区',
     sections: {
       pay: '工资与上班时间', holiday: '假期数据', backup: '数据与备份', advanced: '高级设置',
       display: '画面设置',
     },
     payDesc: '用来计算每天、每秒赚多少，修改后自动保存',
-    // M12：只说卡里有什么，一行放得下（联网更新 / 导入的说明已写在按钮下方）
+    // M12：只說卡里有什麼，一行放得下（聯網更新 / 匯入的說明已寫在按鈕下方）
     holidayDesc: (years) => `法定节假日与调休安排，已内置 ${years.join('、')} 年`,
     backupDesc: '设置只保存在这个浏览器里，不会上传。',
     advancedSub: '一般不用改',
-    // 展开 / 收起的小三角（与 banner.closeGlyph 一样放在文案里）
+    // 展開 / 收起的小三角（與 banner.closeGlyph 一樣放在文案裡）
     chevronClosed: '▸',
     chevronOpen: '▾',
     salaryUnit: '元 / 月',
-    // 示例月薪的口径与出处较长：默认收起，这句是输入框旁展开钮的文字
+    // 示例月薪的口徑與出處較長：預設收起，這句是輸入框旁展開鈕的文字
     salaryNoteToggle: '说明',
-    // 读屏用全名；不含「月薪」二字，避免与输入框的 getByLabel 定位冲突
+    // 讀屏用全名；不含「月薪」二字，避免與輸入框的 getByLabel 定位衝突
     salaryNoteToggleAria: '示例说明与来源',
     workTime: '上下班时间',
     lunchTime: '午休时间',
@@ -305,9 +305,9 @@ export const STRINGS = {
     paydayNone: '未设置',
     paydayHint: '设置后，状态卡会显示「距离发薪日 N 天」',
     paydayOption: (d) => `每月 ${d} 号`,
-    // ---- 画面设置：只管状态卡显示什么，不改变任何计算 ----
-    // 导入报告按字段名查标签（import-model 的 t.settings[field]）：这些键在 settings 顶层也放一份，
-    // 报告才不会显示成生字段名。界面上的标签仍然用下面的 display.*（措辞为避开同名控件的歧义）。
+    // ---- 畫面設定：只管狀態卡顯示什麼，不改變任何計算 ----
+    // 匯入報告按欄位名查標籤（import-model 的 t.settings[field]）：這些鍵在 settings 頂層也放一份，
+    // 報告才不會顯示成生欄位名。介面上的標籤仍然用下面的 display.*（措辭為避開同名控制元件的歧義）。
     fontScale: '字号',
     showCardProgress: '显示进度条', showCardMetrics: '显示薪资明细', showCardDate: '显示日期',
     showCardPayday: '显示发薪提醒', showCardCheer: '显示鼓励内容',
@@ -323,8 +323,8 @@ export const STRINGS = {
       metricsHint: '显示本月累计、时薪等信息；不影响上方主要金额。',
       date: '日期',
       dateHint: '关闭后，农历日期也一起隐藏。',
-      // 开关标签不能与「发薪日」「鼓励语」两个输入框的标签同名：读屏与 getByLabel 都按子串匹配，
-      // 同名会让「发薪日」一次命中两个控件。这里用「提醒 / 文字」区分「显示的是什么」，提示语里再写全称。
+      // 開關標籤不能與「發薪日」「鼓勵語」兩個輸入框的標籤同名：讀屏與 getByLabel 都按子串匹配，
+      // 同名會讓「發薪日」一次命中兩個控制元件。這裡用「提醒 / 文字」區分「顯示的是什麼」，提示語裡再寫全稱。
       payday: '发薪提醒',
       paydayHint: '没设置发薪日时本来就不显示。',
       cheer: '鼓励内容',
@@ -335,9 +335,9 @@ export const STRINGS = {
       export: '导出备份',
       import: '导入备份',
       note: '备份文件含月薪，请妥善保管',
-      // 一段说清「备份里有什么、什么时候用、怎么恢复」；按钮就在下面，不再各写一段导语
+      // 一段說清「備份裡有什麼、什麼時候用、怎麼恢復」；按鈕就在下面，不再各寫一段導語
       summary: '备份文件含月薪、上下班时间、主题色和月历标记。换电脑或清除浏览数据前导出，之后用「导入备份」恢复。',
-      // 只是说明现状（备份内容不变，Kevin 2026-11-04）
+      // 只是說明現狀（備份內容不變，Kevin 2026-11-04）
       scope: '备份不含联网取得或导入的假期表和自定义数据网址。',
     },
   },
@@ -349,20 +349,20 @@ export const STRINGS = {
     today: '回到今天',
     todayBack: (title) => `回到今天 · ${title}`,
     monthTitle: (y, m) => `${y} 年 ${m} 月`,
-    // 「上月」「下月」按钮的悬停提示：顺带说明焦点在日期格上时可按 PgUp / PgDn 切月（工具列不放键盘提示，R29）
+    // 「上月」「下月」按鈕的懸停提示：順帶說明焦點在日期格上時可按 PgUp / PgDn 切月（工具列不放鍵盤提示，R29）
     prevTitle: '上月（PgUp）',
     nextTitle: '下月（PgDn）',
     summary: (days, wage) => `本月应出勤 ${days} 天 · 日薪 ${wage}`,
     legendHint: '点日期可标记：调休上班 · 带薪假 · 无薪假',
     legendHintShort: '点日期可标记',
-    // 摘要行的情境胶囊（R36 / 决定 4）：放假区间与调休上班日取自该月实际使用的表；「依据」按该年数据来源如实写
+    // 摘要行的情境膠囊（R36 / 決定 4）：放假區間與調休上班日取自該月實際使用的表；「依據」按該年資料來源如實寫
     context: {
       noHoliday: '本月没有法定假日',
       noneMarked: '本月没有已标出的法定假日',
       noData: (y) => `没有 ${y} 年的假期数据，未标出假日`,
       range: (a, b) => (a === b ? a : `${a}–${b}`),
       md: (m, d) => `${m}/${d}`,
-      // 按节日分组、按各组最早的日期排序；组内先放假后调休：「国庆 9/20 调休上班；中秋 9/25–9/27 放假」
+      // 按節日分組、按各組最早的日期排序；組內先放假後調休：「國慶 9/20 調休上班；中秋 9/25–9/27 放假」
       off: (ranges) => `${ranges.join('、')} 放假`,
       makeup: (days) => `${days.join('、')} 调休上班`,
       group: (name, parts) => `${name} ${parts.join('，')}`,
@@ -372,7 +372,7 @@ export const STRINGS = {
         builtin: (y) => `依据 ${y} 年国务院放假通知`,
         online: (y) => `依据联网取得的 ${y} 年放假数据`,
         file: (y) => `依据导入的 ${y} 年假期表`,
-        // R49：无表年份按实际标出的日子分开写（2028–2035 含农历 / 节气日；其他年份只有固定日期）
+        // R49：無表年份按實際標出的日子分開寫（2028–2035 含農曆 / 節氣日；其他年份只有固定日期）
         lunar: '按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
         fixed: '按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出',
       },
@@ -393,7 +393,7 @@ export const STRINGS = {
     todayLabel: '今天',
     manual: '手动标记',
     manualTitle: '已手动标记',
-    // 法定假日格不再有文字标签（只有旗子图示 + 节日名，Task 18）
+    // 法定假日格不再有文字標籤（只有旗子圖示 + 節日名，Task 18）
     tags: { makeup: '班', paid: '带薪', unpaid: '无薪', rest: '休' },
     cellAria: ({ month, day, weekday, kind, holidayName, manual, today }) =>
       `${month}月${day}日 ${weekday}，${today ? '今天，' : ''}${kind}${holidayName ? `（${holidayName}）` : ''}${manual ? '，已手动标记' : ''}，按回车打开菜单`,
@@ -401,15 +401,15 @@ export const STRINGS = {
     cleared: (md) => `${md} 已恢复默认`,
     resetDone: '已重置本月标记',
     undo: '撤销',
-    // 撤销后（按钮仍只写「撤销」，不提示快捷键）
+    // 撤銷後（按鈕仍只寫「撤銷」，不提示快捷鍵）
     undoDone: '已撤销上一次标记',
     undoPartial: (done, skipped) => `已撤销 ${done} 天，另有 ${skipped} 天已在别处改过，保持不变`,
     undoStale: '上一次标记已在别处改过，没有撤销',
-    // 标记没写进储存：仍然给撤销按钮，但不谎称已保存
+    // 標記沒寫進儲存：仍然給撤銷按鈕，但不謊稱已儲存
     unsaved: (msg) => `${msg}（未能保存，请先导出备份）`,
     dayTitle: (month, day, weekday) => `${month}月${day}日 ${weekday}`,
     todaySuffix: '（今天）',
-    // 日期的状态文字（菜单标题与提示共用）
+    // 日期的狀態文字（選單標題與提示共用）
     status: {
       workday: '工作日',
       rest: '休息日',
@@ -418,30 +418,30 @@ export const STRINGS = {
       paid: '带薪假',
       unpaid: '无薪假',
     },
-    // 点日期弹出的小菜单
+    // 點日期彈出的小選單
     menu: {
       header: (title, status) => `${title} · ${status}`,
       options: { work: '改为上班（调休）', rest: '改为休息（调休）', paidLeave: '带薪假', unpaidLeave: '无薪假' },
-      // 「恢复默认」说清楚默认是哪一种（M18）：按这一天的默认类型给出三种之一
+      // 「恢復預設」說清楚預設是哪一種（M18）：按這一天的預設型別給出三種之一
       defaultWork: '恢复为工作日',
       defaultRest: '恢复为休息日',
       defaultHoliday: '恢复为法定假日',
       preview: (from, to) => `日薪 ${from} → ${to}`,
       unchanged: '日薪不变',
-      // 各项的说明（H7）：说结论，不用「日薪」这种内部说法
+      // 各項的說明（H7）：說結論，不用「日薪」這種內部說法
       paidNote: '照常计薪',
       unpaidNote: (yuan) => `这天不计薪（本月少 ${yuan}）`,
       restPreview: (before, after) => `月薪不变，每天 ${before} → ${after}`,
       noWorkdays: '本月没有上班日，不计薪',
       footer: '月薪固定，按当月上班天数平分',
     },
-    // 悬停 / 聚焦提示
+    // 懸停 / 聚焦提示
     tip: {
       source: (label) => `来源：${label}`,
       sources: { builtin: '内置·官方通知', online: '联网更新', file: '导入文件', manual: '手动标记', rule: '按周末规则', statutory: '法定日期（《放假办法》）', default: '按默认规则' },
       pay: (yuan) => `当日计薪 ${yuan}`,
       payShort: (yuan) => `计薪 ${yuan}`,
-      // 盖在格子上的提示（R50）：状态不用括号、「今天」放进状态行；来源用短写（完整说法仍在 aria-describedby）
+      // 蓋在格子上的提示（R50）：狀態不用括號、「今天」放進狀態行；來源用短寫（完整說法仍在 aria-describedby）
       statusShort: { holiday: (name) => (name ? `法定假日·${name}` : '法定假日'), makeup: (name) => (name ? `调休上班·${name}` : '调休上班') },
       todayTag: (status) => `${status}·今天`,
       sourcesShort: { statutory: '《放假办法》' },

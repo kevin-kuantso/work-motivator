@@ -63,7 +63,7 @@ test('card shows a year note when the holiday table is missing (R15)', () => {
   assert.equal(m.yearNote, '2028 年只标了法定假日，补假和调休未标出');
   assert.equal(m.yearTitle, '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
   assert.ok([...m.yearNote.replace(/[\d\s]/g, '')].length <= 17, 'short tag stays short (Task 19 F1: truthful wording is longer; the one-line row is checked in e2e)');
-  // P9：2027 有内置表，不再出现缺表提示
+  // P9：2027 有內建表，不再出現缺表提示
   const now27 = at(1, 4, 10, 0, 0, 2027);
   const builtin = cardModel({ ...snapshot(now27, cfg, {}), now: now27 }, cfg, t);
   assert.deepEqual([builtin.yearNote, builtin.yearTitle], [null, '']);
@@ -78,7 +78,7 @@ test('card model per status', () => {
   assert.equal(before.label, '08:30 开始计薪');
   assert.equal(before.secondary, '距上班 1小时30分0秒');
   const after = cardModel(snapshot(at(11, 3, 18), cfg, {}), cfg, t);
-  assert.equal(after.label, '今天辛苦了，收工！'); // Task 17：已下班换成收工文案（带薪假仍是「今天一共赚了」，见下方 Task 17 测试）
+  assert.equal(after.label, '今天辛苦了，收工！'); // Task 17：已下班換成收工文案（帶薪假仍是「今天一共賺了」，見下方 Task 17 測試）
   assert.equal(after.settled, true);
   const rest = cardModel(snapshot(at(11, 7, 10), cfg, {}), cfg, t);
   assert.equal(rest.badge, '休息日');
@@ -87,7 +87,7 @@ test('card model per status', () => {
   assert.equal(rest.secondary, '距下个工作日 2 天');
   const holiday = cardModel(snapshot(at(10, 1, 10), cfg, {}), cfg, t);
   assert.equal(holiday.label, '今天休息 · 国庆');
-  assert.equal(holiday.badge, '法定假日'); // 节日名只在标签里出现一次（V6）
+  assert.equal(holiday.badge, '法定假日'); // 節日名只在標籤裡出現一次（V6）
   assert.equal(holiday.tone, 'holiday');
   assert.equal(rest.tone, 'rest');
   const paid = cardModel(snapshot(at(11, 3, 10), cfg, { '2026-11-03': 'paidLeave' }), cfg, t);
@@ -164,7 +164,7 @@ test('import report counts applied items and lists dropped + unknown with curren
   assert.equal(byLabel['上班时间'].value, '保留当前值 08:30');
   assert.equal(byLabel['月历标记 2026-02-30 · 中国大陆'].value, '保留当前值 未标记');
   assert.equal(byLabel.foo.reason, '无法识别的字段，已忽略');
-  // 报告里的原因由语义 code 按当前字典翻出来：文案与迁移前逐字一致
+  // 報告裡的原因由語義 code 按當前字典翻出來：文案與遷移前逐字一致
   assert.equal(byLabel['月薪 · 中国大陆'].reason, '月薪必须是大于 0 的数字');
   assert.equal(byLabel['上班时间'].reason, '上班时间格式不正确，应为 24 小时制的「时:分」，例如 08:30');
   assert.equal(byLabel['月历标记 2026-02-30 · 中国大陆'].reason, '不是真实存在的日期');
@@ -178,7 +178,7 @@ test('import report reasons are re-rendered from the dictionary it is given, not
   const { salary, ...shared } = cfg;
   const current = { region: 'CN', cfg: shared, salaries: { TW: 40000, CN: salary }, marksByRegion: { TW: {}, CN: {} } };
   const res = importState(JSON.stringify({ version: 1, salary: -5, start: '9am' }), current);
-  // 同一份结果、换一本字典：文字跟着字典走（新增地区只要注册字典就能复用这套校验）
+  // 同一份結果、換一本字典：文字跟著字典走（新增地區只要註冊字典就能複用這套校驗）
   const other = {
     ...t,
     reasons: {
@@ -191,7 +191,7 @@ test('import report reasons are re-rendered from the dictionary it is given, not
   const rows = Object.fromEntries(importReport(res, other).rows.map((x) => [x.label, x.reason]));
   assert.equal(rows['月薪 · 中国大陆'], 'SALARY-TEXT');
   assert.equal(rows['上班时间'], 'TIME(START-LABEL)');
-  // 缺键时留空，不回退到简体或旧译文
+  // 缺鍵時留空，不回退到簡體或舊譯文
   const bare = { ...t, reasons: {} };
   assert.equal(importReport(res, bare).rows[0].reason, '');
 });
@@ -236,7 +236,7 @@ test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other
     const now = at(m, day, h, mi);
     return cardModel({ ...snapshot(now, cfg, {}), now }, cfg, t);
   };
-  const done = d(11, 4, 18); // 2026-11-04 周三 18:00：今天 323.8095、本月累计 971.43
+  const done = d(11, 4, 18); // 2026-11-04 週三 18:00：今天 323.8095、本月累計 971.43
   assert.equal(done.status, 'afterWork');
   assert.equal(done.label, '今天辛苦了，收工！');
   assert.equal(done.rateLabel, '已赚占月薪');
@@ -250,14 +250,14 @@ test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other
   assert.match(working.rate, /^¥\d+\.\d{4}\/秒$/);
   const lunch = d(11, 4, 12, 15);
   assert.equal(lunch.label, '今天已经赚了');
-  assert.equal(lunch.rate, '13:00'); // Task 19 H2：午休中第一格改为「午休结束 13:00」
+  assert.equal(lunch.rate, '13:00'); // Task 19 H2：午休中第一格改為「午休結束 13:00」
   const before = d(11, 4, 7);
   assert.equal(before.label, '08:30 开始计薪'); // Task 19 M1
   assert.equal(before.rateLabel, '已赚占月薪'); // Task 19 mini round: 08:30 only in the label (F6)
   assert.match(before.rate, /^\d+%$/);
   const rest = d(11, 7, 18);
   assert.equal(rest.label, '今天休息');
-  assert.equal(rest.rateLabel, '已赚占月薪'); // Task 19 H2：非上班日都说已赚占月薪
+  assert.equal(rest.rateLabel, '已赚占月薪'); // Task 19 H2：非上班日都說已賺佔月薪
   const holiday = d(10, 1, 18);
   assert.equal(holiday.label, '今天休息 · 国庆');
   assert.equal(holiday.rateLabel, '已赚占月薪');
@@ -268,7 +268,7 @@ test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other
   const unpaid = cardModel({ ...snapshot(now, cfg, { '2026-11-04': 'unpaidLeave' }), now }, cfg, t);
   assert.equal(unpaid.rateLabel, '已赚占月薪');
   assert.match(unpaid.rate, /^\d+%$/);
-  // 调休上班日（排定的工作日）收工后同样适用
+  // 調休上班日（排定的工作日）收工後同樣適用
   const makeup = d(9, 20, 18);
   assert.equal(makeup.status, 'afterWork');
   assert.equal(makeup.label, '今天辛苦了，收工！');
@@ -277,8 +277,8 @@ test('Task 17: 已下班 gets the wrap-up label and 已赚占月薪; every other
 test('Task 17: monthPercent rounds, clamps to 0–100 and guards salary 0', () => {
   assert.equal(monthPercent(0, 6800), 0);
   assert.equal(monthPercent(971.43, 6800), 14);
-  assert.equal(monthPercent(34, 6800), 1); // 0.5% 四舍五入进位
-  assert.equal(monthPercent(33.99, 6800), 0); // 刚好低于 0.5%
+  assert.equal(monthPercent(34, 6800), 1); // 0.5% 四捨五入進位
+  assert.equal(monthPercent(33.99, 6800), 0); // 剛好低於 0.5%
   assert.equal(monthPercent(6800, 6800), 100);
   assert.equal(monthPercent(9999, 6800), 100);
   assert.equal(monthPercent(-5, 6800), 0);
@@ -298,21 +298,21 @@ test('Task 19 H2: the first metric cell is the speed only while working; every o
   const before = model(at(11, 4, 7));
   assert.equal(before.rateLabel, '已赚占月薪');
   assert.ok(!before.rate.includes('08:30'));
-  // 取自设置，不写死
+  // 取自設定，不寫死
   const custom = { ...cfg, start: '09:15', lunchStart: '12:00', lunchEnd: '13:30', end: '18:00' };
   assert.deepEqual([model(at(11, 4, 12, 40), custom).rateLabel, model(at(11, 4, 12, 40), custom).rate], ['午休结束', '13:30']);
   assert.equal(model(at(11, 4, 8), custom).label, '09:15 开始计薪');
-  // 休息日 / 法定假日 / 带薪假 / 无薪假 / 已下班：已赚占月薪 N%（与 Task 17 同一个函数）
+  // 休息日 / 法定假日 / 帶薪假 / 無薪假 / 已下班：已賺佔月薪 N%（與 Task 17 同一個函式）
   for (const m of [model(at(11, 7, 10)), model(at(10, 1, 10)), model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' }),
     model(at(11, 4, 10), cfg, { '2026-11-04': 'unpaidLeave' }), model(at(11, 4, 18))]) {
     assert.equal(m.rateLabel, '已赚占月薪', m.status);
     assert.match(m.rate, /^\d{1,3}%$/, m.status);
     assert.ok(Number.parseInt(m.rate, 10) >= 0 && Number.parseInt(m.rate, 10) <= 100);
   }
-  // 月薪 0（无效）：夹成 0%，不是 NaN / Infinity
+  // 月薪 0（無效）：夾成 0%，不是 NaN / Infinity
   const zero = model(at(11, 7, 10), { ...cfg, salary: 0 });
   assert.equal(zero.rate, '0%');
-  // 时间格式坏了：不猜，不显示假的时间
+  // 時間格式壞了：不猜，不顯示假的時間
   const bad = model(at(11, 4, 7), { ...cfg, start: 'abc' });
   assert.ok(!/abc/.test(bad.rate + bad.label));
 });
@@ -338,7 +338,7 @@ test('Task 19 H8: 已下班 shows the settled amount with 2 decimals, no tail, p
   assert.equal(model(at(11, 4, 19), custom).progressText, '今天工作满 8小时');
   const half = { ...cfg, end: '17:30' };
   assert.equal(model(at(11, 4, 19), half).progressText, '今天工作满 7小时30分');
-  // 带薪假同样定格 2 位；上班中仍是 4 位
+  // 帶薪假同樣定格 2 位；上班中仍是 4 位
   const paid = model(at(11, 4, 10), cfg, { '2026-11-04': 'paidLeave' });
   assert.equal(paid.hero.tail, '');
   assert.deepEqual(model(at(11, 3, 14, 12)).hero, heroParts(model(at(11, 3, 14, 12)).amount));
@@ -370,7 +370,7 @@ test('Task 19 M2 / L10 / L11: 调休上班 tag, /秒 without a space, 距发薪�
 test('Task 19 M3: worked text is 已工作 H小时M分 / 共 H小时; countdown format unchanged', () => {
   assert.equal(model(at(11, 4, 10, 30)).progressText, '已工作 2小时0分 / 共 7小时'); // 08:30 → 10:30
   assert.equal(model(at(11, 4, 8, 55)).progressText, '已工作 25分 / 共 7小时');
-  assert.equal(model(at(11, 4, 14, 30, 59)).progressText, '已工作 4小时30分 / 共 7小时'); // 08:30→14:30:59 扣午休 1.5h，秒不进位
+  assert.equal(model(at(11, 4, 14, 30, 59)).progressText, '已工作 4小时30分 / 共 7小时'); // 08:30→14:30:59 扣午休 1.5h，秒不進位
   assert.equal(model(at(11, 4, 10, 30)).secondary, '距下班 6小时30分0秒');
   assert.equal(duration(65, t), '1分5秒');
 });

@@ -4,7 +4,7 @@ import {
   DIGIT_FALLBACK, isDigit, planCells, fontSignature, widestDigit, createWidthCache, resolveDigitWidth, renderDigits,
 } from '../src/ui/digits.js';
 
-// ---- 极简假 DOM：只实现 renderDigits 用到的部分（不引入 jsdom）----
+// ---- 極簡假 DOM：只實現 renderDigits 用到的部分（不引入 jsdom）----
 class FakeNode {
   constructor(doc) { this.ownerDocument = doc; this.parentNode = null; this.childNodes = []; }
   append(...nodes) { for (const n of nodes) { n.parentNode?.removeChild(n); n.parentNode = this; this.childNodes.push(n); } }
@@ -28,7 +28,7 @@ class FakeEl extends FakeNode {
     this.style = { setProperty: (k, v) => { props[k] = v; }, getPropertyValue: (k) => props[k] ?? '', cssText: '' };
   }
   setAttribute(k, v) { this.attrs[k] = String(v); }
-  getClientRects() { return []; } // 假 DOM 没有排版：量不到宽度 → 回退 0.62em
+  getClientRects() { return []; } // 假 DOM 沒有排版：量不到寬度 → 回退 0.62em
   getBoundingClientRect() { return { width: 0 }; }
   get textContent() { return super.textContent; }
   set textContent(s) { this.writes += 1; this.childNodes = [new FakeText(this.ownerDocument, s)]; }

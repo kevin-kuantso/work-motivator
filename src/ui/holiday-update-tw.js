@@ -22,7 +22,7 @@ const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArr
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
 
 // 存不進儲存、只能留在本次會話的表（year → { off, makeup, source, base }），按 storage 物件掛在整頁層級：
-// 切到別的地區時 app 會重建這個流程物件（新 generation），若把補位表放在實例裡，切回臺灣就整份消失。
+// 切到別的地區時 app 會重建這個流程物件（新 generation），若把補位表放在例項裡，切回臺灣就整份消失。
 // 掛在 storage 上等於「這個頁面配這份儲存」，重開頁面自然歸零；不同的儲存物件（每個測試各自的假 storage）
 // 互不影響。base 是「寫入失敗當下」儲存裡那一年的簽章，儲存成功就移除，所以儲存一直是真相來源。
 const SESSION_TABLES = new WeakMap();
@@ -67,7 +67,7 @@ export function statusLineTw(now, tables, t) {
   return m.chips.map((c) => c.text).join(t.holidayUpdate.sep);
 }
 
-// 解析失敗代碼 → 目前字典的文字。字典缺該代碼時退回 codeGeneric，不顯示 undefined。
+// 解析失敗程式碼 → 目前字典的文字。字典缺該程式碼時退回 codeGeneric，不顯示 undefined。
 export function reasonText(code, params, t) {
   const U = t?.holidayUpdate;
   const f = code && U?.codes ? U.codes[code] : null;
@@ -79,7 +79,7 @@ export function reasonText(code, params, t) {
 }
 
 // 結果一律帶 { key, params }（面板按當前字典重譯）＋ text（沒有字典時的退路）。
-// detail 的 params 放「失敗代碼規格」{ code, params }：面板會用當前字典的 codes 表重譯，
+// detail 的 params 放「失敗程式碼規格」{ code, params }：面板會用當前字典的 codes 表重譯，
 // 切語言後不會殘留發出當時那句翻譯（text 只是沒有字典時的退路）。
 function detailSpec(code, params, t) {
   const reason = reasonText(code, params, t);
@@ -203,7 +203,7 @@ export function startHolidayUpdateTw(ctx) {
     emit(g);
   }
 
-  // 同一地區的狀態刷新（其他分頁改了臺灣資料、字典／地區設定剛換過）：重新讀取儲存並回報狀態。
+  // 同一地區的狀態重新整理（其他分頁改了臺灣資料、字典／地區設定剛換過）：重新讀取儲存並回報狀態。
   // 不換 generation。
   function refresh() {
     if (!current()) return;

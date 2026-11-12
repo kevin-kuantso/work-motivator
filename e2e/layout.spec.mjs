@@ -1,13 +1,13 @@
-// 版面重设计（spec §13）：实测四种视窗不滚动、提示条两条通道、分页键盘与 ARIA、PgUp / PgDn、
-// 只列当月类型的图例、「回到今天」强调、摘要行、对比度（实算）、用语扫描、<1000px 上下排列、等宽数字。
-// 量测结果以 `MEASURE {...}` 打印，供报告引用（数字都是本次实际量到的）。
+// 版面重設計（spec §13）：實測四種視窗不滾動、提示條兩條通道、分頁鍵盤與 ARIA、PgUp / PgDn、
+// 只列當月型別的圖例、「回到今天」強調、摘要行、對比度（實算）、用語掃描、<1000px 上下排列、等寬數字。
+// 量測結果以 `MEASURE {...}` 列印，供報告引用（數字都是本次實際量到的）。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harness.mjs';
 
-// 截图只在设了 WM_SHOTS=目录 时才写（默认不写任何文件，Task 14 E3）
+// 截圖只在設了 WM_SHOTS=目錄 時才寫（預設不寫任何檔案，Task 14 E3）
 const SHOTS = process.env.WM_SHOTS || null;
 async function shot(page, name) {
   if (!SHOTS) return;
@@ -15,14 +15,14 @@ async function shot(page, name) {
   await page.screenshot({ path: join(SHOTS, name) });
 }
 
-const T1412 = '2026-11-03T14:12:00+08:00'; // 2026-11：周一为首共 6 周
+const T1412 = '2026-11-03T14:12:00+08:00'; // 2026-11：週一為首共 6 周
 
-// 本文件断言的是中国地区的版面文案、币别与年表：明确写入旧版（v1，无地区）设置，
-// 让应用走「旧数据一律归中国」的迁移路径，不依赖应用当前的新用户默认地区（台湾）。
-// 例外：断言首次提示横幅的测试必须让 localStorage 里没有设置，因此那些用例以 seed: false 保持全新用户。
+// 本檔案斷言的是中國地區的版面文案、幣別與年表：明確寫入舊版（v1，無地區）設定，
+// 讓應用走「舊資料一律歸中國」的遷移路徑，不依賴應用當前的新使用者預設地區（臺灣）。
+// 例外：斷言首次提示橫幅的測試必須讓 localStorage 裡沒有設定，因此那些用例以 seed: false 保持全新使用者。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
-// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+// 與既有的 init 組在一起：字串相加、函式轉成字串、{ content } 加字首、null / undefined 只留種子、{ path } 原樣。
 const seeded = (init) => {
   if (init == null) return CN_SEED;
   if (typeof init === 'string') return `${CN_SEED}\n${init}`;
@@ -31,7 +31,7 @@ const seeded = (init) => {
   return init;
 };
 const VIEWPORTS = [[1280, 585], [1366, 650], [1536, 730], [1920, 950]];
-// Task 18：窄 / 矮视窗也是主要目标（1093×535 = 1366×768 @125%）；提示与格子标签的测试都要跑
+// Task 18：窄 / 矮視窗也是主要目標（1093×535 = 1366×768 @125%）；提示與格子標籤的測試都要跑
 const NARROW_VP = [[1000, 700], [1093, 535], [1100, 700], [1150, 700], [1200, 700]];
 const ALL_VP = [...VIEWPORTS, ...NARROW_VP];
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當'];
@@ -52,7 +52,7 @@ async function withPage(iso, fn, opts) {
   const { seed = true, ...rest } = opts ?? {};
   const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...rest, init: seed ? seeded(rest.init) : rest.init });
   try {
-    // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
+    // R19：開頁只會請求「自動檢查」該請求的網址（11 月前為 0 個）；一律被 harness 中止（離線）
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
     assert.deepEqual(errors.map(String), [], 'no uncaught page errors');
@@ -64,11 +64,11 @@ async function withPage(iso, fn, opts) {
 }
 
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
-// 提示新增的「农历」可见行（日期之后、状态之前）；格子放不下时整行不显示，完整农历始终在 aria-describedby
+// 提示新增的「農曆」可見行（日期之後、狀態之前）；格子放不下時整行不顯示，完整農曆始終在 aria-describedby
 const LUNAR_LINE = /^农历/;
 const cell = (page, label) => page.locator(`.cal-grid button[aria-label^="${label} "]`);
-// 分页按钮的 id（#tab-settings / #tab-calendar）是稳定契约，与地区无关；role 名称会随字典变化
-// （中国：基本设置 / 月历；台湾：基本設定 / 月曆），所以能认出来的名称一律换成 id 定位。
+// 分頁按鈕的 id（#tab-settings / #tab-calendar）是穩定契約，與地區無關；role 名稱會隨字典變化
+// （中國：基本設定 / 月曆；臺灣：基本設定 / 月曆），所以能認出來的名稱一律換成 id 定位。
 const TAB_LABELS = { settings: ['基本设置', '基本設定'], calendar: ['月历', '月曆'] };
 const tab = (page, name) => {
   for (const [id, labels] of Object.entries(TAB_LABELS)) {
@@ -117,7 +117,7 @@ test('save feedback restarts on successive valid edits and hides for invalid inp
     assert.equal(await page.locator('.autosave').isVisible(), true);
   }));
 
-// 在页面里量：面板底部、页面是否可滚动、格子最小行高、格子内容是否被裁切
+// 在頁面裡量：面板底部、頁面是否可滾動、格子最小行高、格子內容是否被裁切
 const measure = (page) => page.evaluate(() => {
   const r = (el) => el.getBoundingClientRect();
   const panel = r(document.querySelector('.main-panel'));
@@ -138,12 +138,12 @@ const measure = (page) => page.evaluate(() => {
     lastRowInside: rows.length ? r(rows.at(-1)).bottom <= panel.bottom + 0.5 : null,
     clippedCells: days.filter((d) => d.scrollHeight > d.clientHeight + 0.5).length,
     cardBottom: Math.round(r(document.querySelector('#card-slot')).bottom),
-    // 左栏 = 状态卡（或占位卡）+「悬浮成小窗」按钮 + 按钮下的说明（R38）
+    // 左欄 = 狀態卡（或佔位卡）+「懸浮成小窗」按鈕 + 按鈕下的說明（R38）
     leftBottom: Math.round(r(leftCol).bottom * 10) / 10,
     floatBottom: Math.round(r(document.querySelector('#btn-float')).bottom * 10) / 10,
     banners: [...document.querySelectorAll('.notices .banner:not([hidden])')].map((b) => Math.round(r(b).height)),
     tablistVisible: tablist.top >= 0 && tablist.bottom <= innerHeight,
-    // 分页本身 + 每一栏（两栏各自可内部滚动，决定 1）：默认状态都必须是 0
+    // 分頁本身 + 每一欄（兩欄各自可內部滾動，決定 1）：預設狀態都必須是 0
     settingsInnerOverflow: sp.hidden ? null : Math.max(sp.scrollHeight - sp.clientHeight, ...cols.map((c) => c.scrollHeight - c.clientHeight)),
     settingsColOverflow: sp.hidden ? null : cols.map((c) => c.scrollHeight - c.clientHeight),
     settingsColSlack: sp.hidden ? null : cols.map((c) => Math.round(r(sp).bottom - r(c.lastElementChild).bottom)),
@@ -185,9 +185,9 @@ test('four viewports with the first-run banner: calendar and 基本设置 need n
       await page.locator('#f-theme').scrollIntoViewIfNeeded();
       assert.equal(await page.locator('#f-theme').isVisible(), true, `${w}x${ht}: theme remains reachable`);
     }
-  }, { seed: false })); // 例外：首次提示横幅只在新用户（localStorage 没有设置）时出现，与写入旧版中国设置互斥
+  }, { seed: false })); // 例外：首次提示橫幅只在新使用者（localStorage 沒有設定）時出現，與寫入舊版中國設定互斥
 
-// 损坏的已存设置 + 第一次保存成功（出现备份建议）+ 之后储存失败（例如配额满）= 合并错误条 + 信息条同时出现
+// 損壞的已存設定 + 第一次儲存成功（出現備份建議）+ 之後儲存失敗（例如配額滿）= 合併錯誤條 + 資訊條同時出現
 const corruptThenQuota = {
   init: `
     if (!sessionStorage.getItem('seeded')) { localStorage.setItem('work-motivator-v1', '{oops'); sessionStorage.setItem('seeded', '1'); }
@@ -207,15 +207,15 @@ test('error channel merges storage failure + corrupt settings into ONE bar; info
     const fail = '无法保存设置，关闭页面后会丢失。请先导出备份';
     assert.equal(await text(page, `${errorBar} .banner-text`), corrupt);
     await tab(page, '基本设置').click();
-    await page.getByLabel('月薪').fill('7000'); // 第 1 次保存成功 → 备份建议
+    await page.getByLabel('月薪').fill('7000'); // 第 1 次儲存成功 → 備份建議
     assert.equal(await page.locator(infoBar).getAttribute('data-id'), 'backupNudge');
-    await page.getByLabel('月薪').fill('7100'); // 第 2 次失败 → 储存失败
+    await page.getByLabel('月薪').fill('7100'); // 第 2 次失敗 → 儲存失敗
     assert.equal(await page.locator(errorBar).count(), 1, 'one merged error bar');
     assert.equal(await text(page, `${errorBar} .banner-text`), `${fail} · ${corrupt}`);
     assert.equal(await page.locator(errorBar).getAttribute('role'), 'alert');
     const btns = await page.locator(errorBar).getByRole('button').allTextContents();
     assert.deepEqual(btns, ['导出备份', '导入备份', '×'], 'export / import once each + close for the dismissible part');
-    // 信息条没有被错误条压掉，两条都在、错误条在上、都在分页之上
+    // 資訊條沒有被錯誤條壓掉，兩條都在、錯誤條在上、都在分頁之上
     assert.equal(await page.locator(infoBar).isVisible(), true);
     const y = await page.evaluate(() => ['.notices .banner-error', '.notices .banner-info', '[role=tablist]'].map((s) => document.querySelector(s).getBoundingClientRect().top));
     assert.ok(y[0] < y[1] && y[1] < y[2], `order error < info < tabs (${y})`);
@@ -234,7 +234,7 @@ test('error channel merges storage failure + corrupt settings into ONE bar; info
       await page.locator('#f-theme').scrollIntoViewIfNeeded();
       assert.equal(await page.locator('#f-theme').isVisible(), true, `${w}x${ht}: theme remains reachable with banners`);
     }
-    // 状态卡最高的常见情况（鼓励语 + 发薪日）也不让页面滚动
+    // 狀態卡最高的常見情況（鼓勵語 + 發薪日）也不讓頁面滾動
     await page.setViewportSize({ width: 1280, height: 585 });
     await page.getByLabel('鼓励语').fill('今天也要好好加油，下班吃顿好的');
     await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
@@ -247,12 +247,12 @@ test('error channel merges storage failure + corrupt settings into ONE bar; info
     assertCalendarFits(tallCal, '1280x585 calendar, tall card');
     await tab(page, '基本设置').click();
 
-    // 关闭：只关掉可关闭的「设置损坏」部分；储存失败在恢复前不可关闭
+    // 關閉：只關掉可關閉的「設定損壞」部分；儲存失敗在恢復前不可關閉
     await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await text(page, `${errorBar} .banner-text`), fail);
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).count(), 0);
     assert.equal(await page.locator(infoBar).isVisible(), true, 'info bar unaffected');
-    // 信息条关闭后错误条仍在
+    // 資訊條關閉後錯誤條仍在
     await page.locator(infoBar).getByRole('button', { name: '知道了' }).click();
     assert.equal(await page.locator(infoBar).isVisible(), false);
     assert.equal(await page.locator(errorBar).isVisible(), true);
@@ -310,14 +310,14 @@ test('tabs: tablist / tab / tabpanel ARIA, roving tabindex, ←/→/Home/End, hi
     await step('Home', 'calendar');
     await step('End', 'settings');
 
-    // 首次提示「去修改」→ 切到基本设置，焦点在分页标签
+    // 首次提示「去修改」→ 切到基本設定，焦點在分頁標籤
     await tab(page, '月历').click();
     await page.locator(infoBar).getByRole('button', { name: '去修改' }).click();
     assert.equal(await tab(page, '基本设置').getAttribute('aria-selected'), 'true');
     assert.equal((await focused(page)).id, 'tab-settings');
     assert.equal(await page.getByLabel('月薪').isVisible(), true);
 
-    // 切分页时收起日期菜单
+    // 切分頁時收起日期選單
     await tab(page, '月历').click();
     await cell(page, '11月7日').click();
     assert.equal(await page.locator('.day-menu').isVisible(), true);
@@ -327,7 +327,7 @@ test('tabs: tablist / tab / tabpanel ARIA, roving tabindex, ←/→/Home/End, hi
     await page.locator('#tab-settings').click();
     await tab(page, '月历').click();
     assert.equal(await page.locator('.day-menu').isVisible(), false);
-  }, { seed: false })); // 例外：本用例要按首次提示的「去修改」按钮，首次提示只在新用户时出现
+  }, { seed: false })); // 例外：本用例要按首次提示的「去修改」按鈕，首次提示只在新使用者時出現
 
 test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month end), preventDefault; ignored elsewhere — 2026-11 → 2027 内置年 → 2028 无内置表年（闰年 2/29）', () =>
   withPage(T1412, async (page) => {
@@ -352,7 +352,7 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     await page.keyboard.press('PageDown');
     assert.equal(await title(), '2027 年 2 月');
     assert.equal((await focused(page)).key, '2027-02-28');
-    // 继续走进「无内置表」的年份（2028 起只有法定日期回退）：同号日期跨月照常，月底夹取仍按真实天数
+    // 繼續走進「無內建表」的年份（2028 起只有法定日期回退）：同號日期跨月照常，月底夾取仍按真實天數
     for (let i = 0; i < 10; i++) await page.keyboard.press('PageDown'); // 2027-03-28 … 2027-12-28
     assert.equal(await title(), '2027 年 12 月');
     assert.equal((await focused(page)).key, '2027-12-28');
@@ -372,15 +372,15 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     assert.equal(await page.evaluate(() => document.querySelectorAll('.cal-grid button[tabindex="0"]').length), 1);
     assert.equal(await page.locator('.cal-grid button[tabindex="0"]').getAttribute('data-key'), '2028-02-29', 'tab stop follows focus');
     assert.ok((await page.evaluate(() => window.__pg)).every(Boolean), 'all handled PgUp/PgDn were preventDefault-ed');
-    // 修饰键：不处理
+    // 修飾鍵：不處理
     await page.keyboard.press('Shift+PageUp');
     assert.equal(await title(), '2028 年 2 月');
-    // 焦点不在日期格：不处理
+    // 焦點不在日期格：不處理
     await page.locator('.cal-next').focus();
     await page.keyboard.press('PageDown');
     assert.equal(await title(), '2028 年 2 月');
     assert.equal((await page.evaluate(() => window.__pg)).at(-1), false);
-    // R29：工具列不放可见的键盘提示；按键只写在「上月」「下月」的悬停提示里（无障碍名称仍是按钮文字）
+    // R29：工具列不放可見的鍵盤提示；按鍵只寫在「上月」「下月」的懸停提示裡（無障礙名稱仍是按鈕文字）
     assert.equal(await page.locator('.cal-toolbar kbd, .cal-keys').count(), 0, 'no visible key hint in the toolbar');
     assert.doesNotMatch(await page.locator('.cal-toolbar').innerText(), /PgUp|PgDn|切换月份/);
     assert.equal(await page.locator('.cal-prev').getAttribute('title'), '上月（PgUp）');
@@ -389,8 +389,8 @@ test('PgUp / PgDn on a day cell: switch month, focus same day (clamped to month 
     assert.equal(await page.getByRole('button', { name: '下月 ›', exact: true }).getAttribute('title'), '下月（PgDn）');
   }));
 
-// R36：图例永远列出全部 7 种，排成一行（有 / 没有假日的月份都一样）；「重置标记」仅本月有手动标记时出现，在摘要行最右
-// M7：操作提示已移到工具列右端，量测对象跟着换（图例行内不再有提示）
+// R36：圖例永遠列出全部 7 種，排成一行（有 / 沒有假日的月份都一樣）；「重置標記」僅本月有手動標記時出現，在摘要行最右
+// M7：操作提示已移到工具列右端，量測物件跟著換（圖例行內不再有提示）
 const ALL_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid', 'today', 'manual'];
 const legendLine = (page) => page.evaluate(() => {
   const l = document.querySelector('.cal-legend');
@@ -430,7 +430,7 @@ test('legend always lists all 7 kinds on ONE line (months with and without holid
     }
     assert.deepEqual(await labels(), ['周末', '法定假日', '调休上班', '带薪假', '无薪假', '今天', '手动标记']);
     assert.equal(await text(page, '.cal-toolbar .legend-hint'), '点日期可标记：调休上班 · 带薪假 · 无薪假');
-    // M7：提示在工具列右端（图例行内不再有它），且贴右边缘（margin-left:auto）
+    // M7：提示在工具列右端（圖例行內不再有它），且貼右邊緣（margin-left:auto）
     assert.equal(await page.locator('.cal-legend .legend-hint').count(), 0, 'the hint left the legend row');
     const hintRight = await page.evaluate(() => {
       const hint = document.querySelector('.cal-toolbar .legend-hint');
@@ -445,7 +445,7 @@ test('legend always lists all 7 kinds on ONE line (months with and without holid
     assert.equal(await page.locator('.cal-legend [data-kind=paid] svg.icon-paid').count(), 1);
     assert.equal(await page.locator('.cal-legend [data-kind=unpaid] svg.icon-unpaid').count(), 1);
     assert.equal(await page.locator('.cal-legend [data-kind=manual] .day-dot').count(), 1);
-    // 重置本月标记
+    // 重置本月標記
     await page.setViewportSize({ width: 1280, height: 585 });
     assert.equal(await page.getByRole('button', { name: '重置本月标记' }).isVisible(), false);
     await cell(page, '11月4日').click();
@@ -459,7 +459,7 @@ test('legend always lists all 7 kinds on ONE line (months with and without holid
     assert.ok(sh <= 30, `summary row (text + pill + reset) stays one line (${sh})`);
     await reset.click();
     assert.equal(await reset.isVisible(), false);
-    // 极端月份：所有类型都出现时仍是一行
+    // 極端月份：所有型別都出現時仍是一行
     await page.locator('.cal-prev').click();
     for (const [label, re] of [['10月12日', /^带薪假/], ['10月13日', /^无薪假/], ['10月14日', /改为休息/]]) {
       await cell(page, label).click();
@@ -490,7 +490,7 @@ test('「回到今天」 is emphasised with the target month when viewing anothe
     const btn = page.locator('.cal-today');
     assert.equal(await text(page, '.cal-today'), '回到今天');
     assert.equal(await btn.evaluate((b) => b.classList.contains('is-away')), false);
-    // 用不带过渡的属性比较（背景色有过渡，而 page.clock 暂停时过渡不前进）
+    // 用不帶過渡的屬性比較（背景色有過渡，而 page.clock 暫停時過渡不前進）
     const look = () => btn.evaluate((b) => `${getComputedStyle(b).color} ${getComputedStyle(b).fontWeight}`);
     const quiet = await look();
     await page.locator('.cal-next').click();
@@ -513,7 +513,7 @@ test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2
     await page.locator('.cal-prev').click();
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 18 天 · 日薪 ¥377.78');
   });
-  // 2027 是内置表（国务院通知）：照实算调休，摘要行不再挂「未内置」标签
+  // 2027 是內建表（國務院通知）：照實算調休，摘要行不再掛「未內建」標籤
   await withPage('2027-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
     assert.equal(await page.locator('.cal-year-tag').isVisible(), false, 'built-in year carries no missing-table tag');
@@ -521,7 +521,7 @@ test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2
     assert.match(await cell(page, '1月31日').getAttribute('aria-label'), /^1月31日 周日，调休上班（春节）/);
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line (${h})`);
-    // 2027-02 是唯一的 4 周月份：内置表把春节连休 2/5–2/13 与 2/14 调休都算进去
+    // 2027-02 是唯一的 4 周月份：內建表把春節連休 2/5–2/13 與 2/14 調休都算進去
     await page.setViewportSize({ width: 1280, height: 585 });
     await page.locator('.cal-next').click();
     assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
@@ -531,27 +531,27 @@ test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2
     console.log(`MEASURE ${JSON.stringify({ case: '2027-02 built-in', tab: 'calendar', ...m4 })}`);
     assertFits(m4, '2027-02 at 1280x585');
     assert.equal(m4.weeks, 4);
-    // 2027-05 是 6 周月份：没有标签时 1280×585 也不滚动
+    // 2027-05 是 6 周月份：沒有標籤時 1280×585 也不滾動
     for (let i = 0; i < 3; i++) await page.locator('.cal-next').click();
     assert.equal(await text(page, '.cal-title'), '2027 年 5 月');
     const m = await measure(page);
     console.log(`MEASURE ${JSON.stringify({ case: '2027-05', tab: 'calendar', ...m })}`);
     assertCalendarFits(m, '2027-05 at 1280x585');
   });
-  // 2028 没有年度表：只有法定日期回退，摘要行带标签；2028-01 本身是 6 周月份
+  // 2028 沒有年度表：只有法定日期回退，摘要行帶標籤；2028-01 本身是 6 周月份
   await withPage('2028-01-04T10:00:00+08:00', async (page) => {
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 17 天 · 日薪 ¥400.00');
     assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出');
     assert.equal(await page.locator('.cal-summary .cal-year-tag').getAttribute('title'), '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
     assert.equal(await page.locator('.cal-toolbar .cal-year-tag').count(), 0, 'not in the toolbar');
-    // 窄于 1280 时摘要行允许换行（style.css 的 @media (max-width:1279px)），所以这里不再要求单行，
-    // 只要求标签完整可见、不被截断，且整块长在摘要行里（最多两行，不能无限长高把月历挤出去）
+    // 窄於 1280 時摘要行允許換行（style.css 的 @media (max-width:1279px)），所以這裡不再要求單行，
+    // 只要求標籤完整可見、不被截斷，且整塊長在摘要行裡（最多兩行，不能無限長高把月曆擠出去）
     const tag = await page.locator('.cal-summary .cal-year-tag').evaluate((e) => {
       const rowEl = e.closest('.cal-summary');
       const row = rowEl.getBoundingClientRect(), r = e.getBoundingClientRect();
       const kids = [...rowEl.children].filter((k) => !k.hidden && k.getBoundingClientRect().width > 0);
       const tallest = Math.max(...kids.map((k) => k.getBoundingClientRect().height));
-      // 两行的上界：两倍最高子项 + CSS 里实际的 row-gap（不写死数值，跟着 style.css 走）
+      // 兩行的上界：兩倍最高子項 + CSS 裡實際的 row-gap（不寫死數值，跟著 style.css 走）
       const gap = parseFloat(getComputedStyle(rowEl).rowGap) || 0;
       return {
         visible: r.width > 0 && r.height > 0,
@@ -564,7 +564,7 @@ test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2
     assert.equal(tag.cut, false, 'the missing-table tag is never truncated');
     assert.equal(tag.inside, true, 'the tag stays inside the summary row');
     assert.ok(tag.h <= tag.twoLines, `summary row stays at most two lines (${tag.h} <= ${tag.twoLines})`);
-    // 宽到 1280 时摘要行必须回到单行（撤销按钮也进来后仍然成立）
+    // 寬到 1280 時摘要行必須回到單行（撤銷按鈕也進來後仍然成立）
     await page.setViewportSize({ width: 1280, height: 585 });
     const h = await page.locator('.cal-summary').evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(h <= 30, `summary row stays one line at 1280 (${h})`);
@@ -572,7 +572,7 @@ test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2
     console.log(`MEASURE ${JSON.stringify({ case: '2028-01 tag', tab: 'calendar', ...m6 })}`);
     assertCalendarFits(m6, '2028-01 at 1280x585');
     assert.equal(m6.weeks, 6);
-    // 2028-07 也是 6 周月份：标签在时仍不滚动
+    // 2028-07 也是 6 周月份：標籤在時仍不滾動
     for (let i = 0; i < 6; i++) await page.locator('.cal-next').click();
     assert.equal(await text(page, '.cal-title'), '2028 年 7 月');
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
@@ -583,7 +583,7 @@ test('summary row: workdays and daily wage live; built-in 2027 has no tag; the 2
   });
 });
 
-// R40：2028 年 1 月（无表）：春节 1/25–1/28 标旗子 + 「春节」，周末也标；补假 / 调休不猜（1/24、1/31 照常上班）
+// R40：2028 年 1 月（無表）：春節 1/25–1/28 標旗子 + 「春節」，週末也標；補假 / 調休不猜（1/24、1/31 照常上班）
 test('2028-01 (no table): 春节 1/25-1/28 marked, summary 17 days, tag text, 6 weeks fit at 1280x585', () =>
   withPage('2028-01-04T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
@@ -595,7 +595,7 @@ test('2028-01 (no table): 春节 1/25-1/28 marked, summary 17 days, tag text, 6 
     }
     assert.match(await cell(page, '1月24日').getAttribute('aria-label'), /^1月24日 周一，工作日/, 'no invented compensation day');
     assert.match(await cell(page, '1月31日').getAttribute('aria-label'), /^1月31日 周一，工作日/, 'no invented extended holiday');
-    // 元旦由《放假办法》的固定日期给出
+    // 元旦由《放假辦法》的固定日期給出
     assert.match(await cell(page, '1月1日').getAttribute('aria-label'), /^1月1日 周六，法定假日（元旦）/);
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 17 天 · 日薪 ¥400.00');
     assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出');
@@ -609,7 +609,7 @@ test('2028-01 (no table): 春节 1/25-1/28 marked, summary 17 days, tag text, 6 
     await shot(page, 'task-16-jan2028.png');
   }));
 
-// 2027 已是内置表：春节连休 2/5–2/13 与 2/14 调休上班都照国务院通知标出
+// 2027 已是內建表：春節連休 2/5–2/13 與 2/14 調休上班都照國務院通知標出
 test('2027-02 (built-in): 春节 2/5-2/13 marked, 2/14 调休上班, summary 15 days, no tag, 4 weeks fit', () =>
   withPage('2027-02-04T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
@@ -619,7 +619,7 @@ test('2027-02 (built-in): 春节 2/5-2/13 marked, 2/14 调休上班, summary 15 
       assert.equal(await cell(page, label).locator('.day-label').textContent(), '春节', `${label} badge: flag + name only (Task 18)`);
       assert.equal(await cell(page, label).locator('.day-label svg.icon-holiday').count(), 1, `${label} flag icon`);
     }
-    // 2/14（周日）是调休上班：仍算工作日，「班」+ 节日名
+    // 2/14（週日）是調休上班：仍算工作日，「班」+ 節日名
     assert.match(await cell(page, '2月14日').getAttribute('aria-label'), /^2月14日 周日，调休上班（春节）/);
     assert.equal(await cell(page, '2月14日').locator('.day-tag').textContent(), '班');
     assert.match(await cell(page, '2月15日').getAttribute('aria-label'), /^2月15日 周一，工作日/, 'the extended holiday ends on 2/13');
@@ -634,7 +634,7 @@ test('2027-02 (built-in): 春节 2/5-2/13 marked, 2/14 调休上班, summary 15 
     await shot(page, 'task-16-feb2027.png');
   }));
 
-// WCAG 对比度：由浏览器实际算出的颜色计算（rgb）
+// WCAG 對比度：由瀏覽器實際算出的顏色計算（rgb）
 const ratio = (a, b) => {
   const lum = (s) => {
     const [r, g, bl] = s.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((c) => c / 255)
@@ -672,7 +672,7 @@ test('contrast ≥ 4.5:1 for weekend / holiday numbers and cell tags (computed f
     assert.ok(ratio(fg, bg) >= 4.5, `paid tag: ${fg} on ${bg}`);
   }));
 
-// H5：手动改成休息的日子不只是一块灰底——要有「休」标签和它的图标，和周末区分开
+// H5：手動改成休息的日子不只是一塊灰底——要有「休」標籤和它的圖示，和週末區分開
 test('H5: a manually-rested workday shows a visible 「休」 tag with its icon', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
@@ -691,7 +691,7 @@ test('H5: a manually-rested workday shows a visible 「休」 tag with its icon'
     console.log(`MEASURE ${JSON.stringify({ case: 'H5 rest tag', ...look })}`);
     assert.ok(look.h >= 12 && look.h <= 16, `same 14px label height as other tags (${look.h})`);
     assert.ok(look.svg >= 10 && look.svg <= 14, `icon rendered at label size (${look.svg})`);
-    // 文字对底色仍 ≥ 4.5:1
+    // 文字對底色仍 ≥ 4.5:1
     const [fg, bg] = await day.locator('.day-tag').evaluate((e) => {
       const b = e.closest('.day');
       return [getComputedStyle(e).color, getComputedStyle(b).backgroundColor];
@@ -701,7 +701,7 @@ test('H5: a manually-rested workday shows a visible 「休」 tag with its icon'
     assert.ok(r >= 4.5, `休 tag: ${fg} on ${bg} = ${r.toFixed(2)}`);
   }));
 
-// M9：旗子是「实心旗面 + 旗杆」，12px 下能认出是旗，不是「P」
+// M9：旗子是「實心旗面 + 旗杆」，12px 下能認出是旗，不是「P」
 test('M9: the holiday icon is a filled flag (solid banner + pole), legible at 12px in cells, legend and pill', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
@@ -720,7 +720,7 @@ test('M9: the holiday icon is a filled flag (solid banner + pole), legible at 12
       console.log(`MEASURE ${JSON.stringify({ case: 'M9 flag', what, ...f })}`);
       assert.equal(f.rects.length, 1, `${what}: the flag has one solid banner rect (not a stroked outline)`);
       const [r] = f.rects;
-      // 16 viewBox 单位换算到实际像素：旗面在 12px 图标里至少 3.5px 宽、2px 高
+      // 16 viewBox 單位換算到實際畫素：旗面在 12px 圖示裡至少 3.5px 寬、2px 高
       const scale = f.px / 16;
       assert.ok(r.w * scale >= 3.5 && r.h * scale >= 2, `${what}: banner is visible at ${f.px}px (${(r.w * scale).toFixed(1)}×${(r.h * scale).toFixed(1)}px)`);
       assert.notEqual(r.fill, 'none', `${what}: banner is filled`);
@@ -729,7 +729,7 @@ test('M9: the holiday icon is a filled flag (solid banner + pole), legible at 12
     }
   }));
 
-// L9：周末的栏头不加粗、不变色——和其它星期几完全一致
+// L9：週末的欄頭不加粗、不變色——和其它星期幾完全一致
 test('L9: weekend column headers look exactly like the other weekdays', () =>
   withPage(T1412, async (page) => {
     const heads = await page.locator('.cal-head .cal-colhead').evaluateAll((els) => els.map((e) => {
@@ -745,7 +745,7 @@ test('L9: weekend column headers look exactly like the other weekdays', () =>
     }
   }));
 
-// L1：大格子（1920×950，格子 ≈163px 宽）日期数字放大到 15px，内边距放宽；小视窗不受影响
+// L1：大格子（1920×950，格子 ≈163px 寬）日期數字放大到 15px，內邊距放寬；小視窗不受影響
 test('L1: in wide cells (≥140px) the date numeral grows to 15px with roomier padding; smaller viewports keep 13px', () =>
   withPage(T1412, async (page) => {
     const read = () => page.locator('.cal-grid button[data-key="2026-11-10"]').evaluate((b) => {
@@ -757,7 +757,7 @@ test('L1: in wide cells (≥140px) the date numeral grows to 15px with roomier p
     for (const [w, ht] of [...VIEWPORTS].reverse()) {
       await page.setViewportSize({ width: w, height: ht });
       const r = await read();
-      // 期望值由实测格子宽度决定（容器查询的阈值就是 140px）：宽格子必须放大，窄格子必须保持原样
+      // 期望值由實測格子寬度決定（容器查詢的閾值就是 140px）：寬格子必須放大，窄格子必須保持原樣
       const wide = r.cellW >= 140;
       console.log(`MEASURE ${JSON.stringify({ case: 'L1 numeral', w, ht, ...r, wide })}`);
       assert.equal(r.fs, wide ? '15px' : '13px', `${w}×${ht}: cell ${r.cellW}px → numeral ${r.fs}`);
@@ -770,21 +770,21 @@ test('L1: in wide cells (≥140px) the date numeral grows to 15px with roomier p
         assert.equal(r.numW, 20, 'base numeral box');
       }
     }
-    // 大格里的 2 位数仍在圆内两侧留 ≥ 2px（用真实墨迹量，见 M6 round 2），这里守住不裁切
+    // 大格里的 2 位數仍在圓內兩側留 ≥ 2px（用真實墨跡量，見 M6 round 2），這裡守住不裁切
     await page.setViewportSize({ width: 1920, height: 950 });
     const clipped = await page.locator('.cal-grid button .day-num').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 0.5).length);
     assert.equal(clipped, 0, 'no numeral overflows its box at 1920×950');
   }));
 
-// M7：未标记的格子悬停时给浅绿反馈；已经带状态的格子（放假 / 带薪 …）保持自己的底色，不被 hover 盖掉
+// M7：未標記的格子懸停時給淺綠反饋；已經帶狀態的格子（放假 / 帶薪 …）保持自己的底色，不被 hover 蓋掉
 test('M7: unmarked cells get a brand-50 hover wash, marked cells keep their own background', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
-    await page.locator('.cal-prev').click(); // 2026-10：同屏有放假格、调休格与普通工作日
+    await page.locator('.cal-prev').click(); // 2026-10：同屏有放假格、調休格與普通工作日
     const bgOf = (key) => page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => getComputedStyle(b).backgroundColor);
     const hoverBg = async (key) => {
       await page.locator(`.cal-grid button[data-key="${key}"]`).hover();
-      // 底色有 120ms 过渡；把过渡关掉再读，免得 page.clock 停住时读到中间值
+      // 底色有 120ms 過渡；把過渡關掉再讀，免得 page.clock 停住時讀到中間值
       const v = await page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => {
         b.style.transition = 'none';
         const c = getComputedStyle(b).backgroundColor;
@@ -799,7 +799,7 @@ test('M7: unmarked cells get a brand-50 hover wash, marked cells keep their own 
     console.log(`MEASURE ${JSON.stringify({ case: 'M7 hover', rest, hovered })}`);
     assert.equal(rest, 'rgb(255, 255, 255)', 'a plain workday is white at rest');
     assert.equal(hovered, 'rgb(240, 253, 244)', 'hover paints brand-50 (#F0FDF4)');
-    // 标记格的底色来自主题变量（默认主题已换成自然绿），所以对照变量值而不是写死十六进制
+    // 標記格的底色來自主題變數（預設主題已換成自然綠），所以對照變數值而不是寫死十六進位制
     const tokenBg = (name) => page.evaluate((n) => {
       const probe = document.createElement('span');
       probe.style.background = `var(${n})`;
@@ -841,7 +841,7 @@ test('Esc back to the cell shows no tooltip; roving tabindex follows the real fo
     const tip = page.locator('.day-tooltip');
     const stops = () => page.locator('.cal-grid button[tabindex="0"]').evaluateAll((els) => els.map((e) => e.dataset.key));
     assert.deepEqual(await stops(), ['2026-11-03'], 'initial tab stop = today');
-    await cell(page, '11月7日').click(); // 鼠标打开
+    await cell(page, '11月7日').click(); // 滑鼠開啟
     assert.deepEqual(await stops(), ['2026-11-07']);
     await page.keyboard.press('Escape');
     assert.equal((await focused(page)).key, '2026-11-07');
@@ -849,17 +849,17 @@ test('Esc back to the cell shows no tooltip; roving tabindex follows the real fo
     await page.clock.runFor(600);
     assert.equal(await tip.isVisible(), false, 'still none after the hover delay');
     assert.deepEqual(await stops(), ['2026-11-07']);
-    // 键盘移动：提示照常立即出现
+    // 鍵盤移動：提示照常立即出現
     await page.keyboard.press('ArrowLeft');
     assert.equal(await tip.isVisible(), true);
     assert.deepEqual(await stops(), ['2026-11-06']);
-    // 用菜单套用（重绘）后，停靠点在套用的那天，且不弹提示
+    // 用選單套用（重繪）後，停靠點在套用的那天，且不彈提示
     await page.keyboard.press('Enter');
     await page.getByRole('menuitemradio', { name: /^带薪假/ }).click();
     assert.equal((await focused(page)).key, '2026-11-06');
     assert.deepEqual(await stops(), ['2026-11-06']);
     assert.equal(await tip.isVisible(), false);
-    // 离开月历再 Tab 回来：回到同一格
+    // 離開月曆再 Tab 回來：回到同一格
     await page.keyboard.press('Shift+Tab');
     assert.equal((await focused(page)).key, null);
     await page.keyboard.press('Tab');
@@ -878,7 +878,7 @@ test('mainland Simplified copy on both tabs (incl. 选单 / 自订 / 未套用),
     await tab(page, '基本设置').click();
     await page.getByRole('button', { name: /高级设置/ }).click();
     assert.match(await text(page, '.adv-summary'), /^自定义数据网址：未设置$/);
-    await page.locator('#btn-example').click(); // Task 14 / R47：格式示例与说明也扫
+    await page.locator('#btn-example').click(); // Task 14 / R47：格式示例與說明也掃
     await scan('settings tab');
   }));
 
@@ -919,7 +919,7 @@ test('changing numbers use tabular digits in the font Chrome actually uses (same
     const ff = await page.locator('#status-card .card-amount').evaluate((e) => [getComputedStyle(e).fontFamily, getComputedStyle(e).fontVariantNumeric]);
     assert.match(ff[0], /^"?Segoe UI"?, system-ui/);
     assert.equal(ff[1], 'tabular-nums');
-    // 实际用到的字体（CDP CSS.getPlatformFontsForNode）
+    // 實際用到的字型（CDP CSS.getPlatformFontsForNode）
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('DOM.enable');
     await cdp.send('CSS.enable');
@@ -932,7 +932,7 @@ test('changing numbers use tabular digits in the font Chrome actually uses (same
     console.log(`MEASURE ${JSON.stringify({ case: 'platformFonts', fonts })}`);
   }));
 
-// ---- Task 12 遗留（在 Task 11 修）----
+// ---- Task 12 遺留（在 Task 11 修）----
 
 test('M6: 「回到今天」 quiet state looks clickable, not disabled: border ≥ 3:1 against the panel, pointer cursor, enabled', () =>
   withPage(T1412, async (page) => {
@@ -977,14 +977,14 @@ test('M2: focus stays on the error-bar button when the bar re-renders (save atte
     const exportBtn = page.locator(`${errorBar} button[data-action="export"]`);
     assert.equal(await exportBtn.isVisible(), true);
     await exportBtn.focus();
-    // 不移动焦点地触发一次保存（例如自动保存 / 其他分页事件）：错误条会重画
+    // 不移動焦點地觸發一次儲存（例如自動儲存 / 其他分頁事件）：錯誤條會重畫
     await page.evaluate(() => {
       const i = document.getElementById('f-salary');
       i.value = '7100';
       i.dispatchEvent(new Event('input', { bubbles: true }));
     });
     assert.equal(await page.evaluate(() => document.activeElement?.dataset?.action ?? document.activeElement?.tagName), 'export', 'focus not lost to BODY');
-    // 按钮组合真的变了才重建（储存恢复 → 错误条消失）
+    // 按鈕組合真的變了才重建（儲存恢復 → 錯誤條消失）
     await page.evaluate(() => { window.__fail = false; });
     await page.getByLabel('月薪').fill('7200');
     assert.equal(await page.locator(errorBar).isVisible(), false);
@@ -1022,13 +1022,13 @@ test('header holds only the title (≈28px); no buttons in the header; the float
     assert.equal(g.bg, 'rgb(21, 128, 61)', 'primary green (#15803D)');
   }, { init: FLOAT_STUB }));
 
-// 三种悬浮状态 × 四种视窗 × 两个分页：左栏（状态卡 / 占位卡 + 按钮 + 说明）都放得下、页面不滚动
+// 三種懸浮狀態 × 四種視窗 × 兩個分頁：左欄（狀態卡 / 佔位卡 + 按鈕 + 說明）都放得下、頁面不滾動
 const floatStates = [
   ['default', FLOAT_STUB, async () => {}],
   ['floating', FLOAT_STUB, async (page) => {
     await page.locator('#btn-float').click();
     await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
-    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; }); // stub 视窗盖在页面左下：截图 / 量测时藏起来（不影响版面）
+    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; }); // stub 視窗蓋在頁面左下：截圖 / 量測時藏起來（不影響版面）
   }],
   ['unsupported', NO_PIP, async () => {}],
 ];
@@ -1068,14 +1068,14 @@ for (const [state, init, act] of floatStates) {
     }, { init }));
 }
 
-// 决定 2 + Task 18（V1）：提示盖在格子本身（±2px），内容置中；「来源」只在放得下时出现（不再按 5 / 6 周一刀切），不盖到下面的格子；键盘聚焦一样
+// 決定 2 + Task 18（V1）：提示蓋在格子本身（±2px），內容置中；「來源」只在放得下時出現（不再按 5 / 6 週一刀切），不蓋到下面的格子；鍵盤聚焦一樣
 async function tipCheck(page, label, lines, how) {
   const c = cell(page, label);
   if (how === 'hover') {
     await c.hover();
     await page.clock.runFor(450);
   } else {
-    await c.focus(); // 程序聚焦不弹提示；用方向键走一格再走回来（键盘聚焦）
+    await c.focus(); // 程式聚焦不彈提示；用方向鍵走一格再走回來（鍵盤聚焦）
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowLeft');
   }
@@ -1094,7 +1094,7 @@ async function tipCheck(page, label, lines, how) {
       gridcell: [cr.left, cr.top, cr.right, cr.bottom].map((v) => Math.round(v * 10) / 10),
       belowTop: below ? Math.round(below.top * 10) / 10 : null,
       lines: shown.map((x) => x.textContent),
-      // 农历行（新）：单独取出，其余行仍按原文比对；格子放不下时整行不显示
+      // 農曆行（新）：單獨取出，其餘行仍按原文比對；格子放不下時整行不顯示
       byClass: Object.fromEntries(['tip-title', 'tip-lunar', 'tip-status', 'tip-source', 'tip-pay'].map((c) => {
         const e = tip.querySelector(`.${c}`);
         return [c, e && getComputedStyle(e).display !== 'none' && e.getClientRects().length ? e.textContent : null];
@@ -1126,7 +1126,7 @@ for (const how of ['hover', 'keyboard']) {
           assert.equal(r.hidden, false, `${month} @${w}: shown`);
           assert.equal(r.inCell, true, 'rendered inside the cell');
           for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2, `${month} @${w}: tooltip edge ${i} ${r.tip[i]} within ±2px of the cell ${r.cell[i]}`);
-          // 新增的农历行（.tip-lunar）在日期之后；放不下时整行不显示 → 原样的三 / 四行断言仍逐字成立
+          // 新增的農曆行（.tip-lunar）在日期之後；放不下時整行不顯示 → 原樣的三 / 四行斷言仍逐字成立
           const base = r.lines.filter((l) => !LUNAR_LINE.test(l));
           const lunarShown = r.lines.length > base.length;
           assert.ok(!lunarShown || (r.lines.length === base.length + 1 && r.lines[1] === r.byClass['tip-lunar']), `${month} @${w}: one lunar line, right under the date (${JSON.stringify(r.lines)})`);
@@ -1134,7 +1134,7 @@ for (const how of ['hover', 'keyboard']) {
           assert.deepEqual([base[0], base[1], base.at(-1)], [lines[0], lines[1], lines[3]], `${month} @${w}: date / status / pay lines`);
           if (base.length === 4) assert.equal(r.byClass['tip-source'], lines[2], `${month} @${w}: source line text`);
           assert.ok(base.length >= 3 && base.length <= 4, `${month} @${w}: ${base.length} lines (excluding lunar)`);
-          // 5 周月份在 ≥ 1366 放得下第 4 行；那一行现在可能是来源，也可能是农历（来源先让位）
+          // 5 周月份在 ≥ 1366 放得下第 4 行；那一行現在可能是來源，也可能是農曆（來源先讓位）
           if (month === '2026-10' && w >= 1366) assert.ok(r.lines.length >= 4, `${month} @${w}: 5-week month at ≥ 1366 has room for a 4th line: ${JSON.stringify(r.lines)}`);
           assert.equal(r.byClass['tip-title'], lines[0], `${month} @${w}: the date line is always shown`);
           assert.equal(r.byClass['tip-pay'], lines[3], `${month} @${w}: the pay line is always shown`);
@@ -1174,7 +1174,7 @@ test('tooltip with error + info banners at 1280×585: the 5-week cell is shorter
     for (let i = 0; i < 4; i++) assert.ok(Math.abs(r.tip[i] - r.cell[i]) <= 2);
   }, corruptThenQuota));
 
-// 决定 4：摘要行情境胶囊——依据如实写；无表年份不声称官方来源
+// 決定 4：摘要行情境膠囊——依據如實寫；無表年份不聲稱官方來源
 const pill = (page) => page.locator('.cal-summary .cal-note').evaluate((e) => ({
   text: e.textContent, tone: e.dataset.tone, title: e.title,
   check: Boolean(e.querySelector('.icon-check')), flag: Boolean(e.querySelector('.icon-holiday')),
@@ -1199,11 +1199,11 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
     assert.equal(oct.title, '国庆 10/1–10/7 放假，10/10 调休上班 · 依据 2026 年国务院放假通知');
     await shot(page, 'task-14-calendar-oct-1280x585.png');
     assert.ok(await summaryOneLine(page) <= 30);
-    // 2025（无表、已过去，fixed 年份）：不显示缺表标签，胶囊说 app 只标了固定日期的法定假日（R49）
+    // 2025（無表、已過去，fixed 年份）：不顯示缺表標籤，膠囊說 app 只標了固定日期的法定假日（R49）
     for (let i = 0; i < 12; i++) await page.locator('.cal-prev').click();
     assert.equal(await text(page, '.cal-title'), '2025 年 10 月');
     const past = await pill(page);
-    // round 2：所有无表年份的「依据」都只放在 title（与当年以后的年份同一种写法）
+    // round 2：所有無表年份的「依據」都只放在 title（與當年以後的年份同一種寫法）
     assert.equal(past.text, '国庆 10/1–10/3 放假');
     assert.equal(past.title, '国庆 10/1–10/3 放假 · 按《放假办法》只标出固定日期的法定假日；其余假日和补假、调休未标出');
     assert.equal(past.cut, false, 'fits at 1280');
@@ -1218,7 +1218,7 @@ test('summary pill: 2026-11 (no holidays, built-in), 2026-10 (国庆 + make-up d
   }));
 
 test('summary pill + tag: 2027 (built-in 国务院 notice: 元旦 + 春节调休, 劳动节, 中秋 / 国庆) and 2028 (no table: only the statutory dates)', async () => {
-  // 2027 是内置表：照实说放假与调休，不再挂缺表标签
+  // 2027 是內建表：照實說放假與調休，不再掛缺表標籤
   await withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     await page.locator('.cal-next').click();
@@ -1239,7 +1239,7 @@ test('summary pill + tag: 2027 (built-in 国务院 notice: 元旦 + 春节调休
     const mar = await pill(page);
     assert.deepEqual([mar.text, mar.tone, mar.check, mar.border], ['本月没有法定假日', 'none', true, 'none'], 'a table month without holidays is a known 「none」, not 「unknown」');
     assert.equal(mar.title, '本月没有法定假日 · 依据 2027 年国务院放假通知');
-    // 2027-05（6 周）与 2027-10：劳动节 / 国庆的长假 + 调休都在内置表里
+    // 2027-05（6 周）與 2027-10：勞動節 / 國慶的長假 + 調休都在內建表裡
     await page.locator('.cal-next').click();
     await page.locator('.cal-next').click();
     assert.equal(await text(page, '.cal-title'), '2027 年 5 月');
@@ -1251,7 +1251,7 @@ test('summary pill + tag: 2027 (built-in 国务院 notice: 元旦 + 春节调休
     assert.equal((await pill(page)).text, '国庆 10/1–10/7 放假，10/9 调休上班');
     assert.equal(await tagText(page), null);
   });
-  // 2028 没有年度表：只标《放假办法》的法定日期，标签与胶囊都说清楚补假 / 调休未标出
+  // 2028 沒有年度表：只標《放假辦法》的法定日期，標籤與膠囊都說清楚補假 / 調休未標出
   await withPage('2028-01-04T10:00:00+08:00', async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     const jan = await pill(page);
@@ -1265,7 +1265,7 @@ test('summary pill + tag: 2027 (built-in 国务院 notice: 元旦 + 春节调休
     assert.deepEqual([feb.text, feb.tone, feb.check, feb.border], ['本月没有已标出的法定假日', 'unknown', false, 'dashed']);
     assert.doesNotMatch(feb.text + feb.title, /国务院|依据/);
     assert.equal(await tagText(page), '2028 年只标了法定假日，补假和调休未标出');
-    // 2028-10（6 周）只标国庆的前三天
+    // 2028-10（6 周）只標國慶的前三天
     for (let i = 0; i < 8; i++) await page.locator('.cal-next').click();
     assert.equal(await text(page, '.cal-title'), '2028 年 10 月');
     const oct = await pill(page);
@@ -1286,17 +1286,17 @@ test('summary pill + tag: 2027 (built-in 国务院 notice: 元旦 + 春节调休
   });
 });
 
-// 联网 / 导入的年份：依据写数据的真实来源（自己开页面：联网成功时开页只会请求第一个来源，与 withPage 的「全部被中止」前提不同）
-// 2027 已内置，不会自动检查；2028 起才是「靠联网 / 导入拿到年度表」的年份
+// 聯網 / 匯入的年份：依據寫資料的真實來源（自己開頁面：聯網成功時開頁只會請求第一個來源，與 withPage 的「全部被中止」前提不同）
+// 2027 已內建，不會自動檢查；2028 起才是「靠聯網 / 匯入拿到年度表」的年份
 const FILE2028 = JSON.stringify({
   year: 2028, papers: ['https://www.gov.cn/zhengce/test-2028.htm'],
   days: [{ name: '元旦', date: '2028-01-01', isOffDay: true }, { name: '元旦', date: '2028-01-02', isOffDay: true }, { name: '元旦', date: '2028-01-03', isOffDay: true }],
-}); // 虚构的测试数据，只为满足校验规则
+}); // 虛構的測試資料，只為滿足校驗規則
 test('summary pill for an online-table year and for an imported-file year: 「依据联网取得的…」 / 「依据导入的…」', async () => {
   for (const mode of ['online', 'file']) {
     const o = await openAt(browser, server.url, '2027-11-04T09:00:00+08:00', {
       viewport: { width: 1280, height: 585 },
-      init: CN_SEED, // 中国地区才有「联网 / 导入」的年份来源（内置 + 国务院公告）
+      init: CN_SEED, // 中國地區才有「聯網 / 匯入」的年份來源（內建 + 國務院公告）
       beforeGoto: (page) => (mode === 'online'
         ? page.route(/cdn\.jsdelivr\.net\/.*\/2028\.json/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FILE2028, headers: { 'access-control-allow-origin': '*' } }))
         : Promise.resolve()),
@@ -1332,7 +1332,7 @@ test('summary pill for an online-table year and for an imported-file year: 「�
   }
 });
 
-// 显示设置增加后右栏可滚动；展开内容仍须进入视野，左栏保持独立。
+// 顯示設定增加後右欄可滾動；展開內容仍須進入視野，左欄保持獨立。
 test('基本设置: expanding 格式示例 / 高级设置 scrolls only the right column, content brought into view', () =>
   withPage(T1412, async (page) => {
     const cols = () => page.evaluate(() => {
@@ -1346,7 +1346,7 @@ test('基本设置: expanding 格式示例 / 高级设置 scrolls only the right
     const inView = (sel) => page.evaluate((s) => {
       const col = document.querySelectorAll('.set-col')[1].getBoundingClientRect();
       const e = document.querySelector(s).getBoundingClientRect();
-      // 顶端在右栏视野内；放得下就整个在视野内（比右栏还高的示例：只要求从顶端开始看得到）
+      // 頂端在右欄視野內；放得下就整個在視野內（比右欄還高的示例：只要求從頂端開始看得到）
       const fits = e.height <= col.height;
       return e.height > 0 && e.top >= col.top - 0.5 && (fits ? e.bottom <= col.bottom + 0.5 : e.top < col.bottom);
     }, sel);
@@ -1382,7 +1382,7 @@ test('基本设置: expanding 格式示例 / 高级设置 scrolls only the right
         await page.locator('.cal-today').click();
       }
     }
-    // 键盘：两个展开钮都可用 Enter / Space 操作
+    // 鍵盤：兩個展開鈕都可用 Enter / Space 操作
     await tab(page, '基本设置').click();
     await page.locator('#btn-example').focus();
     await page.keyboard.press('Enter');
@@ -1409,14 +1409,14 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
       [{ heading: 'H2', name: '工资与上班时间' }, { heading: 'H2', name: '画面设置' }],
       [{ heading: 'H2', name: '假期数据' }, { heading: 'H2', name: '数据与备份' }, { heading: 'H2', name: '高级设置' }],
     ]);
-    // 标签对齐同一条竖线；控件从同一条竖线开始
+    // 標籤對齊同一條豎線；控制元件從同一條豎線開始
     const lines = await page.evaluate(() => [...document.querySelectorAll('.section-pay .row')].filter((r) => !r.hidden).map((r) => [Math.round(r.querySelector('.row-label').getBoundingClientRect().left), Math.round(r.querySelector('.row-ctrl').getBoundingClientRect().left)]));
     assert.equal(new Set(lines.map((x) => x[0])).size, 1, `labels aligned: ${JSON.stringify(lines)}`);
     assert.equal(new Set(lines.map((x) => x[1])).size, 1, `controls aligned: ${JSON.stringify(lines)}`);
-    // 行的顺序与名称（新增「地区」一行，两地月薪与标记分开保存）；标签文本来自当前地区字典
+    // 行的順序與名稱（新增「地區」一行，兩地月薪與標記分開儲存）；標籤文本來自當前地區字典
     assert.deepEqual(await page.locator('.section-pay .row-label').allTextContents(), ['地区', '月薪', '发薪日', '上下班时间', '午休', '午休时间', '周末上班']);
     assert.deepEqual((await page.locator('.section-display .row-label').allTextContents()).slice(0, 2), ['主题色', '鼓励语']);
-    // 名称与描述
+    // 名稱與描述
     assert.equal(await page.getByRole('textbox', { name: '月薪' }).count(), 1);
     assert.equal(await page.getByRole('combobox', { name: '发薪日' }).count(), 1);
     assert.equal(await page.getByRole('group', { name: '上下班时间' }).count(), 1);
@@ -1429,7 +1429,7 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     assert.equal(await text(page, '#hint-holiday-check'), '联网获取新公布的放假安排');
     assert.equal(await text(page, '#hint-holiday-import'), '连不上网时，用文件导入');
     assert.equal(await text(page, '.section-backup .scard-desc'), '设置只保存在这个浏览器里，不会上传。');
-    // 两段白话：备份里有什么 / 不包含什么（顺序即阅读顺序）
+    // 兩段白話：備份裡有什麼 / 不包含什麼（順序即閱讀順序）
     assert.deepEqual(await page.locator('.section-backup .para').allTextContents(), [
       '备份文件含月薪、上下班时间、主题色和月历标记。换电脑或清除浏览数据前导出，之后用「导入备份」恢复。',
       '备份不含联网取得或导入的假期表和自定义数据网址。',
@@ -1438,18 +1438,18 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     assert.equal(await text(page, '.adv-sub'), '一般不用改');
     assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
     assert.deepEqual(await page.locator('#holiday-status .chip').allTextContents(), ['2026 年 · 内置', '2027 年 · 内置']);
-    // 格式示例：真实 2026 节选、GitHub 地址是文字不是链接
+    // 格式示例：真實 2026 節選、GitHub 地址是文字不是連結
     await page.locator('#btn-example').click();
     assert.equal(await text(page, '#btn-example'), '▾收起导入文件的格式示例');
     assert.match(await page.locator('#holiday-example-code').textContent(), /"date":"2026-01-04",\s*"isOffDay":false/);
     assert.equal(await page.locator('#holiday-example a').count(), 0, 'no link');
     assert.equal(await text(page, '#holiday-example .mono'), 'github.com/NateScarlet/holiday-cn');
-    // 高级设置展开：白话说明 + 输入框 + 格式提示
+    // 進階設定展開：白話說明 + 輸入框 + 格式提示
     await page.locator('#adv-toggle').click();
     assert.equal(await page.getByRole('textbox', { name: '自定义数据网址' }).getAttribute('aria-describedby'), 'explain-custom-url hint-custom-url err-custom-url');
     assert.equal(await text(page, '#hint-custom-url'), '必须以 https:// 开头，用 {year} 代表年份。网址返回的内容要和「格式示例」格式相同。');
     assert.equal(await text(page, '#explain-custom-url'), '默认先从 jsDelivr、再从 GitHub 获取假期数据。连不上时，可以填写你自己存放文件的网址。留空则使用默认来源。');
-    // 「显示农历」开关与农历数据来源说明都在高级设置里（不在工资卡、也不在假期数据卡本体）
+    // 「顯示農曆」開關與農曆資料來源說明都在進階設定裡（不在工資卡、也不在假期資料卡本體）
     assert.equal(await page.locator('.section-pay').getByRole('switch', { name: '显示农历' }).count(), 0, 'not in the pay card');
     assert.equal(await page.locator('.section-holiday .scard-body').getByRole('switch', { name: '显示农历' }).count(), 0, 'not in the holiday card body');
     const lunarSwitch = page.locator('#adv-body').getByRole('switch', { name: '显示农历' });
@@ -1459,8 +1459,8 @@ test('基本设置 structure: two columns of <section aria-labelledby> cards wit
     assert.equal(await page.locator('#adv-body').evaluate((b) => b.lastElementChild.className.includes('adv-source')), true, 'the source note is the last line of the advanced body');
   }));
 
-// R47「复制示例」：clipboard.writeText 成功 → 「已复制」（剪贴板里就是示例全文）；被拒绝（CDP 把 clipboard-write 设为 denied）
-// 或不可用 → 选中整段示例并提示「已选中示例，请按 Ctrl+C 复制」
+// R47「複製示例」：clipboard.writeText 成功 → 「已複製」（剪貼簿裡就是示例全文）；被拒絕（CDP 把 clipboard-write 設為 denied）
+// 或不可用 → 選中整段示例並提示「已選中示例，請按 Ctrl+C 複製」
 test('复制示例 (R47): granted → 「已复制」 and the clipboard holds the full example; denied / unavailable → selection + Ctrl+C note', async () => {
   for (const mode of ['granted', 'denied', 'unavailable']) {
     await withPage(T1412, async (page) => {
@@ -1468,7 +1468,7 @@ test('复制示例 (R47): granted → 「已复制」 and the clipboard holds th
       if (mode === 'granted') await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
       let cdp = null;
       if (mode === 'denied') {
-        // 覆盖只在这个 CDP 会话存续期间有效：测试结束才 detach
+        // 覆蓋只在這個 CDP 會話存續期間有效：測試結束才 detach
         cdp = await browser.newBrowserCDPSession();
         const { browserContextIds } = await cdp.send('Target.getBrowserContexts');
         for (const id of browserContextIds) await cdp.send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'denied', origin, browserContextId: id });
@@ -1477,7 +1477,7 @@ test('复制示例 (R47): granted → 「已复制」 and the clipboard holds th
       await page.locator('#btn-example').click();
       const code = await page.locator('#holiday-example-code').textContent();
       await page.locator('#btn-example-copy').click();
-      // 结果先清空、100ms 后再写（连续复制会重新朗读）：让暂停的时钟走一点
+      // 結果先清空、100ms 後再寫（連續複製會重新朗讀）：讓暫停的時鐘走一點
       for (let i = 0; i < 40 && !(await text(page, '.example-copy-state')); i++) { await page.clock.runFor(50); await new Promise((r) => setTimeout(r, 25)); }
       const state = page.locator('.example-copy-state');
       assert.equal(await state.getAttribute('role'), 'status', 'one polite live message');
@@ -1494,14 +1494,14 @@ test('复制示例 (R47): granted → 「已复制」 and the clipboard holds th
   }
 });
 
-// R47：示例下方的白话说明（五行 + GitHub 地址 + 官方来源），地址与来源是可选取的文字、不是链接
+// R47：示例下方的白話說明（五行 + GitHub 地址 + 官方來源），地址與來源是可選取的文字、不是連結
 test('R47: the format help under the example lists year / papers / days / off-day rule, the GitHub address and the official source as text', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 585 });
     await tab(page, '基本设置').click();
     await page.locator('#btn-example').click();
-    // 示例逐行说明由固定数量的节点复用（多出来的行带 hidden）；只比可见行，既能验证没有漏字，
-    // 也不会把没用的占位节点当成空行。
+    // 示例逐行說明由固定數量的節點複用（多出來的行帶 hidden）；只比可見行，既能驗證沒有漏字，
+    // 也不會把沒用的佔位節點當成空行。
     const lines = await page.locator('#holiday-example .ex-line:not([hidden])').allTextContents();
     assert.deepEqual(lines, [
       '文件为 holiday-cn 格式的年度 JSON（例如 2027.json）。',
@@ -1522,7 +1522,7 @@ test('R47: the format help under the example lists year / papers / days / off-da
     assert.equal(await page.locator('#f-theme').isVisible(), true, 'theme remains reachable with example expanded');
   }));
 
-// 新元素的对比度（浏览器实际算出的颜色）：文字 ≥ 4.5:1
+// 新元素的對比度（瀏覽器實際算出的顏色）：文字 ≥ 4.5:1
 test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip lines, float notes, disabled float button, disclosure)', async () => {
   const bgOf = (el) => {
     for (let e = el; e; e = e.parentElement) {
@@ -1577,7 +1577,7 @@ test('contrast ≥ 4.5:1 for the new elements (chips, hints, pill, tag, tooltip 
 
 // ---- Task 14 fix round 1 · Block A（R51 / R52）----
 
-// A1：1000–1199px 宽时设置分页变成单栏：所有卡片都必须能在分页内部滚动到（分页标签不动、页面不滚）
+// A1：1000–1199px 寬時設定分頁變成單欄：所有卡片都必須能在分頁內部滾動到（分頁標籤不動、頁面不滾）
 async function scrollSettingsToBottom(page) {
   return page.evaluate(() => {
     const sp = document.getElementById('panel-settings');
@@ -1609,7 +1609,7 @@ test('A1: at 1100×700, 1093×535 and 1000×600 every settings card is reachable
       assert.equal(r.tabs, true, `${w}x${ht}: tab labels visible`);
       assert.equal(r.pageScroll, false, `${w}x${ht}: page does not scroll`);
     }
-    // 1024×468（设置分页）：页面不滚动。月历分页在这个高度放不下 6 行 × 40px 的最小行高（spec §13.1），只记录量测值
+    // 1024×468（設定分頁）：頁面不滾動。月曆分頁在這個高度放不下 6 行 × 40px 的最小行高（spec §13.1），只記錄量測值
     await page.setViewportSize({ width: 1024, height: 468 });
     for (const tb of ['基本设置', '月历']) {
       await tab(page, tb).click();
@@ -1623,7 +1623,7 @@ test('A1: at 1100×700, 1093×535 and 1000×600 every settings card is reachable
     }
   }));
 
-// A2：Windows 常驻卷轴（12 / 17px）+ 错误条 + 信息条，1280×585 默认状态左栏不得溢出
+// A2：Windows 常駐卷軸（12 / 17px）+ 錯誤條 + 資訊條，1280×585 預設狀態左欄不得溢位
 for (const sb of [17, 12]) {
   test(`A2: classic ${sb}px scrollbars at 1280×585 with error + info banners: the left settings column does not overflow`, () =>
     withPage(T1412, async (page) => {
@@ -1647,17 +1647,17 @@ for (const sb of [17, 12]) {
     }, corruptThenQuota));
 }
 
-// A3（R52）：悬浮中占位卡的高度跟着「此刻」卡片该有的高度（视窗跨过 640px 时不跳）；不支持时按钮是 aria-disabled 且可聚焦
+// A3（R52）：懸浮中佔位卡的高度跟著「此刻」卡片該有的高度（視窗跨過 640px 時不跳）；不支援時按鈕是 aria-disabled 且可聚焦
 test('A3: while floating the placeholder height follows the live card height across the 640px breakpoint (no jump on recall)', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 700 });
     await page.locator('#btn-float').click();
     await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
-    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; }); // stub 视窗盖在左下，会挡住按钮的点击
+    await page.evaluate(() => { document.querySelector('iframe.pip-stub').style.visibility = 'hidden'; }); // stub 視窗蓋在左下，會擋住按鈕的點選
     const ph = () => page.locator('.pip-placeholder').evaluate((e) => Math.round(e.getBoundingClientRect().height * 10) / 10);
     const tall = await ph();
     await page.setViewportSize({ width: 1280, height: 585 });
-    await page.clock.runFor(100); // resize 事件在下一次渲染更新时派发：让暂停的时钟走一点
+    await page.clock.runFor(100); // resize 事件在下一次渲染更新時派發：讓暫停的時鐘走一點
     await new Promise((r) => setTimeout(r, 100));
     const short = await ph();
     await page.locator('#btn-float').click(); // 收回
@@ -1677,7 +1677,7 @@ test('A3: unsupported browser — float button is aria-disabled (not native disa
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'btn-float', 'focusable');
     await page.keyboard.press('Enter');
     await page.keyboard.press(' ');
-    await b.click({ force: true }); // Playwright 把 aria-disabled 视为不可点：强制派发真实点击
+    await b.click({ force: true }); // Playwright 把 aria-disabled 視為不可點：強制派發真實點選
     await b.evaluate((e) => e.click());
     assert.equal(await page.locator('#card-slot #status-card').count(), 1, 'nothing happened');
     assert.equal(await page.locator('.pip-placeholder').isVisible(), false);
@@ -1687,7 +1687,7 @@ test('A3: unsupported browser — float button is aria-disabled (not native disa
 
 // ---- Task 14 fix round 1 · Block B ----
 
-// B1（WCAG 2.4.11）：按下「查看导入文件的格式示例」后，获得焦点的展开钮仍在右栏的可见范围内（示例比右栏高时也一样）
+// B1（WCAG 2.4.11）：按下「檢視匯入檔案的格式示例」後，獲得焦點的展開鈕仍在右欄的可見範圍內（示例比右欄高時也一樣）
 test('B1: after expanding the example the focused toggle stays inside the visible rect of every scroller around it (two-column 1280×585, 1366×650; single-column 1100×520, 1093×535, 1024×468)', () =>
   withPage(T1412, async (page) => {
     for (const [w, ht] of [[1280, 585], [1366, 650], [1100, 520], [1093, 535], [1024, 468]]) {
@@ -1698,7 +1698,7 @@ test('B1: after expanding the example the focused toggle stays inside the visibl
         else if (how === 'keyboard') { await page.locator('#btn-example').focus(); await page.keyboard.press('Enter'); }
         else { await page.locator('#adv-toggle').click(); await page.locator('#btn-adv-example').click(); }
         const r = await page.evaluate(() => {
-          // 可见范围 = 视窗与所有可滚动祖先（两栏时是右栏，单栏时是 .settings）的交集
+          // 可見範圍 = 視窗與所有可滾動祖先（兩欄時是右欄，單欄時是 .settings）的交集
           const btn = document.getElementById('btn-example');
           let top = 0;
           let bottom = innerHeight;
@@ -1715,7 +1715,7 @@ test('B1: after expanding the example the focused toggle stays inside the visibl
         console.log(`MEASURE ${JSON.stringify({ case: 'B1 toggle in view', w, ht, how, ...r })}`);
         assert.equal(r.focus, 'btn-example', `${w} ${how}: focus on the toggle`);
         assert.equal(r.inView, true, `${w} ${how}: focused toggle ${r.t} inside the column ${r.col}`);
-        // 收起，回到初始状态
+        // 收起，回到初始狀態
         await page.locator('#btn-example').click();
         if (how === 'help') await page.locator('#adv-toggle').click();
         await page.evaluate(() => document.querySelectorAll('.set-col, .settings').forEach((c) => { c.scrollTop = 0; }));
@@ -1733,7 +1733,7 @@ test('B minors: chip group is announced once (aria-label only, no duplicate text
       exposed: [...e.childNodes].filter((n) => n.nodeType === 1 && n.getAttribute('aria-hidden') !== 'true').map((n) => n.className),
     }));
     assert.equal(st.aria, '假期数据状态：2026 年 · 内置 · 2027 年 · 内置 · 上次检查 11/03');
-    // fix round 2：只保留一份（分组名称）；可见的胶囊对读屏隐藏，没有重复的隐藏文字
+    // fix round 2：只保留一份（分組名稱）；可見的膠囊對讀屏隱藏，沒有重複的隱藏文字
     assert.equal(st.sr, null, 'no visually-hidden duplicate of the group name');
     assert.deepEqual(st.exposed, [], 'chips / last-check are aria-hidden: the sentence is announced once');
     assert.equal(await text(page, '.section-backup .backup-scope'), '备份不含联网取得或导入的假期表和自定义数据网址。');
@@ -1757,15 +1757,15 @@ test('B minors: chip group is announced once (aria-label only, no duplicate text
 
 // ---- Task 14 fix round 1 · Block C（R49 / R50）----
 
-// R50：提示的每一行都不被省略号截断（scrollWidth ≤ clientWidth）：2026 年全部 7 个节日的放假 / 调休、今天、带薪 / 无薪 / 手动标记，
-// 四种视窗；5 周月份用内置 2026 表，6 周月份（2027-05 内置、2028-07 用导入的测试表）都覆盖
+// R50：提示的每一行都不被省略號截斷（scrollWidth ≤ clientWidth）：2026 年全部 7 個節日的放假 / 調休、今天、帶薪 / 無薪 / 手動標記，
+// 四種視窗；5 周月份用內建 2026 表，6 周月份（2027-05 內建、2028-07 用匯入的測試表）都覆蓋
 const WIDTH2028 = JSON.stringify({
   year: 2028, papers: ['https://www.gov.cn/zhengce/test-width-2028.htm'],
   days: [
     ...['元旦', '春节', '清明', '劳动节', '端午', '中秋', '国庆'].map((n, i) => ({ name: n, date: `2028-07-${String(3 + i).padStart(2, '0')}`, isOffDay: true })),
     ...[['元旦', '01'], ['春节', '02'], ['清明', '15'], ['劳动节', '16'], ['端午', '22'], ['中秋', '23'], ['国庆', '29']].map(([n, d]) => ({ name: n, date: `2028-07-${d}`, isOffDay: false })),
   ],
-}); // 2028-07-01 是周六；所有调休日都在周六 / 周日
+}); // 2028-07-01 是週六；所有調休日都在週六 / 週日
 async function tipLines(page, key) {
   const c = page.locator(`.cal-grid button[data-key="${key}"]`);
   await c.hover();
@@ -1802,7 +1802,7 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     await page.locator('#holiday-file').setInputFiles({ name: '2028.json', mimeType: 'application/json', buffer: Buffer.from(WIDTH2028) });
     await page.locator('#holiday-result[data-tone="success"]').waitFor();
     await tab(page, '月历').click();
-    // 手动标记：11/5 带薪假、11/6 无薪假、11/7（周六）改为上班、11/9 改为休息
+    // 手動標記：11/5 帶薪假、11/6 無薪假、11/7（週六）改為上班、11/9 改為休息
     for (const [label, re] of [['11月5日', /^带薪假/], ['11月6日', /^无薪假/], ['11月7日', /改为上班/], ['11月9日', /改为休息/]]) {
       await cell(page, label).click();
       await page.getByRole('menuitemradio', { name: re }).click();
@@ -1813,9 +1813,9 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     ];
     const months = [
       ...builtin,
-      ['2026-11', ['2026-11-03', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-09', '2026-11-18']], // 6 周：今天 / 带薪 / 无薪 / 手动上班 / 手动休息 / 工作日
-      ['2027-05', ['2027-05-01', '2027-05-03', '2027-05-05', '2027-05-08']], // 6 周（内置表）：劳动节连休 + 5/8 调休上班，来源是长文案「内置·官方通知」
-      ['2028-07', ['2028-07-03', '2028-07-04', '2028-07-05', '2028-07-06', '2028-07-07', '2028-07-08', '2028-07-09', '2028-07-01', '2028-07-02', '2028-07-15', '2028-07-16', '2028-07-22', '2028-07-23', '2028-07-29']], // 6 周：7 个节日名的放假与调休
+      ['2026-11', ['2026-11-03', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-09', '2026-11-18']], // 6 周：今天 / 帶薪 / 無薪 / 手動上班 / 手動休息 / 工作日
+      ['2027-05', ['2027-05-01', '2027-05-03', '2027-05-05', '2027-05-08']], // 6 周（內建表）：勞動節連休 + 5/8 調休上班，來源是長文案「內建·官方通知」
+      ['2028-07', ['2028-07-03', '2028-07-04', '2028-07-05', '2028-07-06', '2028-07-07', '2028-07-08', '2028-07-09', '2028-07-01', '2028-07-02', '2028-07-15', '2028-07-16', '2028-07-22', '2028-07-23', '2028-07-29']], // 6 周：7 個節日名的放假與調休
     ];
     const go = async (ym) => {
       const [y, m] = ym.split('-').map(Number);
@@ -1842,9 +1842,9 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
           if (r.maxOff > 1) geo.push(`${w}x${ht} ${key}: a line is ${r.maxOff} off-centre`);
           minPadDiff = Math.max(minPadDiff, r.padDiff);
           maxOff = Math.max(maxOff, r.maxOff);
-          // 完整文字（含来源与「点击修改」）在 aria-describedby
+          // 完整文字（含來源與「點選修改」）在 aria-describedby
           assert.match(r.desc, /来源：.+，当日计薪 .+，点击修改$/, `${key}: full text in aria-describedby`);
-          // 农历始终在 aria-describedby；可见时与它逐字一致，且紧跟日期行
+          // 農曆始終在 aria-describedby；可見時與它逐字一致，且緊跟日期行
           assert.ok(r.descLunar, `${key} @${w}: lunar date in aria-describedby (${r.desc})`);
           if (r.lunar !== null) {
             assert.equal(r.lunar, r.descLunar, `${key} @${w}: visible lunar matches the accessible one`);
@@ -1856,7 +1856,7 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     console.log(`MEASURE ${JSON.stringify({ case: 'R50 tooltip widths', checked, cuts, geo, worstPadDiff: minPadDiff, worstOffCentre: maxOff })}`);
     assert.deepEqual(cuts, [], 'no truncated or clipped tooltip line');
     assert.deepEqual(geo, [], 'content centred: top / bottom padding differ ≤ 1px, every line centred ≤ 1px');
-    // 状态行的短写（农历行单独取出后逐字比对；农历行出现时必须在日期之后，文字固定）
+    // 狀態行的短寫（農曆行單獨取出後逐字比對；農曆行出現時必須在日期之後，文字固定）
     const r50 = async (key) => {
       const r = await tipLines(page, key);
       const base = r.lines.map((l) => l.text).filter((t) => !LUNAR_LINE.test(t));
@@ -1868,7 +1868,7 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     await page.setViewportSize({ width: 1280, height: 585 });
     await go('2026-05');
     const may1 = await r50('2026-05-01');
-    // 2026-05 是 6 周月份、1280×585：日期 / 状态 / 计薪 必须都在；第 4 行若出现只能是来源（农历行已单独取出）
+    // 2026-05 是 6 周月份、1280×585：日期 / 狀態 / 計薪 必須都在；第 4 行若出現只能是來源（農曆行已單獨取出）
     assert.deepEqual([may1.base[0], may1.base[1], may1.base.at(-1)], ['5月1日 周五', '法定假日·劳动节', '计薪 ¥0.00'], `lines: ${JSON.stringify(may1.base)}`);
     assert.ok(may1.base.length === 3 || (may1.base.length === 4 && may1.base[2] === '内置·官方通知'), `lines: ${JSON.stringify(may1.base)}`);
     if (may1.lunar.length) assert.equal(may1.lunar[0], '农历三月十五', 'lunar line text');
@@ -1878,7 +1878,7 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     await page.setViewportSize({ width: 1366, height: 650 });
     await go('2026-10');
     const oct1 = await r50('2026-10-01');
-    // 5 周月份、1366×650：放得下第 4 行（来源，或先让位给农历）
+    // 5 周月份、1366×650：放得下第 4 行（來源，或先讓位給農曆）
     assert.deepEqual([oct1.base[0], oct1.base[1], oct1.base.at(-1)], ['10月1日 周四', '法定假日·国庆', '计薪 ¥0.00'], `lines: ${JSON.stringify(oct1.base)}`);
     assert.ok(oct1.base.length === 3 || (oct1.base.length === 4 && oct1.base[2] === '内置·官方通知'), `lines: ${JSON.stringify(oct1.base)}`);
     assert.ok(oct1.base.length + oct1.lunar.length >= 4, `5-week month has a 4th line at 1366×650: ${JSON.stringify(oct1.base)}`);
@@ -1890,8 +1890,8 @@ test('R50: no tooltip line is truncated — every 2026 festival (off + make-up),
     if (nov3.lines.some((l) => LUNAR_LINE.test(l.text))) assert.equal(nov3.lines[1].text, '农历九月廿五', 'lunar line text');
   }));
 
-// Task 18：每一种提示（工作日 / 今天 / 周末 / 休息 / 法定假日 / 调休上班 / 带薪 / 无薪 / 手动标记 / 计薪为 0）的每个文字对白底 ≥ 4.5:1（由渲染后的颜色实算），
-// 在最大（1920×950）与最窄（1000×700，最小字号）视窗各量一次
+// Task 18：每一種提示（工作日 / 今天 / 週末 / 休息 / 法定假日 / 調休上班 / 帶薪 / 無薪 / 手動標記 / 計薪為 0）的每個文字對白底 ≥ 4.5:1（由渲染後的顏色實算），
+// 在最大（1920×950）與最窄（1000×700，最小字號）視窗各量一次
 test('Task 18: tooltip text contrast ≥ 4.5:1 on its white card for every variant (computed from rendered colours)', () =>
   withPage(T1412, async (page) => {
     for (const [label, re] of [['11月5日', /^带薪假/], ['11月6日', /^无薪假/], ['11月7日', /改为上班/], ['11月9日', /改为休息/]]) {
@@ -1929,8 +1929,8 @@ test('Task 18: tooltip text contrast ≥ 4.5:1 on its white card for every varia
     console.log(`MEASURE ${JSON.stringify({ case: 'Task 18 tooltip contrast', variants: variants.length * 2, worst: +worst.toFixed(2) })}`);
   }));
 
-// Task 18：格子标签——法定假日只有旗子 + 节日名（没有「假」字）；调休上班保留「班」+ 节日名；任何格子的标签都不被截断（≥ 1000px 宽的各种视窗）；
-// 无障碍名称不变（仍写「法定假日（春节）」）。2026-01…2028-12 每一格：2026 / 2027 用内置表，2028-07 用导入的虚构表把 7 个节日名各与「班」配一遍
+// Task 18：格子標籤——法定假日只有旗子 + 節日名（沒有「假」字）；調休上班保留「班」+ 節日名；任何格子的標籤都不被截斷（≥ 1000px 寬的各種視窗）；
+// 無障礙名稱不變（仍寫「法定假日（春節）」）。2026-01…2028-12 每一格：2026 / 2027 用內建表，2028-07 用匯入的虛構表把 7 個節日名各與「班」配一遍
 test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「班」 kept; no label truncated for 2026-01…2028-12 at 8 viewports; accessible names intact', () =>
   withPage(T1412, async (page) => {
     await tab(page, '基本设置').click();
@@ -1960,7 +1960,7 @@ test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「�
           const tag = b.querySelector('.day-tag');
           let slack = null;
           if (lab) {
-            // 余量 = 标签盒内宽 − 内容（图示 + 间距 + 名字）实际所需宽度
+            // 餘量 = 標籤盒內寬 − 內容（圖示 + 間距 + 名字）實際所需寬度
             const kids = [...lab.children];
             const need = kids.reduce((a, k) => {
               if (k.classList.contains('day-name')) { const rg = document.createRange(); rg.selectNodeContents(k); return a + rg.getBoundingClientRect().width; }
@@ -2003,8 +2003,8 @@ test('Task 18: cell labels — flag + holiday name only (no 「假」 tag); 「�
     assert.ok(minSlack >= 6, `smallest label slack ${minSlack.toFixed(2)}px at ${minWhere} (need ≥ 6px for the wider 微软雅黑)`);
   }));
 
-// Task 18 fix round 1：每一种格子 × 每一种视窗（含 1093×535 = 1366×768 @125%）× 有 / 没有首次提示条（存过设置 = 没有提示条，格子更高）：
-// 提示完全放得下——计薪金额永远在卡片里、没有横纵向裁切、状态里的名字不在中间折行；大格子的金额至少是日期字号的 1.5 倍
+// Task 18 fix round 1：每一種格子 × 每一種視窗（含 1093×535 = 1366×768 @125%）× 有 / 沒有首次提示條（存過設定 = 沒有提示條，格子更高）：
+// 提示完全放得下——計薪金額永遠在卡片裡、沒有橫縱向裁切、狀態裡的名字不在中間折行；大格子的金額至少是日期字號的 1.5 倍
 const SAVED = { init: `localStorage.setItem('work-motivator-v1', JSON.stringify({ ...${JSON.stringify(CN_LEGACY)}, marks: { '2026-11-10': 'paidLeave', '2026-11-11': 'unpaidLeave', '2026-11-12': 'rest', '2026-11-14': 'work', '2026-10-14': 'paidLeave', '2026-10-15': 'unpaidLeave' } }));` };
 for (const [state, opts] of [['first-run banner shown', { seed: false }], ['saved settings (no banner)', SAVED]]) {
   test(`Task 18 r1: tooltip fits every cell of 2026-05 / 2026-10 / 2026-11 at all 9 viewports incl. 1093×535 — ${state}: pay amount inside, no clip, no mid-name break, hero ≥ 1.5× date on ≥ 1280`, () =>
@@ -2062,8 +2062,8 @@ for (const [state, opts] of [['first-run banner shown', { seed: false }], ['save
     }, opts));
 }
 
-// Task 18 fix round 1（视觉裁定）：无薪假不用刺眼的暗红边（边框中性灰，只有状态文字是红）；今天的提示带 brand-50 底色（和工作日不同，且不盖掉格子自己的今天框的辨识度）；
-// 法定假日用青绿色组（和周末的中性灰不同）；周末 / 休息保持中性灰
+// Task 18 fix round 1（視覺裁定）：無薪假不用刺眼的暗紅邊（邊框中性灰，只有狀態文字是紅）；今天的提示帶 brand-50 底色（和工作日不同，且不蓋掉格子自己的今天框的辨識度）；
+// 法定假日用青綠色組（和週末的中性灰不同）；週末 / 休息保持中性灰
 test('Task 18 r1: tooltip colour coding — unpaid has a neutral border + red text, today is tinted brand-50, holiday is teal, weekend neutral; all text ≥ 4.5:1', () =>
   withPage(T1412, async (page) => {
     await cell(page, '11月5日').click();
@@ -2099,7 +2099,7 @@ test('Task 18 r1: tooltip colour coding — unpaid has a neutral border + red te
     assert.notEqual(holiday.ring, weekend.ring);
   }));
 
-// M8：图例色块直接用真实格子的 token——周末色块与周末格子同色，且与法定假日色块不同色系（不再靠加深边框区分）
+// M8：圖例色塊直接用真實格子的 token——週末色塊與週末格子同色，且與法定假日色塊不同色系（不再靠加深邊框區分）
 test('legend swatches use the real cell tokens (weekend ≠ holiday, no special border)', () =>
   withPage(T1412, async (page) => {
     await page.getByRole('button', { name: '上月' }).click(); // 2026-10：有法定假日，同屏可比
@@ -2121,9 +2121,9 @@ test('legend swatches use the real cell tokens (weekend ≠ holiday, no special 
     assert.equal(sw.weekend.border, sw.holiday.border, 'both swatches keep the same subtle border');
   }));
 
-// ---- Task 14 fix round 1 · C3（Kevin 实机反馈）----
+// ---- Task 14 fix round 1 · C3（Kevin 實機反饋）----
 
-// 提示的内容块在卡片里垂直居中（上下留白差 ≤ 1px），日期行比其他行更醒目；四种视窗 + 一个很高的格子，5 周与 6 周月份
+// 提示的內容塊在卡片裡垂直居中（上下留白差 ≤ 1px），日期行比其他行更醒目；四種視窗 + 一個很高的格子，5 周與 6 周月份
 async function tipBalance(page, key) {
   const c = page.locator(`.cal-grid button[data-key="${key}"]`);
   await c.hover();
@@ -2173,8 +2173,8 @@ test('C3 / Task 18: tooltip content is vertically centred in the card (top/botto
     }
   }));
 
-// 今天的绿色圆圈（M6）：22px 正圆；字形墨迹中心与圆心水平、垂直偏差均 ≤ 0.5px；
-// 圆距 2px 的今天边框 ≥ 3px；日期方框位置与普通格子一致。
+// 今天的綠色圓圈（M6）：22px 正圓；字形墨跡中心與圓心水平、垂直偏差均 ≤ 0.5px；
+// 圓距 2px 的今天邊框 ≥ 3px；日期方框位置與普通格子一致。
 async function numGeometry(page, key) {
   return page.locator(`.cal-grid button[data-key="${key}"]`).evaluate((b) => {
     const num = b.querySelector('.day-num');
@@ -2220,7 +2220,7 @@ test('M6: today circle — ink centre within 0.5px in both axes, ≥ 3px border 
         assert.ok(t.clearTop >= 3 && t.clearLeft >= 3, `${t.text} @${w}: ≥ 3px clear of the 2px today border (top ${t.clearTop}, left ${t.clearLeft})`);
         assert.deepEqual(t.circle, [22, 22], `${t.text} @${w}: the today disc is a 22px circle (${t.circle})`);
         assert.ok(Math.abs(t.offTop - o.offTop) <= 0.5 && Math.abs(t.offLeft - o.offLeft) <= 0.5, `today number at the same place as other cells (${t.offTop},${t.offLeft} vs ${o.offTop},${o.offLeft})`);
-        // 旧的普通日期墨迹检查保留原来的 05 / 19 样本；11 的相邻 12 因等宽字形左右留白不对称。
+        // 舊的普通日期墨跡檢查保留原來的 05 / 19 樣本；11 的相鄰 12 因等寬字形左右留白不對稱。
         if (todayKey === '2026-11-04' || todayKey === '2026-11-18') assert.ok(Math.abs(o.dx) <= 1 && Math.abs(o.dy) <= 1, `other number centred in its box (dx ${o.dx}, dy ${o.dy})`);
         if ((w === 1280 || w === 1920) && todayKey === '2026-11-04') await shot(page, `task-14-c3-today-${w}x${ht}.png`);
       }
@@ -2251,7 +2251,7 @@ test('today circle fits and centres single and double digit dates at every font 
 
 // ---- Task 14 fix round 2 · Block C ----
 
-// 支持的最窄宽度（≥ 1000px）也不得截断：窄格子里允许换行 / 小一号字（≥ 1280 保持原样）；同时不得被纵向裁切
+// 支援的最窄寬度（≥ 1000px）也不得截斷：窄格子裡允許換行 / 小一號字（≥ 1280 保持原樣）；同時不得被縱向裁切
 test('C round 2: tooltip never truncates or clips at 1000×700, 1100×700, 1150×700 (and the four target viewports)', () =>
   withPage(T1412, async (page) => {
     await cell(page, '11月5日').click();
@@ -2296,7 +2296,7 @@ test('C round 2: tooltip never truncates or clips at 1000×700, 1100×700, 1150�
     assert.deepEqual(bad, [], 'no truncated / clipped tooltip at any supported width');
   }));
 
-// 2 位数日期（M6）：墨迹两侧离圆边 ≥ 2px，圆是 22px 正圆，垂直居中 ≤ 0.5px，离 2px 绿框 ≥ 3px
+// 2 位數日期（M6）：墨跡兩側離圓邊 ≥ 2px，圓是 22px 正圓，垂直居中 ≤ 0.5px，離 2px 綠框 ≥ 3px
 test('M6 round 2: today circle with 2 digits has ≥ 2px side room, is a 22px circle, vertically centred within 0.5px', async () => {
   for (const [iso, key] of [['2026-11-18T10:00:00+08:00', '2026-11-18'], ['2026-11-30T10:00:00+08:00', '2026-11-30'], ['2026-11-04T10:00:00+08:00', '2026-11-04']]) {
     await withPage(iso, async (page) => {
@@ -2316,7 +2316,7 @@ test('M6 round 2: today circle with 2 digits has ≥ 2px side room, is a 22px ci
 });
 
 // ---- Task 14 fix round 2 · Block A ----
-// 悬浮中卡片内容变高（例如加了鼓励语、发薪日）：占位卡跟着变高，收回时不跳
+// 懸浮中卡片內容變高（例如加了鼓勵語、發薪日）：佔位卡跟著變高，收回時不跳
 test('A round 2: while floating, the placeholder follows the live card when its content grows (cheer + payday), no jump on recall', () =>
   withPage(T1412, async (page) => {
     await page.setViewportSize({ width: 1280, height: 700 });
@@ -2339,7 +2339,7 @@ test('A round 2: while floating, the placeholder follows the live card when its 
 
 // ---- Task 14 fix round 3 · C ----
 
-// 每个无表年份（过去或将来）摘要行都有看得见的简短标签；胶囊与标签都不被截断（1000×700 + 四种视窗）
+// 每個無表年份（過去或將來）摘要行都有看得見的簡短標籤；膠囊與標籤都不被截斷（1000×700 + 四種視窗）
 test('C round 3: every no-table year (2024 / 2025 / 2028 / 2036) shows a visible qualifier tag in the summary row; nothing truncated at 1000×700 and the four viewports', () =>
   withPage(T1412, async (page) => {
     const cases = [
@@ -2375,7 +2375,7 @@ test('C round 3: every no-table year (2024 / 2025 / 2028 / 2036) shows a visible
     assert.ok(m.scrollH <= m.ih);
   }));
 
-// 窄格子（< 1240px）里「周X」与「计薪 ¥…」是不可拆的单位：只在单位之间换行，仍不截断
+// 窄格子（< 1240px）裡「周X」與「計薪 ¥…」是不可拆的單位：只在單位之間換行，仍不截斷
 test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「计薪 ¥…」 never split; no truncation (1000×700 … 1200×700 incl. 1093×535); the holiday status breaks only at 「·」, never inside a name', () =>
   withPage(T1412, async (page) => {
     const bad = [];
@@ -2393,7 +2393,7 @@ test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「�
             const title = lines[0];
             const wk = [...title.querySelectorAll('.u')].find((u) => /^周/.test(u.textContent));
             const pay = tip.querySelector('.tip-pay');
-            // 每个「单位」（日期 / 周X / 状态里的 「法定假日·」「劳动节」…）的文字都在同一行上（Range 的矩形只有一个 top）：不会在名字中间折行
+            // 每個「單位」（日期 / 周X / 狀態裡的 「法定假日·」「勞動節」…）的文字都在同一行上（Range 的矩形只有一個 top）：不會在名字中間折行
             const split = [...tip.querySelectorAll('.u')].filter((u) => {
               const rg = document.createRange();
               rg.selectNodeContents(u);
@@ -2410,7 +2410,7 @@ test('C round 3: narrow tooltip wraps only between units — 「周X」 and 「�
             };
           });
           await page.mouse.move(0, 0);
-          // P1：放不下时倒数第二档先藏「周X」（屏幕阅读器仍读得到），之后才是拿掉状态行。所以「周X」要么完整一行，要么在这一档被藏起来
+          // P1：放不下時倒數第二檔先藏「周X」（螢幕閱讀器仍讀得到），之後才是拿掉狀態行。所以「周X」要麼完整一行，要麼在這一檔被藏起來
           const wdOk = r.weekday === 1 || (r.weekday === 0 && r.noWd && r.statusShown);
           if (!wdOk || r.pay !== 1 || r.cut.length || r.vclip || r.split.length || !r.amtInside) bad.push(`${w} ${key}: ${JSON.stringify(r)}`);
         }
@@ -2426,9 +2426,9 @@ test('calendar toolbar refits its hint after resizing while settings is open', (
     await page.setViewportSize({ width: 340, height: 585 });
     await tab(page, /月历/).click();
     const hint = page.locator('.cal-toolbar .legend-hint');
-    // 提示有三档：完整句 → 短句 → 不显示（fitHint 逐档试）。340px 下工具列会换行（.cal-toolbar 在
-    // ≤480px 折行），所以短句常常放得下；这里不预设哪一档，只要求「重新量过」的结果自洽：
-    // 要么不显示，要么是短句、完整不截断、留在工具列内、且不与「回到今天」重叠。
+    // 提示有三檔：完整句 → 短句 → 不顯示（fitHint 逐檔試）。340px 下工具列會換行（.cal-toolbar 在
+    // ≤480px 折行），所以短句常常放得下；這裡不預設哪一檔，只要求「重新量過」的結果自洽：
+    // 要麼不顯示，要麼是短句、完整不截斷、留在工具列內、且不與「回到今天」重疊。
     const state = () => hint.evaluate((e) => {
       const barEl = e.closest('.cal-toolbar');
       const bar = barEl.getBoundingClientRect(), r = e.getBoundingClientRect();
@@ -2450,9 +2450,9 @@ test('calendar toolbar refits its hint after resizing while settings is open', (
     assert.equal(narrow.cut, false, '340px: a shown hint is never cut mid-sentence');
     assert.equal(narrow.overlapsToday, false, '340px: the hint never sits on top of 回到今天');
     await page.setViewportSize({ width: 1280, height: 585 });
-    // 340px 时提示本来就已经可见（短句），waitFor({state:'visible'}) 会立刻返回、等不到重新排版；
-    // resize 事件要到下一次渲染更新才派发（与 A3 同一套做法），所以边推进暂停的时钟边等到目标状态：
-    // 完整句回来、而且在工具列里放得下。等不到就是这次重构真的没发生，下面的断言会失败。
+    // 340px 時提示本來就已經可見（短句），waitFor({state:'visible'}) 會立刻返回、等不到重新排版；
+    // resize 事件要到下一次渲染更新才派發（與 A3 同一套做法），所以邊推進暫停的時鐘邊等到目標狀態：
+    // 完整句回來、而且在工具列裡放得下。等不到就是這次重構真的沒發生，下面的斷言會失敗。
     const FULL = '点日期可标记：调休上班 · 带薪假 · 无薪假';
     let wide = await state();
     for (let i = 0; i < 20 && !(wide.shown && wide.text === FULL && wide.contained); i++) {

@@ -1,4 +1,4 @@
-// 主分页：组装顶栏 / 提示条 / 状态卡 / 分页（月历、基本设置），负责储存、计时与导入导出。
+// 主分頁：組裝頂欄 / 提示條 / 狀態卡 / 分頁（月曆、基本設定），負責儲存、計時與匯入匯出。
 import { snapshot, reasonText } from '../calc.js';
 import logo from '../logo.png';
 import { STORAGE_KEY, defaultsFor, loadState, saveState, exportState, importState } from '../settings.js';
@@ -21,15 +21,15 @@ import { createHolidayPanel } from './holiday-panel.js';
 import { readTicks, isStall } from './pause-model.js';
 import { createTicker } from './tick-scheduler.js';
 
-const UI_KEY = `${STORAGE_KEY}-ui`; // 界面旗标（首次提示已关闭、备份提示已显示），与设置分开存放
+const UI_KEY = `${STORAGE_KEY}-ui`; // 介面旗標（首次提示已關閉、備份提示已顯示），與設定分開存放
 const ANNOUNCE_MS = 60000;
-// R34 / R42 / R43：只有真的停过才提示——两次 tick 之间超过 5 秒（单调时钟与墙上时钟取较大者，见 pause-model.js），
-// 或 Page Lifecycle resume。单纯切走分页再回来（tick 照常）不提示。数字会一下子跳到当前时间：不打扰地提示一次，10 分钟内最多一次。
+// R34 / R42 / R43：只有真的停過才提示——兩次 tick 之間超過 5 秒（單調時鐘與牆上時鐘取較大者，見 pause-model.js），
+// 或 Page Lifecycle resume。單純切走分頁再回來（tick 照常）不提示。數字會一下子跳到當前時間：不打擾地提示一次，10 分鐘內最多一次。
 const PAUSE_NOTICE_EVERY_MS = 10 * 60 * 1000;
-// 显示设置（设置 › 显示）：改了这些字段要立刻套用到主文件与小窗，不必等下一次 tick
+// 顯示設定（設定 › 顯示）：改了這些欄位要立刻套用到主檔案與小窗，不必等下一次 tick
 const DISPLAY_FIELDS = ['fontScale', 'showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer'];
 
-// 小窗尺寸依字号保存；切换字号时清除目标档位的旧手动尺寸，重新采用默认尺寸。
+// 小窗尺寸依字號儲存；切換字號時清除目標檔位的舊手動尺寸，重新採用預設尺寸。
 const UI_SCALES = ['xs', 's', 'm', 'l', 'xl'];
 function readSizes(v) {
   const out = {};
@@ -58,7 +58,7 @@ function writeUi(storage, ui) {
   try {
     storage.setItem(UI_KEY, JSON.stringify(ui));
   } catch {
-    // 储存不可用时由警告条告知，这里不重复处理
+    // 儲存不可用時由警告條告知，這裡不重複處理
   }
 }
 
@@ -91,17 +91,17 @@ export function mountApp(doc, storage, clock) {
   let storageOk = loaded.storageOk;
   const ui = readUi(storage);
   doc.documentElement.dataset.theme = state.cfg.theme;
-  // 当前使用的假期表（R16）：所有计算与月历都用它；替换请走 setTables()。
+  // 當前使用的假期表（R16）：所有計算與月曆都用它；替換請走 setTables()。
   let tables = profile.holidayProvider.tables;
   let mounted = false;
 
-  // ---- 提示层（spec §13.2：错误通道 + 信息通道）----
+  // ---- 提示層（spec §13.2：錯誤通道 + 資訊通道）----
   const banners = createBanners(doc, t);
   const exportAction = { key: 'export', label: (s) => s.settings.backup.export, onClick: () => doExport() };
   const importAction = { key: 'import', label: (s) => s.settings.backup.import, onClick: () => fileInput.click() };
-  // 储存失败：恢复前不可关闭，带导出 / 导入快捷按钮（这两个按钮已不在顶栏）
+  // 儲存失敗：恢復前不可關閉，帶匯出 / 匯入快捷按鈕（這兩個按鈕已不在頂欄）
   const setStorageFail = (on) => banners.setError('storageFail', on ? (s) => s.banner.storageFail : null, { dismissible: false, actions: [exportAction, importAction] });
-  // 已保存的设置损坏或部分字段无效：明确告知，不当作首次打开静默处理（spec §2 反目标）；可关闭
+  // 已儲存的設定損壞或部分欄位無效：明確告知，不當作首次開啟靜默處理（spec §2 反目標）；可關閉
   const issueOf = (r, strings = t) => (r.corrupt
     ? strings.banner.loadCorrupt
     : r.dropped.length
@@ -121,14 +121,14 @@ export function mountApp(doc, storage, clock) {
   const reportPanel = h(doc, 'section', { class: 'import-report', hidden: true, 'aria-live': 'off' });
   let reportResult = null;
 
-  // ---- 顶栏只留标题；「悬浮成小窗」在左栏状态卡下方（R38）----
+  // ---- 頂欄只留標題；「懸浮成小窗」在左欄狀態卡下方（R38）----
   const cardRoot = h(doc, 'div', { id: 'status-card', 'data-size': 'lg' });
   const float = createFloatControl(doc, t, {
     cardRoot,
     onOpen: (pipWin) => { pipWin.document.documentElement.dataset.theme = state.cfg.theme; pipWin.document.documentElement.lang = profile.locale; pipWin.document.documentElement.dataset.fontScale = state.cfg.fontScale ?? 'm'; pipWin.document.title = t.appTitle; moveTimer(pipWin); },
     onClose: () => moveTimer(win),
     onFail: () => toast((s) => s.float.failed),
-    // 小窗尺寸按字号档位管理：目前档位、该档记住的尺寸、使用者拉动后记住
+    // 小窗尺寸按字號檔位管理：目前檔位、該檔記住的尺寸、使用者拉動後記住
     getScale: () => state.cfg.fontScale ?? 'm',
     getSize: (scale) => ui.winSizes[scale] ?? null,
     rememberSize: (scale, size) => {
@@ -141,8 +141,8 @@ export function mountApp(doc, storage, clock) {
     h(doc, 'img', { class: 'app-logo', src: logo, alt: '', width: 28, height: 28 }),
     h(doc, 'h1', { text: t.appTitle }));
 
-  // ---- 主区：左 状态卡｜右 分页「月历」「基本设置」----
-  let holiday = null; // 下方建立；面板的回调在用户操作时才会用到
+  // ---- 主區：左 狀態卡｜右 分頁「月曆」「基本設定」----
+  let holiday = null; // 下方建立；面板的回撥在使用者操作時才會用到
   const holidayPanel = createHolidayPanel(doc, t, {
     onCheck: () => { if (state.region === 'CN') holiday.checkNow(); },
     onImportText: (text, readError) => holiday.importFile(text, readError),
@@ -159,7 +159,7 @@ export function mountApp(doc, storage, clock) {
       if (region === state.region) return;
       clearUndo();
       commit({ ...state, region }, false);
-      // 切区已提交：把新地区的月薪与共享偏好一起套回面板（旧地区的草稿月薪不跨区沿用）。
+      // 切區已提交：把新地區的月薪與共享偏好一起套回面板（舊地區的草稿月薪不跨區沿用）。
       settings.applyState(activeCfg(), region);
     },
     onChange: (cfg) => commit(changeCfg(cfg), true),
@@ -177,7 +177,7 @@ export function mountApp(doc, storage, clock) {
     onMarks: (marks, msg, prevMarks) => {
       noteMarkChange(prevMarks, marks);
       const saved = commit(changeMarks(marks), false);
-      // 没写进储存时仍给「撤销」（内存里的改动可以撤回），但不谎称已经标记好了
+      // 沒寫進儲存時仍給「撤銷」（記憶體裡的改動可以撤回），但不謊稱已經標記好了
       toast(saved ? msg : (s) => s.calendar.unsaved(msg(s)), undoLatest);
     },
   });
@@ -212,7 +212,7 @@ export function mountApp(doc, storage, clock) {
 
   if (firstRun && !ui.hintDismissed) {
     hintShown = true;
-    // H1：文案里的数字取自当前（默认）设置，不写死
+    // H1：文案裡的數字取自當前（預設）設定，不寫死
     banners.queueInfo('firstRun', (s) => s.banner.firstRun(`${profile.currency}${money(activeCfg().salary, 0, profile.locale)}`, state.cfg.start, state.cfg.end), {
       actions: [{ key: 'goFix', label: (s) => s.banner.goFix, onClick: openSettings }],
       onDismiss: dismissHint,
@@ -220,10 +220,10 @@ export function mountApp(doc, storage, clock) {
   }
   if (loadIssue) setLoadIssue(loadIssue);
 
-  // ---- 行为 ----
+  // ---- 行為 ----
   let toastTimer = null;
-  const pendingQuiet = []; // 不打扰的提示（例如自动获取了假期表）：撤销提示还在时排在它后面，不盖掉撤销
-  // 撤销按钮只对「当前这一条」有效：token 变了旧按钮的回调就不再起作用（提示被打断、撤销记录被清掉时）
+  const pendingQuiet = []; // 不打擾的提示（例如自動獲取了假期表）：撤銷提示還在時排在它後面，不蓋掉撤銷
+  // 撤銷按鈕只對「當前這一條」有效：token 變了舊按鈕的回撥就不再起作用（提示被打斷、撤銷記錄被清掉時）
   let undoToken = 0;
   const pausedMessage = (strings) => strings.notice.paused;
   let toastMessage = null;
@@ -244,24 +244,24 @@ export function mountApp(doc, storage, clock) {
     toastMessage = msg;
     setText(toastText, resolveMessage(msg));
     show(toastUndo, Boolean(undo));
-    // 点「撤销」不经过 hideToast：排队的安静提示（例如暂停提醒）留给下一条，别被撤销回执顶掉
+    // 點「撤銷」不經過 hideToast：排隊的安靜提示（例如暫停提醒）留給下一條，別被撤銷回執頂掉
     toastUndo.onclick = undo ? () => { if (token !== undoToken) return; win.clearTimeout(toastTimer); dismissToast(); undo(); } : null;
     show(toastEl, true);
     win.clearTimeout(toastTimer);
     toastTimer = win.setTimeout(hideToast, 5000);
   }
-  // behindAny：连普通 toast 也不盖掉（暂停提示：最不重要，排在任何正在显示的 toast 后面）
+  // behindAny：連普通 toast 也不蓋掉（暫停提示：最不重要，排在任何正在顯示的 toast 後面）
   function quietToast(msg, behindAny = false) {
     if (!toastEl.hidden && (behindAny || !toastUndo.hidden)) {
       if (!pendingQuiet.includes(msg)) pendingQuiet.push(msg);
     } else toast(msg);
   }
 
-  // ---- 月历标记的撤销 ----
-  // 只记「哪几天从什么改成什么」，撤销时逐天恢复且只恢复现值仍等于当时新值的那几天：
-  // 别的分页 / 导入已经改过的那天原样保留，不静默覆盖。
+  // ---- 月曆標記的撤銷 ----
+  // 只記「哪幾天從什麼改成什麼」，撤銷時逐天恢復且只恢復現值仍等於當時新值的那幾天：
+  // 別的分頁 / 匯入已經改過的那天原樣保留，不靜默覆蓋。
   const UNDO_MAX = 20;
-  const undoStack = []; // 每项：[{ key, before, after }]（before/after 为 undefined 表示没有标记）
+  const undoStack = []; // 每項：[{ key, before, after }]（before/after 為 undefined 表示沒有標記）
   const markValue = (marks, key) => (Object.hasOwn(marks, key) ? marks[key] : undefined);
   function markDiff(prev, next) {
     const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
@@ -282,7 +282,7 @@ export function mountApp(doc, storage, clock) {
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     calendar.setUndoAvailable(true);
   }
-  // 撤销记录整体失效（导入、其他分页改了标记）：收起已经点不到的那颗「撤销」按钮，提示文字保留
+  // 撤銷記錄整體失效（匯入、其他分頁改了標記）：收起已經點不到的那顆「撤銷」按鈕，提示文字保留
   function clearUndo() {
     undoStack.length = 0;
     calendar.setUndoAvailable(false);
@@ -301,7 +301,7 @@ export function mountApp(doc, storage, clock) {
     let skipped = 0;
     for (const { key, before, after } of diff) {
       if (markValue(marks, key) !== after) {
-        skipped += 1; // 这几天已经被改过（导入 / 其他分页）：不覆盖
+        skipped += 1; // 這幾天已經被改過（匯入 / 其他分頁）：不覆蓋
         continue;
       }
       if (before === undefined) delete marks[key];
@@ -317,7 +317,7 @@ export function mountApp(doc, storage, clock) {
     toast(saved ? message : (s) => s.calendar.unsaved(message(s)));
   }
 
-  // 假期表换了（联网 / 导入 / 其他分页）：状态卡、月历、小窗都按新表重算（缺表标签随之消失）
+  // 假期表換了（聯網 / 匯入 / 其他分頁）：狀態卡、月曆、小窗都按新表重算（缺表標籤隨之消失）
   function setTables(next) {
     tables = next;
     if (!mounted) return;
@@ -356,7 +356,7 @@ export function mountApp(doc, storage, clock) {
       const p = win.navigator.storage?.persist?.();
       if (p && typeof p.catch === 'function') p.catch(() => {});
     } catch {
-      // 浏览器不支援或拒绝：不影响功能（spec §7）
+      // 瀏覽器不支援或拒絕：不影響功能（spec §7）
     }
   }
   function applyProfile() {
@@ -387,16 +387,16 @@ export function mountApp(doc, storage, clock) {
   }
 
 
-  // 显示设置（字号档位与状态卡区块开关）：唯一入口。切档只改 <html data-font-scale>，
-  // 主文件与小窗文件各写一次（小窗里的卡片靠它算字号）。content = 区块开关也变了（内容高度会变）。
+  // 顯示設定（字號檔位與狀態卡區塊開關）：唯一入口。切檔只改 <html data-font-scale>，
+  // 主檔案與小窗檔案各寫一次（小窗裡的卡片靠它算字號）。content = 區塊開關也變了（內容高度會變）。
   function applyDisplay({ resize = false, content = false, doc: only = null, pip = null } = {}) {
     const scale = state.cfg.fontScale ?? 'm';
     for (const target of new Set([only ?? doc, cardRoot.ownerDocument])) {
       target.documentElement.dataset.fontScale = scale;
     }
-    // 小窗开着：先把字号档位同步到小窗文件，再重画卡片、再量该多高
+    // 小窗開著：先把字號檔位同步到小窗檔案，再重畫卡片、再量該多高
     if (pip) syncDocumentLook(doc, pip.document);
-    // 区块开关 / 字号变了：先按新设置重画卡片，再重量参考高度（syncRef 会把 refDirty 清掉，所以顺序不能反）
+    // 區塊開關 / 字號變了：先按新設定重畫卡片，再重量參考高度（syncRef 會把 refDirty 清掉，所以順序不能反）
     if (content) tick();
     refDirty = true;
     syncRef();
@@ -418,7 +418,7 @@ export function mountApp(doc, storage, clock) {
     applyProfile();
     doc.documentElement.dataset.theme = state.cfg.theme;
     cardRoot.ownerDocument.documentElement.dataset.theme = state.cfg.theme;
-    // 字号 / 区块开关改了：立刻套用到主文件与小窗（不必等下一次 tick），小窗也跟着换尺寸
+    // 字號 / 區塊開關改了：立刻套用到主檔案與小窗（不必等下一次 tick），小窗也跟著換尺寸
     if (displayChanged) applyDisplay({ resize: prevScale !== state.cfg.fontScale, content: true, pip: float.pipWindow() });
     const res = saveState(storage, state);
     storageOk = res.ok;
@@ -434,7 +434,7 @@ export function mountApp(doc, storage, clock) {
         requestPersist();
       }
     } else if (fromSettings) {
-      settings.flashSaved(false); // 没写进去就不显示「已自动保存」：只说真话，原因由储存警告条说明
+      settings.flashSaved(false); // 沒寫進去就不顯示「已自動儲存」：只說真話，原因由儲存警告條說明
     }
     if (hintShown) {
       hintShown = false;
@@ -445,7 +445,7 @@ export function mountApp(doc, storage, clock) {
     calendar.render();
     tick();
     if (cardTextChanged && float.pipWindow()) float.syncSize({ fit: true });
-    return res.ok; // 调用者可据此说真话（例如标记没写进储存时不能只说「已标记」）
+    return res.ok; // 呼叫者可據此說真話（例如標記沒寫進儲存時不能只說「已標記」）
   }
 
   function doExport() {
@@ -465,17 +465,17 @@ export function mountApp(doc, storage, clock) {
     reportPanel.replaceChildren();
   }
 
-  // 导入报告放在「基本设置 › 数据与备份」卡头下方（H6）：先切到该分页，再把报告带进视野，最后聚焦标题
+  // 匯入報告放在「基本設定 › 資料與備份」卡頭下方（H6）：先切到該分頁，再把報告帶進視野，最後聚焦標題
   function showReport(titleText, body, actions) {
     const title = h(doc, 'h3', { tabindex: '-1', text: titleText });
-    // 按钮紧跟标题、在明细表之前：报告比可滚区域高时，标题与按钮仍在视野内（H6）
+    // 按鈕緊跟標題、在明細表之前：報告比可滾區域高時，標題與按鈕仍在視野內（H6）
     reportPanel.replaceChildren(title, h(doc, 'div', { class: 'report-actions' }, actions), ...body);
     show(reportPanel, true);
     tabs.select('settings');
-    // 先聚焦（不滚动），再把报告的起始端带进视野：长报告不会把标题和按钮推出画面
+    // 先聚焦（不滾動），再把報告的起始端帶進視野：長報告不會把標題和按鈕推出畫面
     title.focus({ preventScroll: true });
     reportPanel.scrollIntoView({ block: 'nearest' });
-    // 报告改变了内容高度：分页没切换时不会自动重算底部渐隐（M16）
+    // 報告改變了內容高度：分頁沒切換時不會自動重算底部漸隱（M16）
     settings.refreshFade();
   }
 
@@ -513,7 +513,7 @@ export function mountApp(doc, storage, clock) {
     }
     if (generation !== regionGeneration) return;
     const res = importState(text, state);
-    // M19：报告里的按钮与其他卡片按钮同一尺寸（28px），主次仍分开
+    // M19：報告裡的按鈕與其他卡片按鈕同一尺寸（28px），主次仍分開
     const okBtn = h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-s', text: t.importer.ok, onclick: closeReport });
     if (res.error) {
       reportResult = res;
@@ -525,7 +525,7 @@ export function mountApp(doc, storage, clock) {
     }
     commit(res.state, false);
     const report = importReport(res, t);
-    clearUndo(); // 导入换掉了整份标记：之前那次标记的撤销不再成立
+    clearUndo(); // 匯入換掉了整份標記：之前那次標記的撤銷不再成立
     settings.applyState(activeCfg(), state.region);
     if (report.rows.length === 0) {
       closeReport();
@@ -545,13 +545,13 @@ export function mountApp(doc, storage, clock) {
     ]);
   }
 
-  // ---- 页面暂停提示（R34）----
+  // ---- 頁面暫停提示（R34）----
   const perf = win.performance;
   const readTick = readTicks(() => perf.now(), () => Date.now(), () => doc.visibilityState === 'hidden'); // 全域 Date，不是可注入的 clock
-  let lastTick = null; // null = 还没 tick 过（第一次 tick 不提示）
-  let skipGap = false; // 小窗开 / 关搬动计时器造成的间隔不算暂停
+  let lastTick = null; // null = 還沒 tick 過（第一次 tick 不提示）
+  let skipGap = false; // 小窗開 / 關搬動計時器造成的間隔不算暫停
   let lastPauseNotice = -Infinity;
-  let pausePending = false; // 分页隐藏时发现的暂停：回到前台再提示
+  let pausePending = false; // 分頁隱藏時發現的暫停：回到前臺再提示
   function notePaused() {
     if (lastTick === null) return;
     if (doc.visibilityState === 'hidden') {
@@ -574,23 +574,23 @@ export function mountApp(doc, storage, clock) {
     if (doc.visibilityState !== 'hidden' && pausePending) notePaused();
   }
 
-  // ---- 计时 ----
-  // 大卡片最小高度（= 上班中的卡高）要重量：载入、视窗尺寸改变、字体载入完成
+  // ---- 計時 ----
+  // 大卡片最小高度（= 上班中的卡高）要重量：載入、視窗尺寸改變、字型載入完成
   let refDirty = true;
   let lastSnap = null;
   function syncRef() {
-    if (!lastSnap || !cardRoot.isConnected || cardRoot.dataset.size !== 'lg') return; // 悬浮中：回到主页后的第一次 tick 再量
+    if (!lastSnap || !cardRoot.isConnected || cardRoot.dataset.size !== 'lg') return; // 懸浮中：回到主頁後的第一次 tick 再量
     refDirty = false;
     syncReferenceHeight(cardRoot, lastSnap, activeCfg(), t);
   }
-  // 视窗改变时立刻量（不等下一次 tick：跨过 640px 断点那一刻卡高就该跟着变）
+  // 視窗改變時立刻量（不等下一次 tick：跨過 640px 斷點那一刻卡高就該跟著變）
   const markRefDirty = () => { refDirty = true; syncRef(); };
   win.addEventListener('resize', markRefDirty);
   try {
     doc.fonts?.ready?.then?.(markRefDirty, () => {});
     doc.fonts?.addEventListener?.('loadingdone', markRefDirty);
   } catch {
-    // 不支持 FontFaceSet：只靠载入与 resize
+    // 不支援 FontFaceSet：只靠載入與 resize
   }
   let lastDay = null;
   let lastStatus = null;
@@ -606,10 +606,10 @@ export function mountApp(doc, storage, clock) {
     const day = ymd(now);
     if (day !== lastDay) {
       const crossed = lastDay !== null;
-      lastDay = day; // 先记下：reload → setTables → tick 会再进来
+      lastDay = day; // 先記下：reload → setTables → tick 會再進來
       if (crossed) {
         calendar.render();
-        holiday.reload(); // 跨日：状态行里的年份可能变了
+        holiday.reload(); // 跨日：狀態行裡的年份可能變了
       }
     }
     if (m.status !== lastStatus || now - lastAnnounce >= ANNOUNCE_MS) {
@@ -619,8 +619,8 @@ export function mountApp(doc, storage, clock) {
     }
   }
 
-  // 计时（R46，tick-scheduler.js）：一般模式 100 ms；减少动态模式对齐墙上时钟整秒；任何时刻只有一个计时器。
-  // 计时器跑在状态卡所在的视窗：悬浮时由小窗驱动（spec §3），收回后回到主视窗。
+  // 計時（R46，tick-scheduler.js）：一般模式 100 ms；減少動態模式對齊牆上時鐘整秒；任何時刻只有一個計時器。
+  // 計時器跑在狀態卡所在的視窗：懸浮時由小窗驅動（spec §3），收回後回到主視窗。
   const mq = win.matchMedia ? win.matchMedia('(prefers-reduced-motion: reduce)') : null;
   const ticker = createTicker({ tick, reduced: () => Boolean(mq && mq.matches), now: () => Date.now() });
   const start = () => ticker.start();
@@ -629,7 +629,7 @@ export function mountApp(doc, storage, clock) {
     ticker.start(host);
     tick();
   }
-  // 其他分页改了设置（或清空了储存）：重新读取并套用，不回写，避免两个分页互相覆盖（spec §2 反目标）
+  // 其他分頁改了設定（或清空了儲存）：重新讀取並套用，不回寫，避免兩個分頁互相覆蓋（spec §2 反目標）
   function applyRemote() {
     const r = loadState(storage);
     const prevScale = state.cfg.fontScale;
@@ -641,23 +641,23 @@ export function mountApp(doc, storage, clock) {
     applyProfile();
     doc.documentElement.dataset.theme = state.cfg.theme;
     cardRoot.ownerDocument.documentElement.dataset.theme = state.cfg.theme;
-    // 别的分页改了字号 / 区块开关：跟着变（不回写，也不改小窗位置）
+    // 別的分頁改了字號 / 區塊開關：跟著變（不回寫，也不改小窗位置）
     if (displayChanged) applyDisplay({ resize: prevScale !== state.cfg.fontScale, content: true, pip: float.pipWindow() });
     storageOk = r.storageOk;
     setStorageFail(!storageOk);
     const issue = issueOf(r);
-    // 新的问题照常显示；与开页时相同、且已被关闭的问题不再弹出
+    // 新的問題照常顯示；與開頁時相同、且已被關閉的問題不再彈出
     setLoadIssue(issue && (issue !== loadIssue || loadShown !== null) ? issue : null, r);
-    // 远端设定（可能连地区一起换了）：同一个入口把权威值套回面板。
-    // 未送出的草稿照旧留着，只有换地区时才丢掉旧地区的月薪草稿。
+    // 遠端設定（可能連地區一起換了）：同一個入口把權威值套回面板。
+    // 未送出的草稿照舊留著，只有換地區時才丟掉舊地區的月薪草稿。
     settings.applyState(activeCfg(), state.region);
-    // H1：别的分页把设置改成非默认值后，「现在按默认…计算」就不成立了：撤掉这条提示（不记为「已关闭」）
+    // H1：別的分頁把設定改成非預設值後，「現在按預設…計算」就不成立了：撤掉這條提示（不記為「已關閉」）
     if (hintShown && Object.entries(defaultsFor(state.region)).some(([k, v]) => Array.isArray(v)
       ? JSON.stringify(activeCfg()[k]) !== JSON.stringify(v) : activeCfg()[k] !== v)) {
       hintShown = false;
       banners.dismissInfo('firstRun');
     }
-    // 别的分页改了标记：撤销记录里「改成什么」的前提已经变了，整批作废
+    // 別的分頁改了標記：撤銷記錄裡「改成什麼」的前提已經變了，整批作廢
     if (marksChanged) clearUndo();
     calendar.render();
     tick();
@@ -666,7 +666,7 @@ export function mountApp(doc, storage, clock) {
   win.addEventListener('storage', (e) => {
     if (e.storageArea && e.storageArea !== storage) return;
     if (e.key === STORAGE_KEY || e.key === null) applyRemote();
-    // 其他分页更新了假期数据：重新读取并刷新，不回写
+    // 其他分頁更新了假期資料：重新讀取並重新整理，不回寫
     if (e.key === null || (state.region === 'CN' && e.key === HOLIDAYS_STORAGE_KEY) || (state.region === 'TW' && e.key === TW_HOLIDAYS_STORAGE_KEY)) {
       if (state.region === 'TW') holiday.refresh();
       else holiday.reload();
@@ -674,38 +674,38 @@ export function mountApp(doc, storage, clock) {
   });
 
   mq?.addEventListener?.('change', start);
-  doc.addEventListener('visibilitychange', onVisibility); // 先于 tick：同一次回来只提示一次
+  doc.addEventListener('visibilitychange', onVisibility); // 先於 tick：同一次回來只提示一次
   doc.addEventListener('visibilitychange', tick);
-  doc.addEventListener('resume', notePaused); // Page Lifecycle：从冻结恢复
+  doc.addEventListener('resume', notePaused); // Page Lifecycle：從凍結恢復
   win.addEventListener('focus', tick);
 
 
   mounted = true;
   settings.applyState(activeCfg(), state.region);
   setStorageFail(!storageOk);
-  applyDisplay(); // 先套字号档位，再排版月历与卡片（避免先按 m 排版再跳一次）
+  applyDisplay(); // 先套字號檔位，再排版月曆與卡片（避免先按 m 排版再跳一次）
   calendar.render();
   tick();
   ticker.start(win);
-  // 中国地区仅在缺表且符合检查间隔时联网；台湾只使用内建及导入的年表。
+  // 中國地區僅在缺表且符合檢查間隔時聯網；臺灣只使用內建及匯入的年表。
   if (state.region === 'CN') holiday.autoCheckIfNeeded();
 
-  // 齿轮只在小窗显示：先把开启者视窗带到前面（R45），再收回小窗（同按 X），再切到「基本设置」分页。
-  // window.focus() 在小窗内的点击手势里调用时，Chrome 123+ 会把开启者分页 / 视窗带到前面
+  // 齒輪只在小窗顯示：先把開啟者視窗帶到前面（R45），再收回小窗（同按 X），再切到「基本設定」分頁。
+  // window.focus() 在小窗內的點選手勢裡呼叫時，Chrome 123+ 會把開啟者分頁 / 視窗帶到前面
   // （https://developer.chrome.com/docs/web-platform/document-picture-in-picture 「Focus the opener window」）；
-  // 必须同步、在任何 await 之前调用。不支持或抛例外时照常收回并切分页。
+  // 必須同步、在任何 await 之前呼叫。不支援或拋例外時照常收回並切分頁。
   cardRoot.querySelector('.card-gear').addEventListener('click', () => {
     try {
       win.focus();
     } catch {
-      // 无法聚焦开启者：不影响后续
+      // 無法聚焦開啟者：不影響後續
     }
     float.close();
     openSettings();
   });
 
   return {
-    // 换用另一份假期表（例如合并了联网数据）：状态卡与月历立即按新表重算。
+    // 換用另一份假期表（例如合併了聯網資料）：狀態卡與月曆立即按新表重算。
     setTables,
   };
 }

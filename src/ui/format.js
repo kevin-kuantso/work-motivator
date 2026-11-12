@@ -1,10 +1,10 @@
-// 纯函数：数字 / 时间 / 日期格式化（不碰 DOM，可在 node 测试）。
+// 純函式：數字 / 時間 / 日期格式化（不碰 DOM，可在 node 測試）。
 import { lunarDate } from '../lunar.js';
 
 const FALLBACK_LOCALE = 'zh-CN';
 const fmtCache = new Map();
 
-// 取 locale：直接给 locale 字符串，或给 profile / strings（两者都带 locale）。缺省沿用 zh-CN，既有调用不改行为。
+// 取 locale：直接給 locale 字串，或給 profile / strings（兩者都帶 locale）。預設沿用 zh-CN，既有呼叫不改行為。
 export function localeOf(x) {
   if (typeof x === 'string' && x !== '') return x;
   const loc = x && typeof x === 'object' ? x.locale : null;
@@ -21,10 +21,10 @@ function nf(digits, locale) {
 
 const safe = (v) => (Number.isFinite(v) ? v : 0);
 
-// 金额文字（不含货币符号），千分位按 locale 决定。
+// 金額文字（不含貨幣符號），千分位按 locale 決定。
 export const money = (v, digits = 2, locale) => nf(digits, localeOf(locale)).format(safe(v));
 
-// 主金额：4 位小数，拆出末两位以便降对比。
+// 主金額：4 位小數，拆出末兩位以便降對比。
 export function heroParts(v, locale) {
   const s = money(v, 4, locale);
   return { head: s.slice(0, -2), tail: s.slice(-2) };
@@ -50,7 +50,7 @@ export function lunarText(date, t) {
   return { full: s.full(month, day), short: l.day === 1 ? month : day };
 }
 
-// 倒数：向上取整到秒（14:12:00.4 距 17:00 显示 2小时48分0秒）。
+// 倒數：向上取整到秒（14:12:00.4 距 17:00 顯示 2小時48分0秒）。
 export function duration(sec, t) {
   const total = Math.max(0, Math.ceil(safe(sec)));
   const h = Math.floor(total / 3600);
@@ -60,7 +60,7 @@ export function duration(sec, t) {
 
 export const hours = (sec) => (safe(sec) / 3600).toFixed(2);
 
-// 秒 → 整小时 + 整分钟（向下取整，分钟 0–59）：工时进度文字用（已工作 2小时0分 / 共 7小时）。
+// 秒 → 整小時 + 整分鐘（向下取整，分鐘 0–59）：工時進度文字用（已工作 2小時0分 / 共 7小時）。
 export function hourMinute(sec) {
   const total = Math.max(0, Math.floor(safe(sec) / 60));
   return { h: Math.floor(total / 60), m: total % 60 };

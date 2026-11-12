@@ -5,7 +5,7 @@
 // 兩份 CSV 已逐日（365 天）比對過：只有「放假」且有名稱的日子寫進 off；兩年都沒有補班日
 // （官方 CSV 每一列 status=0 都是沒有備註的平日），因此 makeup 為空。
 // 節名一律保留官方原文；缺名的一般放假日才由字典補「放假」。
-// 政府行政機關日曆不等同所有勞工的法定休假，薪資為估算；商業再散布的授權範圍尚待法務確認（legalReview）。
+// 政府行政機關日曆不等同所有勞工的法定休假，薪資為估算；商業再散佈的授權範圍尚待法務確認（legalReview）。
 // 官方節名（繁體，保留原文；不從農曆顯示推測）。
 const N = Object.freeze({
   founding: '開國紀念日',
@@ -113,7 +113,7 @@ export const TW_DATASET = Object.freeze({
   license: '政府資料開放授權條款－第1版',
   licenseUrl: 'https://data.gov.tw/license',
   licensePublishedAt: '2015-07-27',
-  // 內建表內嵌散布的授權範圍（商業再散布）尚未經法務確認，畫面必須照實說明。
+  // 內建表內嵌散佈的授權範圍（商業再散佈）尚未經法務確認，畫面必須照實說明。
   legalReview: 'unresolved',
 });
 

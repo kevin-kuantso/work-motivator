@@ -1,4 +1,4 @@
-// 臺灣假期表：純函式（狀態膠囊、日期計數、失敗代碼文字）＋匯入編排（假 storage，完全不連網）。
+// 臺灣假期表：純函式（狀態膠囊、日期計數、失敗程式碼文字）＋匯入編排（假 storage，完全不連網）。
 // 臺灣沒有線上檢查（單一離線檔案抓官方資料集會被 CORS 擋下），所以這裡不注入 fetch，也不驗任何網路行為：
 // 只驗證匯入契約——優先序、整份拒絕、切區丟棄、儲存失敗仍在本次會話生效。
 import test from 'node:test';
@@ -220,7 +220,7 @@ test('儲存失敗（quota／讀不到）：本次會話仍生效並通知 onTab
   assert.equal(r.saved, false, '寫不進儲存要說真話');
   assert.deepEqual(r.years, [year], '但本次會話仍可用');
   assert.equal(seen.at(-1)?.[year]?.source, 'file');
-  // 使用者必須看得到「只留在這個頁面」：結果改成警示，並附上說明（不是只說「已匯入」）
+  // 使用者必須看得到「只留在這個頁面」：結果改成警示，並附上說明（不是隻說「已匯入」）
   const view = statuses.at(-1)?.result ?? null;
   assert.ok(view, '要有可見的結果');
   assert.equal(view.tone, 'warn');
@@ -345,7 +345,7 @@ test('匯入的檔案不是文字（讀檔端失敗）也要說得出下一步�
 });
 
 // 官方 CSV 的備註可以用引號包住跨行內容（人事總處的檔案就有這種情況）。
-// 匯入要接受、原樣保留 LF，而且重新載入（新實例讀同一份儲存）仍拿得到同一句。
+// 匯入要接受、原樣保留 LF，而且重新載入（新例項讀同一份儲存）仍拿得到同一句。
 test('匯入含跨行引號備註的官方 CSV：接受並保留換行，重新載入仍在', () => {
   const year = 2029;
   const day = `${year}-01-02`;
@@ -367,7 +367,7 @@ test('匯入含跨行引號備註的官方 CSV：接受並保留換行，重新�
   assert.equal(stored[year].source, 'file');
   assert.equal(stored[year].off[day], remark, '跨行備註原樣保留（LF，不多也不少）');
 
-  // 重新載入（另一個實例、同一份儲存）：讀回來的仍是同一句跨行備註
+  // 重新載入（另一個例項、同一份儲存）：讀回來的仍是同一句跨行備註
   const reloaded = ctxOf({ storage });
   reloaded.api.reload();
   assert.equal(reloaded.state.tables[year]?.source, 'file');
@@ -451,8 +451,8 @@ test('狀態物件：checking 恆為 false、lastCheck 恆為 null、customUrl �
 });
 
 // ---- 存不進儲存的匯入表：整頁生命週期（切到中國再切回臺灣仍在） ----
-// app 在切換地區時會重建臺灣的流程物件；補位表因此不能放在實例裡，否則切回臺灣就整份消失，
-// 但使用者的檔案明明在這次開頁時匯入過（而且儲存真的寫不進去）。這裡用「兩個實例共用同一份 storage」
+// app 在切換地區時會重建臺灣的流程物件；補位表因此不能放在例項裡，否則切回臺灣就整份消失，
+// 但使用者的檔案明明在這次開頁時匯入過（而且儲存真的寫不進去）。這裡用「兩個例項共用同一份 storage」
 // 模擬一次切區往返。任何時候都不得改寫儲存的原始位元組。
 test('儲存失敗的匯入切到中國、切回臺灣仍然有效，並重新說明只留在本頁', () => {
   const writes = [];
@@ -469,7 +469,7 @@ test('儲存失敗的匯入切到中國、切回臺灣仍然有效，並重新�
   assert.equal(first.state.tables[year]?.source, 'file');
   const counts = dayCountsTw(first.state.tables[year]);
 
-  // 切到中國：舊實例的 generation 作廢，什麼都不能做
+  // 切到中國：舊例項的 generation 作廢，什麼都不能做
   first.state.current = false;
   const marks = first.statuses.length;
   first.api.reload();
@@ -477,7 +477,7 @@ test('儲存失敗的匯入切到中國、切回臺灣仍然有效，並重新�
   assert.equal(first.statuses.length, marks, '切區後舊實例不得更新狀態');
   assert.deepEqual(first.api.importFile(csv(2030, { off: { '2030-01-01': '假日' } })), { ok: false, code: 'stale' });
 
-  // 切回臺灣：全新實例、同一份儲存（模擬 app 重建流程物件）
+  // 切回臺灣：全新例項、同一份儲存（模擬 app 重建流程物件）
   const back = ctxOf({ storage });
   back.api.reload();
   assert.equal(back.state.tables[year]?.source, 'file', '切回臺灣時會話表仍在');
@@ -523,7 +523,7 @@ test('會話表已經不可能生效時就清掉：別的分頁成功寫入同�
   });
   first.api.refresh();
   assert.equal(first.state.tables[year].off[day], '別頁');
-  // 同一個實例：那句話不能繼續掛在結果區（會話表已清除，這裡沒有任何只留在本頁的資料）
+  // 同一個例項：那句話不能繼續掛在結果區（會話表已清除，這裡沒有任何只留在本頁的資料）
   const live = first.statuses.at(-1).result;
   assert.notEqual(live?.detail?.key, 'sessionOnly', '別人寫進儲存後就不再是「只留在本頁」');
   assert.equal(live, null, '那一次匯入的結果也一併換掉，不留誤導的舊訊息');

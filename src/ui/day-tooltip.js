@@ -1,8 +1,8 @@
-// 日期格悬停 / 聚焦提示（spec §12.2、§13；Task 18 · V1「白卡盖格」）：白底卡片直接盖在该格上（同样大小，inset:0），内容置中，
-// 永远不会盖到下面或旁边的格子；纯视觉层：aria-hidden，屏幕阅读器经由格子的 aria-describedby 读取完整文字（含来源）；
-// pointer-events: none，不拦截点击。行：日期｜农历｜状态｜来源｜计薪（金额为主角）。
-// 实测各档位：先收紧、隐藏来源；格子可显示农历时可隐藏提示中的农历，然后继续缩字、隐藏星期，最后才隐藏状态。
-// 窄到格子不显示农历时，提示仍保留农历。金额与 aria-describedby 中的完整文字始终保留。
+// 日期格懸停 / 聚焦提示（spec §12.2、§13；Task 18 · V1「白卡蓋格」）：白底卡片直接蓋在該格上（同樣大小，inset:0），內容置中，
+// 永遠不會蓋到下面或旁邊的格子；純視覺層：aria-hidden，螢幕閱讀器經由格子的 aria-describedby 讀取完整文字（含來源）；
+// pointer-events: none，不攔截點選。行：日期｜農曆｜狀態｜來源｜計薪（金額為主角）。
+// 實測各檔位：先收緊、隱藏來源；格子可顯示農曆時可隱藏提示中的農曆，然後繼續縮字、隱藏星期，最後才隱藏狀態。
+// 窄到格子不顯示農曆時，提示仍保留農曆。金額與 aria-describedby 中的完整文字始終保留。
 import { h } from './dom.js';
 
 const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-no-wd', 'is-lean', 'is-no-lunar', 'is-no-pay-label', 'is-currency-fit', 'is-no-status-name'];
@@ -25,21 +25,21 @@ const TIERS = [
 const kindOf = (btn) => ([...btn.classList].find((c) => c.startsWith('kind-')) ?? 'kind-workday').slice(5);
 
 export function createDayTooltip(doc) {
-  // 文字拆成不可再拆的「单位」：sep 给了就按它拆（日期 / 周X 之间的空格，拆开后补回空格）；没给就在每个「·」之后断开。
-  // 标了 wd 的单位（「周X」）在倒数第二档 is-no-wd 里整个隐藏：先于「拿掉状态行」的最后手段，屏幕阅读器仍读得到（格子的 aria-describedby）
+  // 文字拆成不可再拆的「單位」：sep 給了就按它拆（日期 / 周X 之間的空格，拆開後補回空格）；沒給就在每個「·」之後斷開。
+  // 標了 wd 的單位（「周X」）在倒數第二檔 is-no-wd 裡整個隱藏：先於「拿掉狀態行」的最後手段，螢幕閱讀器仍讀得到（格子的 aria-describedby）
   const units = (text, sep, weekday) => (sep ? text.split(sep) : text.replace(/\s+/g, ' ').split(/(?<=·)/)).flatMap((u, i) => [i && sep ? sep : null, h(doc, 'span', { class: weekday && i === 1 ? 'u u-wd' : i ? 'u u-detail' : 'u', text: u })]);
 
   const win = doc.defaultView;
   const el = h(doc, 'div', { class: 'day-tooltip', 'aria-hidden': 'true', hidden: true });
   let timer = null;
-  let last = null; // 目前显示的格子与模型：resize / 字体就绪后重选分级用
+  let last = null; // 目前顯示的格子與模型：resize / 字型就緒後重選分級用
 
   function cancel() {
     if (timer !== null) win.clearTimeout(timer);
     timer = null;
   }
 
-  // 依序试各档位，选第一个完全放得下的（高、宽都不溢出）；全都不行就停在最后一档（金额永远保留）
+  // 依序試各檔位，選第一個完全放得下的（高、寬都不溢位）；全都不行就停在最後一檔（金額永遠保留）
   function pick() {
     for (const tier of TIERS) {
       el.classList.remove(...ALL);
@@ -52,20 +52,20 @@ export function createDayTooltip(doc) {
     cancel();
     const cell = btn.parentElement;
     if (!btn.isConnected || !cell) return;
-    // 结构化字段（日期 / 星期 / 计薪说明 / 金额）来自 dayTooltipModel：排版只用这些，不解析翻译后的空白或分隔符（Task 14）。
-    // 只有拿不到结构化字段的旧模型（不该出现）才退回按空白拆 payShort
+    // 結構化欄位（日期 / 星期 / 計薪說明 / 金額）來自 dayTooltipModel：排版只用這些，不解析翻譯後的空白或分隔符（Task 14）。
+    // 只有拿不到結構化欄位的舊模型（不該出現）才退回按空白拆 payShort
     const legacy = m.payLabel === undefined && m.payAmount === undefined;
     const [legacyLabel, ...legacyRest] = legacy ? m.payShort.split(' ') : [''];
     const titleDate = m.titleDate ?? m.titleShort;
     const payLabel = legacy ? legacyLabel : m.payLabel;
     const payAmount = legacy ? legacyRest.join(' ') : m.payAmount;
     el.replaceChildren(
-      // 「11月18日」「周三」各是不可拆的单位：窄格子换行时只在单位之间换（round 3）
+      // 「11月18日」「週三」各是不可拆的單位：窄格子換行時只在單位之間換（round 3）
       h(doc, 'span', { class: 'tip-title' },
         h(doc, 'span', { class: 'u', text: titleDate }),
         ...(m.titleWeekday ? [m.titleSep ?? ' ', h(doc, 'span', { class: 'u u-wd', text: m.titleWeekday })] : [])),
       ...(m.lunar ? [h(doc, 'span', { class: 'tip-lunar', text: m.lunar })] : []),
-      // 状态与来源只在「·」处换行（「法定假日·」「劳动节」各是整体），名字中间不折行
+      // 狀態與來源只在「·」處換行（「法定假日·」「勞動節」各是整體），名字中間不折行
       h(doc, 'span', { class: 'tip-status' }, units(m.statusShort)),
       h(doc, 'span', { class: 'tip-source' }, units(m.sourceLabel)),
       h(doc, 'span', { class: `tip-pay${m.payZero ? ' is-zero' : ''}` },
@@ -80,8 +80,8 @@ export function createDayTooltip(doc) {
     pick();
   }
 
-  // 窗口 resize / 字体就绪后重选分级：格子大小或字体度量变了，原本可用的档位可能不再放得下（或反过来）。
-  // 已隐藏的提示不复活；格子被重绘（render() 换掉节点）后不再重选
+  // 視窗 resize / 字型就緒後重選分級：格子大小或字型度量變了，原本可用的檔位可能不再放得下（或反過來）。
+  // 已隱藏的提示不復活；格子被重繪（render() 換掉節點）後不再重選
   function refit() {
     if (!last || el.hidden) return;
     if (!last.btn.isConnected || el.parentElement !== last.btn.parentElement) return;
@@ -105,13 +105,13 @@ export function createDayTooltip(doc) {
     last = null;
   }
 
-  // 与 app.js 的参考宽度同步同一个套路：窗口 resize、字体就绪（fonts.ready）与字体载入完成（loadingdone）后重选分级。
-  // 同步执行、不排 rAF：e2e 用 page.clock 控制时间，rAF 可能被模拟掉
+  // 與 app.js 的參考寬度同步同一個套路：視窗 resize、字型就緒（fonts.ready）與字型載入完成（loadingdone）後重選分級。
+  // 同步執行、不排 rAF：e2e 用 page.clock 控制時間，rAF 可能被模擬掉
   win.addEventListener('resize', refit);
   try {
     doc.fonts?.ready?.then?.(refit, () => {});
     doc.fonts?.addEventListener?.('loadingdone', refit);
-  } catch { /* 旧的浏览器没有 FontFaceSet：忽略，show() 那一次分级仍有效 */ }
+  } catch { /* 舊的瀏覽器沒有 FontFaceSet：忽略，show() 那一次分級仍有效 */ }
 
   return { el, show, later, hide };
 }

@@ -13,21 +13,21 @@
   --state-before-bg:#E4EDE3;  --state-before-fg:#3C5340;
   --state-after-bg:#CCFBF1;   --state-after-fg:#115E59;
   --state-rest-bg:#F3F4F6;    --state-rest-fg:#4B5563;
-  --state-holiday-bg:#CCFBF1; --state-holiday-fg:#115E59; /* 法定假日：与月历提示的假日同色系（不用上班），不再和普通休息日同灰 */
+  --state-holiday-bg:#CCFBF1; --state-holiday-fg:#115E59; /* 法定假日：與月曆提示的假日同色系（不用上班），不再和普通休息日同灰 */
   --state-paid-bg:#DDECE7;    --state-paid-fg:#275C50;
   --state-unpaid-bg:#FFE4E6;  --state-unpaid-fg:#9F1239;
   --state-makeup-bg:#EBEEDD;  --state-makeup-fg:#515C2E;
   --state-unpaid-stripe:#FFF1F2;
 
-  /* 月历日期数字对对应格子背景须 ≥ 4.5:1；法定假日与普通休息日使用可区分的色调。 */
+  /* 月曆日期數字對對應格子背景須 ≥ 4.5:1；法定假日與普通休息日使用可區分的色調。 */
   --cal-weekend-bg:#F3F4F6;  --cal-weekend-num:#4B5563;
   --cal-holiday-bg:#A7F3D0;  --cal-holiday-num:#065F46;
   --cal-rest-bg:#F3F4F6;
 
   --font-sans:'Microsoft YaHei UI','Microsoft YaHei','PingFang SC','Noto Sans SC',system-ui,sans-serif;
-  /* 会跳动的数字：只用系统字体；拉丁 / 数字取 Segoe UI（Windows）或系统 UI 字体（Mac），中文落到雅黑 / 苹方 */
+  /* 會跳動的數字：只用系統字型；拉丁 / 數字取 Segoe UI（Windows）或系統 UI 字型（Mac），中文落到雅黑 / 蘋方 */
   --font-num:"Segoe UI",system-ui,"Microsoft YaHei UI","PingFang SC",sans-serif;
-  /* 五档字号共用一个比例；主金额和月历提示也跟随。 */
+  /* 五檔字號共用一個比例；主金額和月曆提示也跟隨。 */
   --fs-scale:1;
   --fs-hero-lg:calc(56px * var(--fs-scale)); --fs-hero-sm:calc(40px * var(--fs-scale));
   --fs-metric-lg:calc(20px * var(--fs-scale)); --fs-metric-sm:calc(16px * var(--fs-scale));
@@ -39,10 +39,10 @@
   --shadow-card:0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .08);
   --dur-fast:120ms; --dur-base:200ms; --ease:cubic-bezier(.2,0,0,1);
   --control-height:36px; --control-sm:32px;
-  /* 触屏最小可点高度：只在窄于 1000px 时套到按钮 / 分页标签 / 折叠行上（见文件末尾的触屏一节） */
+  /* 觸屏最小可點高度：只在窄於 1000px 時套到按鈕 / 分頁標籤 / 摺疊行上（見檔案末尾的觸屏一節） */
   --tap-min:44px;
 }
-/* M 保持原有大小；相邻档位相差 10 个百分点。 */
+/* M 保持原有大小；相鄰檔位相差 10 個百分點。 */
 :root[data-font-scale="xs"] { --fs-scale:.8; }
 :root[data-font-scale="s"] { --fs-scale:.9; }
 :root[data-font-scale="m"] { --fs-scale:1; }
@@ -143,7 +143,7 @@
   --cal-weekend-bg:#E8EAE7; --cal-weekend-num:#50584E; --cal-rest-bg:#E8EAE7;
   --cal-holiday-bg:#C8DEDF; --cal-holiday-num:#34595B;
 }
-/* 彩虹主题以暖棕色统一操作与选中态；粉、杏黄、薄荷、天蓝作为淡彩背景，
+/* 彩虹主題以暖棕色統一操作與選中態；粉、杏黃、薄荷、天藍作為淡彩背景，
    不取代休假等语义颜色，也不改变其他主题的控件。 */
 :root[data-theme="rainbow"] {
   --color-brand-50:#FFF5EE; --color-brand-100:#FBE9DC; --color-brand-600:#88432F; --color-brand-700:#703522;
@@ -174,7 +174,7 @@
 :root[data-theme="rainbow"] .status-card { background: var(--rainbow-glow), var(--color-card); }
 :root[data-theme="rainbow"] .card-band { height: 5px; background-image: var(--rainbow-band); }
 :root[data-theme="rainbow"] .main-panel { box-shadow: var(--shadow-card); }
-/* 保留实线选中态，在强制颜色模式下也不依赖渐变。 */
+/* 保留實線選中態，在強制顏色模式下也不依賴漸變。 */
 :root[data-theme="rainbow"] .tab[aria-selected="true"] { color: var(--color-brand-700); border-bottom-color: var(--color-brand-600); }
 :root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface); border-color: #D6B6A5; color: var(--color-brand-700); }
 :root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-brand-50); border-color: var(--color-brand-600); }
@@ -187,7 +187,7 @@
 :root[data-theme="rainbow"] .section-holiday .chip-ok { background: #DDEFF9; color: #17466B; }
 :root[data-theme="rainbow"] .switch:checked { background: #24745F; border-color: #24745F; }
 :root[data-theme="rainbow"] .card-cheer { color: var(--color-brand-700); }
-/* 普通工作日用轻淡四色；有语义标记的日期沿用各自颜色。 */
+/* 普通工作日用輕淡四色；有語義標記的日期沿用各自顏色。 */
 :root[data-theme="rainbow"] .cal-cell:nth-child(4n + 1) .day.kind-workday { background: #FCE7EE; }
 :root[data-theme="rainbow"] .cal-cell:nth-child(4n + 2) .day.kind-workday { background: #FFF1D9; }
 :root[data-theme="rainbow"] .cal-cell:nth-child(4n + 3) .day.kind-workday { background: #E1F4E8; }
@@ -212,13 +212,13 @@ button, input, select { font: inherit; color: inherit; }
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-/* 数字格旁边给读屏用的完整文字：不可选取，复制时不会重复一份 */
+/* 數字格旁邊給讀屏用的完整文字：不可選取，複製時不會重複一份 */
 .sr-text { user-select: none; -webkit-user-select: none; }
-/* 固定宽度数字格（R33）：--digit-w 由 digits.js 按实际字体量出最宽的数字；量不到时 0.62em */
+/* 固定寬度數字格（R33）：--digit-w 由 digits.js 按實際字型量出最寬的數字；量不到時 0.62em */
 .digits { white-space: nowrap; }
 .digit { display: inline-block; width: var(--digit-w, 0.62em); text-align: center; }
 
-/* Shell（spec §13.1）：≥1000px 时整页固定在视窗内，右侧面板吃掉剩余高度，月历行高弹性吸收提示条 */
+/* Shell（spec §13.1）：≥1000px 時整頁固定在視窗內，右側面板吃掉剩餘高度，月曆行高彈性吸收提示條 */
 #app { position: relative; max-width: 1600px; min-width: 0; margin: 0 auto; padding: var(--space-3) var(--space-4) var(--space-4); }
 @media (min-width: 1000px) {
   #app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
@@ -240,12 +240,12 @@ button, input, select { font: inherit; color: inherit; }
 .btn-s { min-height: 28px; padding: 0 var(--space-3); font-size: calc(13px * var(--fs-scale)); border-radius: var(--radius-sm); }
 .btn-xs { min-height: 24px; padding: 0 var(--space-2); font-size: calc(12px * var(--fs-scale)); border-radius: var(--radius-sm); }
 
-/* Header：品牌图示与标题（「悬浮成小窗」在左栏）。 */
+/* Header：品牌圖示與標題（「懸浮成小窗」在左欄）。 */
 .app-header { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; margin-bottom: var(--space-2); flex: none; }
 .app-logo { width: calc(28px * var(--fs-scale)); height: calc(28px * var(--fs-scale)); flex: none; object-fit: contain; }
 .app-header h1 { font-size: calc(18px * var(--fs-scale)); line-height: calc(28px * var(--fs-scale)); font-weight: 700; }
 
-/* Banners（单行薄条约 28px；info → before, error → unpaid） */
+/* Banners（單行薄條約 28px；info → before, error → unpaid） */
 .notices { display: grid; gap: var(--space-2); margin-bottom: var(--space-2); flex: none; }
 .notices:not(:has(> :not([hidden]))) { display: none; }
 .banner {
@@ -254,7 +254,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .banner-text { flex: 0 1 auto; min-width: 0; padding: var(--space-1) 0; }
 .banner-info { background: var(--state-before-bg); color: var(--state-before-fg); }
-/* M13：错误条靠底色、12px 图示与 500 字重区分，高度仍是 28px（两条横幅时页面预算才够） */
+/* M13：錯誤條靠底色、12px 圖示與 500 字重區分，高度仍是 28px（兩條橫幅時頁面預算才夠） */
 .banner-error { background: var(--state-unpaid-bg); color: var(--state-unpaid-fg); font-weight: 500; }
 .banner-icon { width: 12px; height: 12px; flex: none; }
 .banner-actions { display: flex; gap: var(--space-1); align-items: center; flex: none; margin-left: var(--space-1); }
@@ -265,7 +265,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .banner-close:hover { background: rgb(0 0 0 / .06); }
 
-/* Layout：左 状态卡（宽 360，固定）｜右 分页面板；窄于 1000px 改上下排列 */
+/* Layout：左 狀態卡（寬 360，固定）｜右 分頁面板；窄於 1000px 改上下排列 */
 .shell { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: var(--space-4); align-items: start; }
 .shell > .main-panel { align-self: stretch; }
 .card-col { min-width: 0; display: grid; gap: var(--space-2); align-content: start; }
@@ -303,14 +303,14 @@ button, input, select { font: inherit; color: inherit; }
 }
 .status-card[data-size="sm"] { padding: var(--space-4); box-shadow: none; border-radius: 0; }
 .status-card[data-size="sm"] { row-gap: 10px; }
-/* 大卡片：纵向 flex，指标格贴在卡片底部（margin-top:auto），所以九种状态的指标格在同一个 y；多出来的空白落在「标签 / 金额」与指标格之间（M11 / V1）。
+/* 大卡片：縱向 flex，指標格貼在卡片底部（margin-top:auto），所以九種狀態的指標格在同一個 y；多出來的空白落在「標籤 / 金額」與指標格之間（M11 / V1）。
    最小高度 = 「上班中」卡高，由 app.js 在运行时量（见 card.js measureReferenceHeight：载入、窗口改变、字体载入后）写成 --card-ref-h，
    所以 Windows 字体下也跟着变，不依赖在 macOS 量到的像素。内容更多（鼓励语、发薪日、缺表标签）时照常长高 */
 .status-card[data-size="lg"] { display: flex; flex-direction: column; min-height: var(--card-ref-h, 0px); }
-.status-card[data-size="lg"] { justify-content: space-between; } /* 多出来的高度均分到各块之间；最后一块（指标格）始终贴底，所以它与按钮的 y 不变 */
+.status-card[data-size="lg"] { justify-content: space-between; } /* 多出來的高度均分到各塊之間；最後一塊（指標格）始終貼底，所以它與按鈕的 y 不變 */
 .status-card[data-size="lg"][data-tone="rest"] .card-metrics, .status-card[data-size="lg"][data-tone="holiday"] .card-metrics,
 .status-card[data-size="lg"][data-tone="unpaid"] .card-metrics { margin-top: auto; }
-/* 矮视窗（≤ 640px，例如 1280×585）：左栏还要放「悬浮成小窗」按钮（R38）。主分页的大卡片收紧一点垂直间距，
+/* 矮視窗（≤ 640px，例如 1280×585）：左欄還要放「懸浮成小窗」按鈕（R38）。主分頁的大卡片收緊一點垂直間距，
    最高的常见卡片（鼓励语 + 发薪日）+ 两条提示条时左栏仍放得下；小窗（sm）不受影响 */
 @media (max-height: 640px) {
   .status-card[data-size="lg"] { padding-block: 18px; gap: 10px; }
@@ -344,33 +344,33 @@ button, input, select { font: inherit; color: inherit; }
   background: none; color: var(--color-text-600); cursor: pointer; align-items: center; justify-content: center;
 }
 .status-card[data-size="sm"] .card-gear { display: inline-flex; }
-/* 最小高 24px = 20px 强调标签（已下班 / 休息日 / 无薪假）的行高：12px 的小标签与强调标签同高，状态切换时卡高不变；小字贴近下方金额 */
+/* 最小高 24px = 20px 強調標籤（已下班 / 休息日 / 無薪假）的行高：12px 的小標籤與強調標籤同高，狀態切換時卡高不變；小字貼近下方金額 */
 .card-label { display: flex; align-items: flex-end; min-height: 24px; font: 500 var(--fs-body)/1.4 var(--font-sans); color: var(--color-text-900); }
 .card-amount {
   font-weight: 700; line-height: 1.1; white-space: nowrap; color: var(--color-text-900);
-  /* 理想字号等比例放大；金额过宽时才由 fitHero 缩小以免裁切。 */
+  /* 理想字號等比例放大；金額過寬時才由 fitHero 縮小以免裁切。 */
   font-size: calc(clamp(32px, 12.5cqi, 56px) * var(--fs-scale) * var(--hero-fit, 1));
 }
 .status-card[data-size="sm"] .card-amount { font-size: calc(var(--fs-hero-sm) * var(--hero-fit, 1)); }
 .amount-tail { color: var(--color-text-500); }
 .status-card.is-settled .amount-tail { color: inherit; }
-/* 收工当下的金额高亮：工作状态浅色褪去；背景色 + 等量 padding / 负 margin 避免版面位移。减少动态时不播。 */
+/* 收工當下的金額高亮：工作狀態淺色褪去；背景色 + 等量 padding / 負 margin 避免版面位移。減少動態時不播。 */
 .card-amount.is-celebrating { border-radius: var(--radius-md); padding: 2px 6px; margin: -2px -6px; animation: wm-cheer 1.2s var(--ease) 1; }
 @keyframes wm-cheer { 0% { background-color: var(--state-working-bg); } 100% { background-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { .card-amount.is-celebrating { animation: none; } }
 .card-cheer { color: var(--color-text-900); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-progress { display: grid; gap: var(--space-1); }
-/* 头一行（M4）：左「工时进度」，右倒数（14px、深色）；没有进度条的状态倒数另起一行（.card-countdown-slot） */
+/* 頭一行（M4）：左「工時進度」，右倒數（14px、深色）；沒有進度條的狀態倒數另起一行（.card-countdown-slot） */
 .card-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); min-height: 21px; }
 .card-progress-title { font: 500 var(--fs-label)/1.4 var(--font-sans); color: var(--color-text-600); white-space: nowrap; }
 .card-progress-aside { min-width: 0; text-align: right; white-space: nowrap; }
 .card-progress-aside .card-countdown { display: inline; font-size: var(--fs-body); line-height: 1.4; color: var(--color-text-900); }
-/* 倒数占位（V3）：隐藏的最宽形态与真实文字叠在同一格，真实文字靠左；格子右对齐，宽度恒定 */
+/* 倒數佔位（V3）：隱藏的最寬形態與真實文字疊在同一格，真實文字靠左；格子右對齊，寬度恆定 */
 .cd-wrap { display: inline-grid; justify-items: start; }
 .cd-wrap > * { grid-area: 1 / 1; }
 .cd-ghost { visibility: hidden; pointer-events: none; user-select: none; white-space: nowrap; }
 .card-progress-aside .cd-ghost, .card-progress-aside .card-countdown { font-size: var(--fs-body); line-height: 1.4; }
-/* 进度条（M5）：无描边、8px、淡轨道；填色圆角跟随轨道 */
+/* 進度條（M5）：無描邊、8px、淡軌道；填色圓角跟隨軌道 */
 .bar { height: 8px; border-radius: var(--radius-full); background: var(--color-border-subtle); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: inherit; background: var(--tone-fg); }
 .status-card[data-tone="lunch"] .bar-fill { background: var(--state-lunch-fill); }
@@ -380,24 +380,24 @@ button, input, select { font: inherit; color: inherit; }
 .metric-value { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
 .status-card[data-size="sm"] .metric-value { font-size: var(--fs-metric-sm); }
 
-/* Settings（基本设置分页）：两栏 = 两种用途；内容放不下时各栏独立滚动，页面与分页标签不动。 */
+/* Settings（基本設定分頁）：兩欄 = 兩種用途；內容放不下時各欄獨立滾動，頁面與分頁標籤不動。 */
 .tabpanel-settings { overflow: hidden; }
 .settings { position: relative; height: 100%; min-height: 0; overflow: hidden; }
-/* position: relative：分页内的绝对定位元素（看不见的文件输入框等）以滚动区为包含块，被它裁剪，不会把整页撑出卷轴 */
-/* 「已自动保存」放在分页标签那一行的右侧（app.js 把它放在 .main-panel 下、相对它定位，不被分页的 overflow 裁掉，也不盖住卡片文字） */
+/* position: relative：分頁內的絕對定位元素（看不見的檔案輸入框等）以滾動區為包含塊，被它裁剪，不會把整頁撐出卷軸 */
+/* 「已自動儲存」放在分頁標籤那一行的右側（app.js 把它放在 .main-panel 下、相對它定位，不被分頁的 overflow 裁掉，也不蓋住卡片文字） */
 .autosave { position: absolute; top: 14px; right: 16px; z-index: 1; font-size: var(--fs-caption); line-height: calc(20px * var(--fs-scale)); color: var(--color-brand-700); background: var(--color-surface); animation: fade-out 1.5s var(--ease) forwards; }
 @keyframes fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .autosave { animation: none; } }
 .set-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; height: 100%; min-height: 0; align-items: stretch; }
 .set-col { display: grid; gap: 16px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 2px; }
-/* 不预留卷轴槽（R51 A2）：Windows 常驻卷轴（12–17px）只在真的需要滚动时才占宽，默认状态不会因此把卡头挤成两行 */
-/* 分页较窄（1000–1199px 宽的视窗）改单栏：整个设置内容在分页内部滚动（R51 A1），每张卡都滚得到，分页标签与页面不动 */
+/* 不預留卷軸槽（R51 A2）：Windows 常駐卷軸（12–17px）只在真的需要滾動時才佔寬，預設狀態不會因此把卡頭擠成兩行 */
+/* 分頁較窄（1000–1199px 寬的視窗）改單欄：整個設定內容在分頁內部滾動（R51 A1），每張卡都滾得到，分頁標籤與頁面不動 */
 @container (max-width: 760px) {
   .settings { overflow-y: auto; }
   .set-grid { grid-template-columns: minmax(0, 1fr); height: auto; }
   .set-col { overflow: visible; }
 }
-/* M16：单栏模式下设置内容在分页内滚动，mac 没有常驻滚动条——没到底时底部渐隐，提示下面还有内容；
+/* M16：單欄模式下設定內容在分頁內滾動，mac 沒有常駐捲軸——沒到底時底部漸隱，提示下面還有內容；
    滚到底（.is-cut 被去掉）即消失。覆在内容上，不占高度、不挡点击。
    注意：容器查询只能命中容器的后代，这条规则必须写在查询外（.is-cut 只在单栏模式下才会被加上）。 */
 .tabpanel-settings:has(> .settings.is-cut)::after {
@@ -415,7 +415,7 @@ button, input, select { font: inherit; color: inherit; }
 .scard-title .icon { color: var(--color-brand-700); flex: none; }
 .scard-desc { margin: 0; text-wrap: balance; font-size: calc(13px * var(--fs-scale)); line-height: calc(19px * var(--fs-scale)); color: var(--color-text-600); }
 .scard-body { padding: 14px 16px 16px; display: grid; gap: 10px; min-width: 0; }
-/* 标签 → 控件：固定标签栏宽，所有行对齐同一条竖线；提示与错误在控件下方 */
+/* 標籤 → 控制元件：固定標籤欄寬，所有行對齊同一條豎線；提示與錯誤在控制元件下方 */
 .row { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 12px; align-items: center; min-height: 32px; }
 .row-label { font-size: calc(14px * var(--fs-scale)); font-weight: 500; color: var(--color-text-600); }
 .row-ctrl { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -437,7 +437,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 @media (forced-colors: active) { .sel { appearance: auto; background-image: none; } }
 .inp[aria-invalid="true"], .sel[aria-invalid="true"] { border-color: var(--state-unpaid-fg); border-width: 2px; }
-/* 焦点框贴合控件外缘；说明文字留出描边空间。 */
+/* 焦點框貼合控制元件外緣；說明文字留出描邊空間。 */
 .inp:focus-visible, .sel:focus-visible { outline-offset: 0; }
 .input-prefix-sign { flex: none; font-weight: 600; color: var(--color-text-600); }
 .unit, .to { flex: none; font-size: calc(14px * var(--fs-scale)); color: var(--color-text-600); }
@@ -457,14 +457,14 @@ button, input, select { font: inherit; color: inherit; }
 .switch:checked::after { background: #fff; transform: translateX(16px); }
 .switch-state { font-size: calc(14px * var(--fs-scale)); color: var(--color-text-900); min-width: 1em; }
 .cheer-count { flex: none; margin-left: auto; min-width: 3em; text-align: right; font-size: var(--fs-caption); color: var(--color-text-600); font-variant-numeric: tabular-nums; }
-/* 鼓励语：一句一行。行内是「输入框 + 计数 + 删除」，整块与右侧控件列对齐、上下留白由网格行自带 */
+/* 鼓勵語：一句一行。行內是「輸入框 + 計數 + 刪除」，整塊與右側控制元件列對齊、上下留白由網格行自帶 */
 .row-cheer { align-items: start; }
 .row-cheer > .row-label { padding-top: 7px; }
 .cheer-editor { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: 1 1 auto; min-width: 0; width: 100%; }
 .cheer-list { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
 .cheer-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .cheer-item > .inp { flex: 1 1 auto; width: auto; min-width: 0; }
-/* 删除钮只有一个符号：固定成方型，别让文字按钮的内边距把它拉成椭圆 */
+/* 刪除鈕只有一個符號：固定成方型，別讓文字按鈕的內邊距把它拉成橢圓 */
 .cheer-remove { flex: none; min-width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: calc(15px * var(--fs-scale)); }
 .cheer-add { align-self: flex-start; }
 .para { margin: 0; font-size: calc(13px * var(--fs-scale)); line-height: calc(19px * var(--fs-scale)); color: var(--color-text-600); }
@@ -472,7 +472,7 @@ button, input, select { font: inherit; color: inherit; }
 .btn-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .warn-note { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: calc(12px * var(--fs-scale)); line-height: calc(18px * var(--fs-scale)); color: var(--warning-fg); background: var(--warning-bg); border-radius: var(--radius-full); padding: 2px 8px; }
 .warn-note .icon { width: 12px; height: 12px; flex: none; }
-/* 高级设置：卡头本身就是展开按钮（标题里放按钮，APG 手风琴） */
+/* 進階設定：卡頭本身就是展開按鈕（標題裡放按鈕，APG 手風琴） */
 .adv-heading { margin: 0; font: inherit; }
 .adv-head {
   display: flex; align-items: center; gap: 6px; width: 100%; min-height: 36px; padding: 8px 14px; border: 0; cursor: pointer; text-align: left;
@@ -488,7 +488,7 @@ button, input, select { font: inherit; color: inherit; }
 .field-label { font-size: calc(14px * var(--fs-scale)); font-weight: 600; color: var(--color-text-900); }
 .adv-field .inp { font-family: var(--font-num); }
 
-/* 矮视窗保留紧凑版，避免预设内容出现内层滚动。 */
+/* 矮視窗保留緊湊版，避免預設內容出現內層滾動。 */
 @media (max-height: 800px) {
   .set-grid { gap: var(--space-3); }
   .set-col { gap: 6px; }
@@ -505,7 +505,7 @@ button, input, select { font: inherit; color: inherit; }
   .adv-head { padding-block: 6px; min-height: 32px; }
 }
 
-/* 基本设置 › 假期数据：年份胶囊 + 上次检查、两颗按钮各带常驻说明、单一结果区（tone：success 绿 / info 蓝 / warn 黄；「已是最新」用 success）、格式示例 */
+/* 基本設定 › 假期資料：年份膠囊 + 上次檢查、兩顆按鈕各帶常駐說明、單一結果區（tone：success 綠 / info 藍 / warn 黃；「已是最新」用 success）、格式示例 */
 .holiday-body { display: grid; gap: 6px; min-width: 0; }
 @media (max-height: 640px) { .holiday-body { gap: 4px; } }
 .hstatus { display: flex; align-items: center; gap: 6px; min-height: 26px; }
@@ -526,7 +526,7 @@ button, input, select { font: inherit; color: inherit; }
 .holiday-result[data-tone="success"] { background: var(--state-working-bg); color: var(--state-working-fg); }
 .holiday-result[data-tone="info"] { background: var(--state-before-bg); color: var(--state-before-fg); }
 .holiday-result[data-tone="warn"] { background: var(--warning-bg); color: var(--warning-fg); }
-/* L7：结果行里的 ✓ 与胶囊 / 月历标记里的图示同尺寸 */
+/* L7：結果行裡的 ✓ 與膠囊 / 月曆標記裡的圖示同尺寸 */
 .holiday-result-text .icon { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
 .holiday-result-detail { font-size: var(--fs-caption); }
 .holiday-result-detail:empty { display: none; }
@@ -546,29 +546,29 @@ button, input, select { font: inherit; color: inherit; }
 .ex-line { margin: 0; font-size: calc(12px * var(--fs-scale)); line-height: calc(17px * var(--fs-scale)); color: var(--color-text-600); }
 .mono { font-family: ui-monospace, Consolas, "SF Mono", Menlo, monospace; font-size: calc(12px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); color: var(--color-text-900); background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: 3px; padding: 0 3px; user-select: all; overflow-wrap: anywhere; }
 
-/* Calendar（spec §13.3）：工具列 / 摘要行 / 图例各占一行且不换行，其余高度给格子（行高 minmax(40px, 1fr)） */
+/* Calendar（spec §13.3）：工具列 / 摘要行 / 圖例各佔一行且不換行，其餘高度給格子（行高 minmax(40px, 1fr)） */
 .calendar { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
 .cal-toolbar { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; margin-bottom: 6px; flex: none; white-space: nowrap; }
 .cal-title { font-weight: 600; font-size: calc(15px * var(--fs-scale)); min-width: 7.5em; text-align: center; font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) { .cal-toolbar { flex-wrap: wrap; } }
-/* 本月时是「安静」样式：边框仍用控件色（对白底 4.83:1，≥ 3:1），看得出能点、不像停用（M6） */
+/* 本月時是「安靜」樣式：邊框仍用控制元件色（對白底 4.83:1，≥ 3:1），看得出能點、不像停用（M6） */
 .cal-today { color: var(--color-text-600); }
 .cal-today.is-away { background: var(--color-brand-100); border-color: var(--color-brand-600); color: var(--color-brand-700); font-weight: 600; }
 .cal-today.is-away:hover { background: var(--color-brand-50); }
 .cal-summary { display: flex; align-items: center; gap: 10px; min-height: 28px; margin-bottom: 2px; flex: none; white-space: nowrap; font-size: calc(13px * var(--fs-scale)); min-width: 0; }
-/* 较窄的视窗（< 1280px）：摘要行放不下时换行，不截断胶囊或缺表标签（round 3） */
+/* 較窄的視窗（< 1280px）：摘要行放不下時換行，不截斷膠囊或缺表標籤（round 3） */
 @media (max-width: 1279px) { .cal-summary { flex-wrap: wrap; row-gap: 2px; } .cal-note { flex: none; } }
 .cal-undo[aria-disabled="true"] { color: var(--color-text-600); cursor: default; opacity: .65; }
 .cal-summary-text { font-weight: 500; font-variant-numeric: tabular-nums; flex: none; }
-/* 情境胶囊（R36 / 决定 4）：有放假 = 实线灰底 + 旗子；有表且本月真的没有 = 纯灰字、无框（M10）；无表且没标出 = 虚线、不打 ✓。放不下时省略号，全文在 title */
+/* 情境膠囊（R36 / 決定 4）：有放假 = 實線灰底 + 旗子；有表且本月真的沒有 = 純灰字、無框（M10）；無表且沒標出 = 虛線、不打 ✓。放不下時省略號，全文在 title */
 .cal-note {
   display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--radius-full);
   font-size: calc(12px * var(--fs-scale)); white-space: nowrap; font-family: var(--font-num); min-width: 0; overflow: hidden; flex: 0 1 auto;
 }
 .cal-note[data-tone="holiday"] { background: var(--cal-holiday-bg); color: var(--color-text-900); border: 1px solid var(--color-border-subtle); }
-/* M10：本月确实没有法定假日——只是说明，不是状态，不给框、不给底；依据只放在 title 里 */
+/* M10：本月確實沒有法定假日——只是說明，不是狀態，不給框、不給底；依據只放在 title 裡 */
 .cal-note[data-tone="none"] { background: none; border: 0; padding: 0; color: var(--color-text-600); }
-/* 没有假期表、也还没标出假日：虚线框提醒「这里可以补」 */
+/* 沒有假期表、也還沒標出假日：虛線框提醒「這裡可以補」 */
 .cal-note[data-tone="unknown"] { background: var(--color-surface); color: var(--color-text-600); border: 1px dashed var(--color-border-control); }
 .cal-note-icon { display: inline-flex; flex: none; }
 .cal-note .icon { width: 12px; height: 12px; }
@@ -579,7 +579,7 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--warning-bg); color: var(--warning-fg);
 }
 .cal-reset { margin-left: auto; }
-/* 图例在宽屏保持一行，窄屏按可用空间换行。 */
+/* 圖例在寬屏保持一行，窄屏按可用空間換行。 */
 .cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; height: 22px; margin-bottom: 6px; flex: none; white-space: nowrap; overflow: hidden; font-size: var(--fs-caption); color: var(--color-text-600); }
 .legend-title { font-weight: 600; flex: none; }
 .legend-items { display: flex; gap: 10px; align-items: center; flex: none; }
@@ -588,7 +588,7 @@ button, input, select { font: inherit; color: inherit; }
   .cal-legend { height: auto; overflow: visible; row-gap: 4px; }
   .legend-items { flex: 1 1 0; min-width: 0; flex-wrap: wrap; gap: 4px 10px; }
 }
-/* M7：操作提示贴工具栏右端；空间不够时量测改短文案，再不够才隐藏（render / resize / 字体就绪都重算）。 */
+/* M7：操作提示貼工具欄右端；空間不夠時量測改短文案，再不夠才隱藏（render / resize / 字型就緒都重算）。 */
 .legend-hint { margin-left: auto; flex: none; line-height: calc(22px * var(--fs-scale)); font-size: var(--fs-caption); color: var(--color-text-600); }
 .legend-swatch {
   display: inline-flex; align-items: center; justify-content: center; position: relative;
@@ -596,7 +596,7 @@ button, input, select { font: inherit; color: inherit; }
   border: 1px solid var(--color-border-subtle); background: var(--color-surface);
 }
 .legend-swatch.is-today { border: 2px solid var(--color-brand-600); }
-/* M8：色块直接用真实格子的 token（后面的 .kind-* 底色规则盖掉这里的白底），不再单独给周末加边框 */
+/* M8：色塊直接用真實格子的 token（後面的 .kind-* 底色規則蓋掉這裡的白底），不再單獨給週末加邊框 */
 .legend-swatch .day-dot { position: static; }
 .legend-swatch .icon { width: 12px; height: 12px; }
 .cal-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto; grid-auto-rows: minmax(40px, 1fr); gap: var(--space-1); }
@@ -611,11 +611,11 @@ button, input, select { font: inherit; color: inherit; }
   transition: background-color var(--dur-fast) var(--ease);
 }
 .day:hover { border-color: var(--color-border-control); }
-/* 只有「没被标记」的格子加 hover 底色：周末/休息日格本来就是灰底，工作日的白底给一点浅绿反馈；
+/* 只有「沒被標記」的格子加 hover 底色：週末/休息日格本來就是灰底，工作日的白底給一點淺綠反饋；
    有标记的格子（法定假日/带薪假/无薪假/调休上班/手动改休息）已经有自己的底色，不去盖掉它 */
 .day.kind-workday:hover, .day.kind-weekend:hover { background: var(--color-brand-50); }
 .day:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
-/* 数字宽于圆时也以圆心为基准居中；今天另按实际墨迹对齐。 */
+/* 數字寬於圓時也以圓心為基準居中；今天另按實際墨跡對齊。 */
 .day-num { font-size: calc(13px * var(--fs-scale)); font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; height: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .day-num-ink { flex: none; }
 .day-date { display: flex; align-items: center; gap: 3px; max-width: 100%; }
@@ -626,9 +626,9 @@ button, input, select { font: inherit; color: inherit; }
 .day-tag, .legend-swatch .day-tag { display: inline-flex; align-items: center; gap: 1px; flex: none; font-size: var(--fs-caption); line-height: calc(14px * var(--fs-scale)); }
 .day-tag .icon { width: 12px; height: 12px; }
 .day-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* 窄视窗（< 1240px，格子最窄约 78px）：标签字号 11px，让「班 劳动节」在 Windows 的微软雅黑下也有余量（mac 上实测 ≥ 6px） */
+/* 窄視窗（< 1240px，格子最窄約 78px）：標籤字號 11px，讓「班 勞動節」在 Windows 的微軟雅黑下也有餘量（mac 上實測 ≥ 6px） */
 @media (max-width: 1239px) { .day-label, .day-tag { font-size: calc(11px * var(--fs-scale)); } }
-/* 「班」与节日名之间 3px，免得读成一个词（班国庆）；最窄的格子（≤ 80px，1000px 宽的视窗）只留 1px，保住 ≥ 6px 的余量 */
+/* 「班」與節日名之間 3px，免得讀成一個詞（班國慶）；最窄的格子（≤ 80px，1000px 寬的視窗）只留 1px，保住 ≥ 6px 的餘量 */
 @container (max-width: 80px) { .day-label { gap: 1px; } }
 .day-dot { position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-600); display: inline-block; }
 .kind-weekend { background: var(--cal-weekend-bg); }
@@ -643,16 +643,16 @@ button, input, select { font: inherit; color: inherit; }
 }
 .kind-rest { background: var(--cal-rest-bg); }
 .day.is-today { border: 2px solid var(--color-brand-600); padding: 3px 5px 1px; }
-/* 今日圆圈随字级放大，M 以下维持原尺寸，避免大字贴住圆边。 */
+/* 今日圓圈隨字級放大，M 以下維持原尺寸，避免大字貼住圓邊。 */
 .day.is-today .day-num { width: max(22px, calc(22px * var(--fs-scale))); height: max(22px, calc(22px * var(--fs-scale))); flex: none; background: var(--color-brand-600); color: #fff; }
-/* 大格子放大日期并放宽内边距；今日圆圈仍随全局字级调整。 */
+/* 大格子放大日期並放寬內邊距；今日圓圈仍隨全域性字級調整。 */
 @container (min-width: 140px) {
   .day { padding: 6px 8px 2px; }
   .day.is-today { padding: 5px 7px 1px; }
   .day-num { width: 24px; height: 24px; font-size: calc(15px * var(--fs-scale)); }
 }
 
-/* Day menu（菜单）与提示：浮在月历之上；状态以文字 + 图示表达，不只靠颜色 */
+/* Day menu（選單）與提示：浮在月曆之上；狀態以文字 + 圖示表達，不只靠顏色 */
 .day-menu {
   position: absolute; z-index: 20; width: 300px; max-width: calc(100% - 8px);
   background: var(--color-surface); border: 1px solid var(--color-border-subtle);
@@ -675,7 +675,7 @@ button, input, select { font: inherit; color: inherit; }
 .day-menu-note { display: block; grid-column: 3; font-size: var(--fs-caption); color: var(--color-text-600); font-weight: 400; font-variant-numeric: tabular-nums; }
 .day-menu-note.is-current { color: var(--color-brand-700); }
 .day-menu-footer { margin: 0; padding: var(--space-2) var(--space-2) var(--space-1); border-top: 1px solid var(--color-border-subtle); font-size: var(--fs-caption); line-height: 1.4; color: var(--color-text-600); }
-/* 日期提示（Task 18 · V1「白卡盖格」）：白底卡片原样盖在被悬停 / 聚焦的格子上（inset:0，不溢出到旁边或下面的格子），内容水平置中、
+/* 日期提示（Task 18 · V1「白卡蓋格」）：白底卡片原樣蓋在被懸停 / 聚焦的格子上（inset:0，不溢位到旁邊或下面的格子），內容水平置中、
    上下留白相等；2px 边框用状态色（工作日绿 / 调休紫 / 带薪蓝 / 法定假日青绿 / 周末休息中性灰 / 今天 brand-600；无薪假边框中性灰、只有状态文字是红）；
    日期粗体、状态用状态色、计薪金额是主角。由 day-tooltip.js 实测、依序试这些档位，选第一个放得下的：
    依次收紧行距、去掉来源或把计薪改成一行；日期格能显示农历时才隐藏提示里的农历，再缩字、藏星期，最后才拿掉状态。
@@ -696,7 +696,7 @@ button, input, select { font: inherit; color: inherit; }
 .day-tooltip[data-kind="paid"] { --tip-fg: var(--state-paid-fg); }
 .day-tooltip[data-kind="unpaid"] { --tip-fg: var(--state-unpaid-fg); --tip-ring: var(--color-text-500); }
 .day-tooltip.is-today { --tip-fg: var(--color-brand-700); --tip-ring: var(--color-brand-600); --tip-bg: var(--color-brand-50); }
-/* 「单位」：只在单位之间换行（日期、周X、「法定假日·」、「劳动节」…），名字中间不折行 */
+/* 「單位」：只在單位之間換行（日期、周X、「法定假日·」、「勞動節」…），名字中間不折行 */
 .day-tooltip .u { display: inline-block; white-space: nowrap; }
 .day-tooltip .tip-title { font-weight: 600; color: var(--color-text-900); }
 .day-tooltip .tip-lunar { white-space: nowrap; color: var(--color-text-600); }
@@ -704,42 +704,42 @@ button, input, select { font: inherit; color: inherit; }
 .day-tooltip .tip-status { font-weight: 500; color: var(--tip-fg); }
 .day-tooltip .tip-source { font-size: calc(11px * var(--fs-scale)); line-height: calc(14px * var(--fs-scale)); color: var(--color-text-600); }
 .day-tooltip .tip-pay { line-height: calc(22px * var(--fs-scale)); white-space: nowrap; }
-.day-tooltip .pay-label, .day-tooltip .pay-amt { line-height: 1; } /* 一行里字号不同：行高由 .tip-pay 决定，不被大字撑高 */
+.day-tooltip .pay-label, .day-tooltip .pay-amt { line-height: 1; } /* 一行裡字號不同：行高由 .tip-pay 決定，不被大字撐高 */
 .day-tooltip .pay-label { font-size: calc(11px * var(--fs-scale)); color: var(--color-text-600); }
 .day-tooltip .pay-amt { font-size: calc(18px * var(--fs-scale)); font-weight: 700; color: var(--color-brand-700); letter-spacing: -0.2px; }
-.day-tooltip .tip-pay { font-size: calc(18px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+.day-tooltip .tip-pay { font-size: calc(18px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
 .day-tooltip .tip-pay.is-zero .pay-amt { color: var(--color-text-600); }
 .day-tooltip.is-compact .tip-source { display: none; }
 .day-tooltip.is-no-pay-label .pay-label { display: none; }
 .day-tooltip.is-no-status-name .tip-status .u-detail { display: none; }
-.day-tooltip.is-no-wd .u-wd { display: none; } /* 倒数第二档：先藏「周X」（屏幕阅读器仍从 aria-describedby 读到），之后才是拿掉状态行 */
+.day-tooltip.is-no-wd .u-wd { display: none; } /* 倒數第二檔：先藏「周X」（螢幕閱讀器仍從 aria-describedby 讀到），之後才是拿掉狀態行 */
 .day-tooltip.is-lean .tip-status { display: none; }
 .day-tooltip.is-tight { font-size: calc(11px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
 .day-tooltip.is-tight .tip-source { font-size: calc(10.5px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
 .day-tooltip.is-tight .tip-pay { line-height: calc(20px * var(--fs-scale)); }
 .day-tooltip.is-tight .pay-label { font-size: calc(10.5px * var(--fs-scale)); }
 .day-tooltip.is-tight .pay-amt { font-size: calc(17px * var(--fs-scale)); }
-.day-tooltip.is-tight .tip-pay { font-size: calc(17px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+.day-tooltip.is-tight .tip-pay { font-size: calc(17px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
 .day-tooltip.is-mini { font-size: calc(10px * var(--fs-scale)); line-height: calc(11px * var(--fs-scale)); }
 .day-tooltip.is-mini .tip-pay { line-height: calc(15px * var(--fs-scale)); }
 .day-tooltip.is-mini .pay-label { font-size: calc(10px * var(--fs-scale)); }
 .day-tooltip.is-mini .pay-amt { font-size: calc(13px * var(--fs-scale)); }
-.day-tooltip.is-mini .tip-pay { font-size: calc(13px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
-/* 窄格子（< 112px，约 1000–1200px 宽的视窗）：小一号字；「计薪」小字一行、金额一行（金额仍是主角）；放不下（矮格子）就回到一行 */
+.day-tooltip.is-mini .tip-pay { font-size: calc(13px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
+/* 窄格子（< 112px，約 1000–1200px 寬的視窗）：小一號字；「計薪」小字一行、金額一行（金額仍是主角）；放不下（矮格子）就回到一行 */
 @container (max-width: 112px) {
   .day-tooltip { padding: 0 2px; font-size: calc(11px * var(--fs-scale)); line-height: calc(13px * var(--fs-scale)); }
   .day-tooltip .tip-source { font-size: calc(10.5px * var(--fs-scale)); line-height: calc(13px * var(--fs-scale)); }
   .day-tooltip .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: calc(12px * var(--fs-scale)); }
   .day-tooltip .pay-label { font-size: calc(10.5px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
   .day-tooltip .pay-amt { font-size: calc(14px * var(--fs-scale)); line-height: calc(17px * var(--fs-scale)); letter-spacing: -0.3px; }
-  .day-tooltip .tip-pay { font-size: calc(14px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip .tip-pay { font-size: calc(14px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
   .day-tooltip.is-inline .tip-pay { display: block; line-height: calc(17px * var(--fs-scale)); }
   .day-tooltip.is-tight { padding: 0 1px; font-size: calc(10.5px * var(--fs-scale)); line-height: calc(12px * var(--fs-scale)); }
-  .day-tooltip.is-tight .tip-title { letter-spacing: -0.2px; } /* 78px 宽的格子：「11月18日 周三」挤进一行 */
+  .day-tooltip.is-tight .tip-title { letter-spacing: -0.2px; } /* 78px 寬的格子：「11月18日 週三」擠進一行 */
   .day-tooltip.is-tight .tip-pay { line-height: calc(12px * var(--fs-scale)); }
   .day-tooltip.is-tight .pay-label { line-height: calc(11px * var(--fs-scale)); }
   .day-tooltip.is-tight .pay-amt { font-size: calc(13px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); }
-  .day-tooltip.is-tight .tip-pay { font-size: calc(13px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-tight .tip-pay { font-size: calc(13px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
   .day-tooltip.is-tight.is-inline .tip-pay { line-height: calc(16px * var(--fs-scale)); }
   .day-tooltip.is-mini { font-size: calc(10px * var(--fs-scale)); line-height: calc(11px * var(--fs-scale)); }
   .day-tooltip.is-mini.is-inline .tip-pay { line-height: calc(14px * var(--fs-scale)); }
@@ -747,13 +747,13 @@ button, input, select { font: inherit; color: inherit; }
   .day-tooltip.is-mini .pay-label, .day-tooltip.is-mini .pay-amt { line-height: 1; }
   .day-tooltip.is-mini .pay-label { font-size: calc(10px * var(--fs-scale)); }
   .day-tooltip.is-mini .pay-amt { font-size: calc(11px * var(--fs-scale)); }
-  .day-tooltip.is-mini .tip-pay { font-size: calc(11px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-mini .tip-pay { font-size: calc(11px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
 }
 @container (max-width: 74px) {
   .day-tooltip.is-lean .tip-title, .day-tooltip.is-lean .tip-lunar { line-height: calc(10px * var(--fs-scale)); }
   .day-tooltip.is-lean .tip-pay { display: flex; flex-direction: column; align-items: center; line-height: calc(11px * var(--fs-scale)); }
 }
-/* 大格子（≥ 140px，约 1536 / 1920 宽）：字跟着放大；行高不够（6 周月份）时收紧，金额仍 ≥ 日期字号的 1.5 倍 */
+/* 大格子（≥ 140px，約 1536 / 1920 寬）：字跟著放大；行高不夠（6 周月份）時收緊，金額仍 ≥ 日期字號的 1.5 倍 */
 @container (min-width: 140px) {
   .day-tooltip { font-size: calc(13px * var(--fs-scale)); line-height: calc(18px * var(--fs-scale)); gap: 1px; }
   .day-tooltip .tip-title { font-size: calc(14px * var(--fs-scale)); }
@@ -761,21 +761,21 @@ button, input, select { font: inherit; color: inherit; }
   .day-tooltip .tip-pay { line-height: calc(28px * var(--fs-scale)); }
   .day-tooltip .pay-label { font-size: calc(12px * var(--fs-scale)); }
   .day-tooltip .pay-amt { font-size: calc(22px * var(--fs-scale)); }
-  .day-tooltip .tip-pay { font-size: calc(22px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip .tip-pay { font-size: calc(22px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
   .day-tooltip.is-tight { font-size: calc(13px * var(--fs-scale)); line-height: calc(16px * var(--fs-scale)); gap: 0; }
   .day-tooltip.is-tight .tip-title { font-size: calc(13px * var(--fs-scale)); }
   .day-tooltip.is-tight .tip-source { font-size: calc(12px * var(--fs-scale)); line-height: calc(14px * var(--fs-scale)); }
   .day-tooltip.is-tight .tip-pay { line-height: calc(22px * var(--fs-scale)); }
   .day-tooltip.is-tight .pay-label { font-size: calc(12px * var(--fs-scale)); }
   .day-tooltip.is-tight .pay-amt { font-size: calc(20px * var(--fs-scale)); }
-  .day-tooltip.is-tight .tip-pay { font-size: calc(20px * var(--fs-scale)); } /* 行内基线（strut）与金额同字号，行高才不被撑高 */
+  .day-tooltip.is-tight .tip-pay { font-size: calc(20px * var(--fs-scale)); } /* 行內基線（strut）與金額同字號，行高才不被撐高 */
 }
 /* Keep a readable amount and status when the NT$ prefix needs more width. */
 .day-tooltip.is-currency-fit .tip-title { font-size: calc(9px * var(--fs-scale)); }
 .day-tooltip.is-currency-fit .pay-amt { font-size: calc(14px * var(--fs-scale)); letter-spacing: -0.4px; }
 .day-tooltip.is-currency-fit .tip-pay { font-size: calc(14px * var(--fs-scale)); line-height: calc(15px * var(--fs-scale)); }
 
-/* Import report（H6 放到备份卡顶部；M19：不再是一层嵌套框，只用一条分隔线与卡片其余内容分开） */
+/* Import report（H6 放到備份卡頂部；M19：不再是一層巢狀框，只用一條分隔線與卡片其餘內容分開） */
 .import-report { display: grid; gap: var(--space-2); padding: 0 0 var(--space-2); border: 0; border-bottom: 1px solid var(--color-border-subtle); }
 .import-report p { margin: 0; }
 .import-report h3 { margin: 0; font-size: var(--fs-body); font-weight: 600; }
@@ -792,7 +792,7 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--color-text-900); color: #fff; border-radius: var(--radius-md); box-shadow: var(--shadow-card);
 }
 .toast-action { border: 0; background: none; color: var(--color-toast-action); font-weight: 600; cursor: pointer; text-decoration: underline; min-height: 24px; }
-/* 标签的角色：有金额的状态是小标签（14px 深色，V5）；已下班是 20px 状态色的收工句；
+/* 標籤的角色：有金額的狀態是小標籤（14px 深色，V5）；已下班是 20px 狀態色的收工句；
    休息日 / 法定假日 / 无薪假没有金额，标签就是这张卡的主角（32px），在标签与指标格之间的空白里居中（lg） */
 .status-card[data-tone="after"] .card-label { font: 600 var(--fs-metric-lg)/1.2 var(--font-sans); color: var(--tone-fg); }
 .status-card[data-tone="rest"] .card-label, .status-card[data-tone="holiday"] .card-label, .status-card[data-tone="unpaid"] .card-label {
@@ -800,18 +800,18 @@ button, input, select { font: inherit; color: inherit; }
 }
 .status-card[data-size="lg"][data-tone="rest"] .card-label, .status-card[data-size="lg"][data-tone="holiday"] .card-label,
 .status-card[data-size="lg"][data-tone="unpaid"] .card-label { margin-top: auto; }
-/* 已下班：进度头一行右侧「✓ 今天工作满 7小时」（状态色） */
+/* 已下班：進度頭一行右側「✓ 今天工作滿 7小時」（狀態色） */
 .card-done { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-body); line-height: 1.4; color: var(--tone-fg); white-space: nowrap; }
 .card-done .icon { flex: none; }
 
-/* 无内置假期表的年份提示（文字本身就是信息，不只靠颜色） */
+/* 無內建假期表的年份提示（文字本身就是資訊，不只靠顏色） */
 .card-year {
   justify-self: start; align-self: start; padding: 2px var(--space-2); border-radius: var(--radius-full);
   font: 500 var(--fs-caption)/1.4 var(--font-sans);
   background: var(--warning-bg); color: var(--warning-fg);
 }
 
-/* Float (Document PiP)：状态卡正下方、同一栏满宽的主按钮（R38）；按钮下是说明（不支持的原因 / 悬浮时请保持本页开启） */
+/* Float (Document PiP)：狀態卡正下方、同一欄滿寬的主按鈕（R38）；按鈕下是說明（不支援的原因 / 懸浮時請保持本頁開啟） */
 .float-control { display: grid; gap: 6px; }
 .float-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
 .float-btn .icon { flex: none; }
@@ -828,10 +828,10 @@ button, input, select { font: inherit; color: inherit; }
 .pip-placeholder:hover { background: var(--color-brand-50); }
 .pip-placeholder:active { background: var(--color-brand-100); }
 .pip-body { margin: 0; min-height: 100vh; display: grid; background: var(--color-surface); }
-/* 小窗里卡片铺满窗口（L3）：内容少的状态垂直居中，不留白条；测量用的 measureSmallCard 在主文件里量，不受影响 */
+/* 小窗裡卡片鋪滿視窗（L3）：內容少的狀態垂直居中，不留白條；測量用的 measureSmallCard 在主檔案裡量，不受影響 */
 .pip-body .status-card { min-height: 100vh; align-content: center; }
 
-/* 状态卡区块开关（设置 › 显示）：card.js 用 hidden 收起来，这里再声明一次「关掉就真的不占位」。
+/* 狀態卡區塊開關（設定 › 顯示）：card.js 用 hidden 收起來，這裡再宣告一次「關掉就真的不佔位」。
    两条路都留着 = 就算某个环节漏了 hidden（例如将来某块不是 show() 收起），版面也不会留下空洞。
    日期开关只收 .card-date-group（日期 + 农历），状态徽章永远保留：看得到「为什么今天这样」。 */
 .status-card[data-show-progress="false"] .card-progress,
@@ -840,59 +840,59 @@ button, input, select { font: inherit; color: inherit; }
 .status-card[data-show-payday="false"] .card-payday,
 .status-card[data-show-cheer="false"] .card-cheer { display: none; }
 
-/* 会变化的数字统一用数字字体栈 + 等宽数字（放在最后，覆盖前面 font 简写里的字体族）。
+/* 會變化的數字統一用數字字型棧 + 等寬數字（放在最後，覆蓋前面 font 簡寫裡的字型族）。
    雅黑是否支持等宽数字未在 Windows 实测，所以数字不交给 --font-sans。 */
 .amount, .metric-value, .card-date, .card-progress-text, .card-countdown, .cd-ghost, .card-done, .card-payday,
 .day-num, .cal-title, .cal-summary-text, .day-menu-note, .day-tooltip, .cheer-count, .input-prefix > input {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 
-/* 触屏 / 窄屏（< 1000px）：可点目标统一到 --tap-min（44px）。桌面（≥ 1000px）保持 24 / 28 / 32 / 36px 的紧凑密度，
+/* 觸屏 / 窄屏（< 1000px）：可點目標統一到 --tap-min（44px）。桌面（≥ 1000px）保持 24 / 28 / 32 / 36px 的緊湊密度，
    所以这一节整段只在窄屏生效；只改高度、内边距与换行，不引入新颜色，全部沿用上面的 token。 */
 @media (max-width: 999px) {
-  /* 按钮：.btn(36) / .btn-s(28) / .btn-xs(24) 都抬到 44——导入/导出备份、导入假期表、检查更新、复制示例、月历翻页
+  /* 按鈕：.btn(36) / .btn-s(28) / .btn-xs(24) 都抬到 44——匯入/匯出備份、匯入假期表、檢查更新、複製示例、月曆翻頁
      都走这三类。选择器与上面的 .btn-s / .btn-xs 同优先级，本段在文件末尾，靠源码顺序覆盖；宽度、内边距与字号不动，
      所以「复制示例」这类窄按钮只变高，不会挤到下一行。 */
   .btn { min-height: var(--tap-min); }
   .autosave { position: fixed; top: 12px; right: 12px; z-index: 10; padding: 4px 10px; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-full); box-shadow: var(--shadow-card); }
 
-  /* 鼓励语的删除钮：桌面 32px 方钮，窄屏抬到 --tap-min 的方型点击区（宽度也要抬，只抬高度会变成细长条）；
+  /* 鼓勵語的刪除鈕：桌面 32px 方鈕，窄屏抬到 --tap-min 的方型點選區（寬度也要抬，只抬高度會變成細長條）；
      输入框仍是 flex:1 1 auto + min-width:0，行内其余元素不换行，320px 下不会挤出横向卷轴 */
   .cheer-remove { min-width: var(--tap-min); min-height: var(--tap-min); }
 
-  /* 分页标签与折叠行（格式示例、高级设置）：整行可点，高度与按钮一致 */
+  /* 分頁標籤與摺疊行（格式示例、進階設定）：整行可點，高度與按鈕一致 */
   .tab { height: var(--tap-min); }
   .disclosure, .adv-head { min-height: var(--tap-min); }
 
-  /* 提示条：动作按钮与关闭钮变高后整条允许换行——文字放不下时动作退到第二行，而不是把正文挤成一列字。
+  /* 提示條：動作按鈕與關閉鈕變高後整條允許換行——文字放不下時動作退到第二行，而不是把正文擠成一列字。
      正文仍用基础的 flex:0 1 auto，短文案配小按钮时依然排成一行 */
   .banner { flex-wrap: wrap; row-gap: var(--space-1); padding-block: var(--space-1); }
   .banner-actions { gap: var(--space-2); }
   .banner-close { min-width: var(--tap-min); min-height: var(--tap-min); }
 
-  /* 开关：视觉仍是 40×24（描边与滑块不动），点击区用伪元素扩到 44×44；.row 同步到 44，避免相邻行点击区互相覆盖 */
+  /* 開關：視覺仍是 40×24（描邊與滑塊不動），點選區用偽元素擴到 44×44；.row 同步到 44，避免相鄰行點選區互相覆蓋 */
   .row { min-height: var(--tap-min); }
   .switch::before { content: ""; position: absolute; inset: -10px -2px; }
 
-  /* 月历：日期菜单项 40 → 44（菜单高度由 JS 用 offsetHeight 量后重新定位，变高不会跑到视窗外的错误位置）。
+  /* 月曆：日期選單項 40 → 44（選單高度由 JS 用 offsetHeight 量後重新定位，變高不會跑到視窗外的錯誤位置）。
      工具栏 / 摘要行本身不改：里面的 .btn-s 变 44 会把行撑高，基础样式已有的 480px / 1279px 换行规则照旧生效。 */
   .day-menu-item { min-height: var(--tap-min); }
 
-  /* 撤销（toast 里的动作）：44 高；整条限宽并允许换行，320px 下既不出横向卷轴，也不会把提示文字挤出屏幕 */
+  /* 撤銷（toast 裡的動作）：44 高；整條限寬並允許換行，320px 下既不出橫向卷軸，也不會把提示文字擠出螢幕 */
   .toast { max-width: calc(100% - 2 * var(--space-4)); flex-wrap: wrap; row-gap: var(--space-1); }
   .toast-text { min-width: 0; overflow-wrap: anywhere; }
   .toast-action { min-height: var(--tap-min); padding-inline: var(--space-1); }
 
-  /* 导入结果的「导出报告 / 关闭」两颗按钮变高后，320px 下允许换行，不撑破卡片 */
+  /* 匯入結果的「匯出報告 / 關閉」兩顆按鈕變高後，320px 下允許換行，不撐破卡片 */
   .report-actions { flex-wrap: wrap; row-gap: var(--space-2); }
 }
 
-/* 单栏设置显示分区导航；窄视口的两栏也显示，并让导航占满整行。 */
+/* 單欄設定顯示分割槽導航；窄視口的兩欄也顯示，並讓導航佔滿整行。 */
 .settings-nav { display: none; align-items: center; gap: var(--space-2);
     min-width: 0; max-width: 100%;
     overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
-    /* 四边各留 4px：:focus-visible 的 2px 描边 + 2px 偏移刚好落在留白里，不被滚动容器裁掉 */
+    /* 四邊各留 4px：:focus-visible 的 2px 描邊 + 2px 偏移剛好落在留白裡，不被滾動容器裁掉 */
     padding: var(--space-1); margin: 0;
     border-bottom: 1px solid var(--color-border-subtle);
     scrollbar-width: thin;
@@ -907,9 +907,9 @@ button, input, select { font: inherit; color: inherit; }
     transition: background-color var(--dur-fast) var(--ease);
   }
   .settings-nav-link:hover { background: var(--color-brand-50); color: var(--color-brand-700); }
-  /* 焦点环画在内侧（与 .inp / .sel 同一做法），横向滚动容器不会裁掉它 */
+  /* 焦點環畫在內側（與 .inp / .sel 同一做法），橫向滾動容器不會裁掉它 */
   .settings-nav-link:focus-visible { outline-offset: 0; }
-  /* 容器宽于 760px 时设置区仍是两栏（约 ≥816px 视窗）：导航占满整行，不挤掉第一张卡；单栏时 1 / -1 等价于整行，无害 */
+  /* 容器寬於 760px 時設定區仍是兩欄（約 ≥816px 視窗）：導航佔滿整行，不擠掉第一張卡；單欄時 1 / -1 等價於整行，無害 */
   .set-grid > .settings-nav { grid-column: 1 / -1; }
 @container (max-width: 760px) { .settings-nav { display: flex; } }
 @media (max-width: 999px) { .settings-nav { display: flex; } }

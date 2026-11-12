@@ -1,4 +1,4 @@
-// Task 11：联网更新假期 / 导入假期表 —— 纯函数层（URL、未发布判定、差异计数、状态行、结果模型）与流程编排（假 storage + 假 fetch）。
+// Task 11：聯網更新假期 / 匯入假期表 —— 純函式層（URL、未釋出判定、差異計數、狀態行、結果模型）與流程編排（假 storage + 假 fetch）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ const memStore = (init = {}) => {
   const m = { ...init };
   return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, m };
 };
-// 测试用的 2027 年数据（虚构，不是官方安排；只为满足校验规则）
+// 測試用的 2027 年資料（虛構，不是官方安排；只為滿足校驗規則）
 const file2027 = () => ({
   year: 2027,
   papers: ['https://www.gov.cn/zhengce/test-2027.htm'],
@@ -33,7 +33,7 @@ const file2027 = () => ({
   ],
 });
 const resp = (body, ok = true, status = 200) => ({ ok, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
-// 2027 自 P9 起内置：这些流程测试要的是「该年没有表」的路径，所以显式注入不含 2027 的表集合
+// 2027 自 P9 起內建：這些流程測試要的是「該年沒有表」的路徑，所以顯式注入不含 2027 的表集合
 const NO_2027 = { 2026: HOLIDAYS_CN[2026] };
 
 // ---- URL ----
@@ -50,16 +50,16 @@ test('validateCustomUrl: https:// + {year} required; no whitespace; must parse; 
     assert.equal(r.ok, false, bad);
     assert.equal(r.code, 'customUrlError', bad);
   }
-  // R32：可见 ASCII 以外（空格、控制字符、零宽字符、中文）
+  // R32：可見 ASCII 以外（空格、控制字元、零寬字元、中文）
   for (const bad of [' https://example.org/{year}.json', 'https://example.org/{year}.json ', 'https://exa mple.org/{year}', 'https://example.org/\u0001{year}', 'https://example.org/\u200b{year}.json', 'https://例子.cn/{year}.json', 'https://example.org/{year}\t']) {
     assert.equal(validateCustomUrl(bad).code, 'customUrlChars', JSON.stringify(bad));
   }
   assert.equal(validateCustomUrl('https://example.org\\@evil.com/{year}').code, 'customUrlBackslash');
   assert.equal(validateCustomUrl('https:\\\\evil.com/{year}').code, 'customUrlBackslash');
-  // 用户名 / 密码：看起来像 jsDelivr，实际主机是 evil.com
+  // 使用者名稱 / 密碼：看起來像 jsDelivr，實際主機是 evil.com
   assert.equal(validateCustomUrl('https://cdn.jsdelivr.net@evil.com/{year}.json').code, 'customUrlUserinfo');
   assert.equal(validateCustomUrl('https://u:p@example.org/{year}.json').code, 'customUrlUserinfo');
-  // {year} 只能在路径或查询参数里
+  // {year} 只能在路徑或查詢引數裡
   for (const bad of ['https://{year}', 'https://{year}.example.org/a.json', 'https://example.org:{year}/a.json', 'https://example.org/a.json#{year}', 'https://example.org/a.json?x=1#y{year}']) {
     assert.equal(validateCustomUrl(bad).code, 'customUrlYearPlace', bad);
   }
@@ -74,7 +74,7 @@ test('sourcesWith: custom first, then the three defaults; invalid custom ignored
   assert.deepEqual(sourcesWith('http://bad/{year}'), [...DEFAULT_HOLIDAY_SOURCES]);
 });
 
-// ---- 未发布 ----
+// ---- 未釋出 ----
 test('isUnpublishedYear: only the real empty upstream shape (papers [] and days [])', () => {
   assert.equal(isUnpublishedYear(fx('holiday-cn-2027-empty.json'), 2027), true);
   assert.equal(isUnpublishedYear({ year: 2027, papers: [], days: [] }, 2026), false, 'year must match');
@@ -95,7 +95,7 @@ test('fetchHolidayYear failure kind: unpublished / invalid / network (invalid > 
   assert.equal((await one(resp('', false, 404))).kind, 'network');
   const thrown = await fetchHolidayYear(2027, { sources: ['https://a/{year}'], fetchImpl: async () => { throw new TypeError('x'); } });
   assert.equal(thrown.kind, 'network');
-  // 多个来源：只要有一个给了「不合格数据」就报 invalid；否则有「未发布」就报 unpublished
+  // 多個來源：只要有一個給了「不合格資料」就報 invalid；否則有「未釋出」就報 unpublished
   const mixed = async (bodies) => {
     let i = 0;
     return fetchHolidayYear(2027, { sources: bodies.map((_, k) => `https://s${k}/{year}`), fetchImpl: async () => { const b = bodies[i++]; if (b instanceof Error) throw b; return b; } });
@@ -104,7 +104,7 @@ test('fetchHolidayYear failure kind: unpublished / invalid / network (invalid > 
   assert.equal((await mixed([resp(fx('holiday-cn-2027-empty.json')), resp({ ...file2027(), days: [{ name: 'x', date: '2027-01-04', isOffDay: false }, { name: '元旦', date: '2027-01-01', isOffDay: true }] })])).kind, 'invalid');
 });
 
-// ---- store：customUrl 是新增字段，不影响旧字段 ----
+// ---- store：customUrl 是新增欄位，不影響舊欄位 ----
 test('store: customUrl roundtrip; other writes keep it; invalid stored value ignored', () => {
   const s = memStore();
   assert.equal(loadCustomUrl(s), null);
@@ -127,7 +127,7 @@ test('store: customUrl roundtrip; other writes keep it; invalid stored value ign
   assert.deepEqual(saveCustomUrl(bad, 'https://example.org/{year}'), { ok: false });
 });
 
-// ---- 差异计数：只比日期与类型（放假 / 调休上班），不比节日名 ----
+// ---- 差異計數：只比日期與型別（放假 / 調休上班），不比節日名 ----
 test('diffCount: real 2026 file vs built-in = 0 (names 清明 vs 清明节 ignored)', () => {
   const v = validateHolidayYear(fx('holiday-cn-2026.json'), 2026);
   assert.equal(v.ok, true);
@@ -149,22 +149,22 @@ test('dayCounts for the import summary', () => {
   assert.deepEqual(dayCounts(validateHolidayYear(file2027(), 2027).table), { off: 3, makeup: 1 });
 });
 
-// ---- 状态行 ----
+// ---- 狀態行 ----
 const online2027 = { off: { '2027-01-01': '元旦' }, makeup: {}, source: 'online' };
 test('statusLine / statusModel: built-in / online / imported / missing chips; 上次检查 only when checked', () => {
   const nov = new Date(2026, 10, 20, 9);
   const file2027t = { ...online2027, source: 'file' };
-  // P9：2027 从 2026-11 起内置，两个年份胶囊都是「内置」
+  // P9：2027 從 2026-11 起內建，兩個年份膠囊都是「內建」
   assert.equal(statusLine(nov, HOLIDAYS_CN, null, t), '2026 年 · 内置 · 2027 年 · 内置');
   assert.equal(statusLine(nov, HOLIDAYS_CN, new Date(2026, 10, 3, 8).getTime(), t), '2026 年 · 内置 · 2027 年 · 内置 · 上次检查 11/03');
-  // 未内置仍要覆盖：注入不含 2027 的表集合
+  // 未內建仍要覆蓋：注入不含 2027 的表集合
   assert.equal(statusLine(nov, NO_2027, null, t), '2026 年 · 内置 · 2027 年 · 未内置');
   assert.equal(statusLine(nov, NO_2027, new Date(2026, 10, 3, 8).getTime(), t), '2026 年 · 内置 · 2027 年 · 未内置 · 上次检查 11/03');
   assert.equal(statusLine(nov, { ...HOLIDAYS_CN, 2027: online2027 }, nov.getTime(), t),
     '2026 年 · 内置 · 2027 年 · 联网更新 · 上次检查 11/20');
-  // R30：导入的年份不声称来源
+  // R30：匯入的年份不聲稱來源
   assert.equal(statusLine(nov, { ...HOLIDAYS_CN, 2027: file2027t }, null, t), '2026 年 · 内置 · 2027 年 · 已导入文件');
-  // 11 月之前只列当年；有下一年的表时也列出（P9 后 2027 已内置，所以 6 月也列出来）
+  // 11 月之前只列當年；有下一年的表時也列出（P9 後 2027 已內建，所以 6 月也列出來）
   assert.equal(statusLine(new Date(2026, 5, 1), HOLIDAYS_CN, null, t), '2026 年 · 内置 · 2027 年 · 内置');
   assert.equal(statusLine(new Date(2026, 5, 1), NO_2027, null, t), '2026 年 · 内置');
   assert.equal(statusLine(new Date(2026, 5, 1), { ...HOLIDAYS_CN, 2027: online2027 }, null, t), '2026 年 · 内置 · 2027 年 · 联网更新');
@@ -179,7 +179,7 @@ test('statusLine / statusModel: built-in / online / imported / missing chips; �
   assert.equal(statusModel(nov, HOLIDAYS_CN, null, t).lastCheck, null);
 });
 
-// ---- 结果模型：一次只显示一个结果 ----
+// ---- 結果模型：一次只顯示一個結果 ----
 test('pickResult + resultView: one result; non-built-in years first; priorities', () => {
   const v = (rs) => resultView(pickResult(rs), t);
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }, { year: 2027, protected: false, outcome: 'added' }]), { tone: 'success', text: '已更新：新增 2027 年假期表', detail: null });
@@ -187,19 +187,19 @@ test('pickResult + resultView: one result; non-built-in years first; priorities'
     { tone: 'info', text: '数据来源暂未发布 2027 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: null });
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'network', reason: 'r1' }, { year: 2027, protected: false, outcome: 'network', reason: 'r2' }]),
     { tone: 'warn', text: '无法连接假期数据来源，请稍后重试，或使用「导入假期表文件」', detail: null });
-  // reason 现在总是语义化的 { code, params }：detail 由当前字典翻出，不再需要剥「所有数据源都获取失败：」前缀
+  // reason 現在總是語義化的 { code, params }：detail 由當前字典翻出，不再需要剝「所有資料來源都獲取失敗：」字首
   assert.deepEqual(v([{ year: 2027, protected: false, outcome: 'invalid', reason: { code: 'papersBad' } }]),
     { tone: 'warn', text: '来源数据不完整，已拒绝，未采用', detail: '原因：假期数据的出处不是国务院官网（www.gov.cn）的链接', formatHelp: false });
   assert.deepEqual(v([{ year: 2027, protected: false, outcome: 'invalid', reason: { code: 'httpFail', params: 500 } }]).detail, `原因：${t.holidayData.httpFail(500)}`);
   assert.equal(v([{ year: 2027, protected: false, outcome: 'invalid', reason: null }]).detail, null);
-  // R47：格式 / 内容不合格（validateHolidayYear）才附「查看格式示例」
+  // R47：格式 / 內容不合格（validateHolidayYear）才附「檢視格式示例」
   assert.equal(v([{ year: 2027, protected: false, outcome: 'invalid', reason: 'bad', format: true }]).formatHelp, true);
-  // L7：「已是最新」是成功的结果（绿）并在前面加 ✓，不是停用的灰
+  // L7：「已是最新」是成功的結果（綠）並在前面加 ✓，不是停用的灰
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'same' }]), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: null, check: true });
   assert.deepEqual(v([{ year: 2026, protected: true, outcome: 'diff', n: 3 }]), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: null, check: true }, 'built-in diff never applied; notice is page-level');
   assert.equal(pickResult([]), null);
   assert.equal(resultView(null, t), null);
-  // invalid 胜过 network、network 胜过 unpublished（同为非内置年份）
+  // invalid 勝過 network、network 勝過 unpublished（同為非內建年份）
   assert.equal(pickResult([{ year: 2027, protected: false, outcome: 'unpublished' }, { year: 2028, protected: false, outcome: 'invalid', reason: 'x' }]).outcome, 'invalid');
   assert.equal(pickResult([{ year: 2027, protected: false, outcome: 'unpublished' }, { year: 2028, protected: false, outcome: 'network', reason: 'x' }]).outcome, 'network');
 });
@@ -209,7 +209,7 @@ test('customUrlSummary', () => {
   assert.equal(customUrlSummary('https://example.org:8443/a/{year}.json', t), '自定义数据网址：example.org:8443');
 });
 
-// ---- 流程编排 ----
+// ---- 流程編排 ----
 function harness({ now = new Date(2026, 10, 4, 9), storage = memStore(), fetchImpl, tables = HOLIDAYS_CN } = {}) {
   const calls = [];
   const notes = [];
@@ -240,13 +240,13 @@ test('auto-check: before Nov 1 no request at all', async () => {
 });
 
 test('auto-check: 2027 built in -> nothing to fetch in Nov 2026 either', async () => {
-  // P9：2027 有了内置表，11 月起也不再为次年抓取
+  // P9：2027 有了內建表，11 月起也不再為次年抓取
   const h = harness({ now: new Date(2026, 10, 4, 9), fetchImpl: async () => { throw new Error('should not fetch'); } });
   await h.api.autoCheckIfNeeded();
   assert.deepEqual(h.calls, []);
   assert.equal(loadLastCheck(h.storage), null, 'no attempt -> lastCheck untouched');
   assert.equal(h.tables()[2027], HOLIDAYS_CN[2027]);
-  // 次年（2028）没有表时照常抓取（空文件会继续试下一个来源）
+  // 次年（2028）沒有表時照常抓取（空檔案會繼續試下一個來源）
   const empty2028 = JSON.stringify({ year: 2028, papers: [], days: [] });
   const n = harness({ now: new Date(2027, 10, 4, 9), fetchImpl: byHost({ 'cdn.jsdelivr.net': resp(empty2028) }) });
   await n.api.autoCheckIfNeeded();
@@ -293,7 +293,7 @@ test('auto-check from 2026-11-04: valid 2027 applied, persisted, quiet toast, la
   assert.equal(loadLastCheck(h.storage), new Date(2026, 10, 4, 9).getTime());
   assert.equal(h.last().result, null, 'auto success: toast only');
   assert.match(h.last().line, /2027 年 · 联网更新/);
-  // 同一天第二次：不再请求
+  // 同一天第二次：不再請求
   await h.api.autoCheckIfNeeded();
   assert.equal(h.calls.length, 1);
 });
@@ -341,7 +341,7 @@ test('manual check: current year (built-in, compared) + next year in Nov; one re
 test('manual check: built-in diff -> page-level info notice with N, not applied', async () => {
   const changed = fx('holiday-cn-2026.json');
   changed.days = changed.days.filter((d) => d.date !== '2026-10-07'); // 少一天放假
-  changed.days.push({ name: '国庆节', date: '2026-10-11', isOffDay: false }); // 多一个调休（周日）
+  changed.days.push({ name: '国庆节', date: '2026-10-11', isOffDay: false }); // 多一個調休（週日）
   const h = harness({ now: new Date(2026, 5, 1, 9), tables: NO_2027, fetchImpl: byHost({ '2026.json': resp(changed) }) });
   await h.api.checkNow();
   assert.deepEqual(h.notes, [['info', '网上的放假安排与本机内置的有 2 天不同，暂按内置的计算']]);
@@ -358,7 +358,7 @@ test('manual check: failure shows the specific message; invalid file rejected; e
   assert.doesNotMatch(f.last().result.text, /网络不通/);
 
   const bad = file2027();
-  bad.days.push({ name: '劳动节', date: '2027-05-06', isOffDay: false }); // 周四调休上班
+  bad.days.push({ name: '劳动节', date: '2027-05-06', isOffDay: false }); // 週四調休上班
   const storage = memStore();
   const i = harness({ storage, tables: NO_2027, fetchImpl: byHost({ '2027.json': resp(bad), '2026.json': resp(fx('holiday-cn-2026.json')) }) });
   await i.api.checkNow();
@@ -409,7 +409,7 @@ test('importFile: success / rejected / no year / built-in year / not JSON', () =
   bad.papers = ['https://evil.example/x'];
   const r = h.api.importFile(JSON.stringify({ ...bad, year: 2028, days: bad.days.map((d) => ({ ...d, date: d.date.replace('2027', '2028') })) }));
   assert.equal(r.ok, false);
-  // 经渲染后再比较：无论 reason 是 {code} 还是旧的整句，显示出来都必须还是同一句中文
+  // 經渲染後再比較：無論 reason 是 {code} 還是舊的整句，顯示出來都必須還是同一句中文
   assert.equal(renderReason(r.reason, t.holidayData), t.holidayData.papersBad);
   assert.equal(h.last().result.text, t.holidayData.papersBad);
   assert.equal(h.last().result.tone, 'warn');
@@ -417,7 +417,7 @@ test('importFile: success / rejected / no year / built-in year / not JSON', () =
   for (const txt of ['{"papers":[],"days":[]}', '{"year":"2027"}', '{"year":27.5}', 'not json', '[]', 'null']) {
     const x = h.api.importFile(txt);
     assert.equal(x.ok, false, txt);
-    // 返回值保持语义：{ code, domain }；画面上才是当前字典的句子
+    // 返回值保持語義：{ code, domain }；畫面上才是當前字典的句子
     assert.equal(x.reason.code, 'importNoYear', txt);
     assert.equal(h.last().result.text, t.holidayUpdate.importNoYear, txt);
   }
@@ -425,7 +425,7 @@ test('importFile: success / rejected / no year / built-in year / not JSON', () =
   assert.deepEqual(b, { ok: false, reason: { code: 'importBuiltin', params: 2026, domain: 'update' }, year: 2026 });
   assert.equal(h.last().result.text, t.holidayUpdate.importBuiltin(2026));
   assert.equal(h.tables()[2026], HOLIDAYS_CN[2026]);
-  // 空文件（未发布）导入：按校验拒绝，不当作「该年没有假日」
+  // 空檔案（未釋出）匯入：按校驗拒絕，不當作「該年沒有假日」
   const e = h.api.importFile(JSON.stringify({ year: 2029, papers: [], days: [] }));
   assert.equal(e.ok, false);
   assert.equal(h.tables()[2029], undefined);
@@ -435,7 +435,7 @@ test('setCustomUrl: invalid not saved; empty clears; status summary follows', ()
   const storage = memStore();
   const h = harness({ storage, fetchImpl: async () => { throw new Error('no'); } });
   assert.equal(h.last().customSummary, '自定义数据网址：未设置');
-  // 纯校验只给 code/params（面板读 r.code → 当前字典）；句子不再从这里出来
+  // 純校驗只給 code/params（面板讀 r.code → 當前字典）；句子不再從這裡出來
   assert.deepEqual(h.api.setCustomUrl('http://x/{year}'), { ok: false, code: 'customUrlError' });
   assert.equal(renderReason({ code: 'customUrlError' }, t.holidayUpdate), '网址必须以 https:// 开头，并包含 {year}');
   assert.equal(loadCustomUrl(storage), null);
@@ -465,7 +465,7 @@ test('reload (other tab changed the holidays key): re-read tables, no storage wr
   assert.equal(h.tables()[2026], HOLIDAYS_CN[2026]);
 });
 
-// ---- R30：导入的文件年份受保护 ----
+// ---- R30：匯入的檔案年份受保護 ----
 test('R30: online data never overwrites an imported (file) year; differing data -> 「联网数据与导入的表有 N 处不同，未采用」', async () => {
   const storage = memStore();
   const body = file2027();
@@ -485,7 +485,7 @@ test('R30: online data never overwrites an imported (file) year; differing data 
   assert.equal(cur[2027].source, 'file');
   assert.equal(loadOnlineTables(storage).meta[2027].source, 'file', 'storage untouched too');
   assert.deepEqual(notes, [['info', '网上的放假安排与你导入的文件有 1 天不同，暂按导入的文件计算', 'file']]);
-  // 相同的数据：不提示
+  // 相同的資料：不提示
   notes.length = 0;
   const api2 = startHolidayUpdate({
     storage, clock: () => new Date(2026, 10, 4, 9),
@@ -495,7 +495,7 @@ test('R30: online data never overwrites an imported (file) year; differing data 
   });
   await api2.checkNow();
   assert.deepEqual(notes, []);
-  // 用户可以再次导入覆盖自己的文件年份
+  // 使用者可以再次匯入覆蓋自己的檔案年份
   assert.equal(api2.importFile(JSON.stringify(body)).ok, true);
   assert.equal(cur[2027].off['2027-04-05'], '清明节');
 });
@@ -512,7 +512,7 @@ test('store: source file read as file; an https:// source as online; empty sourc
   assert.equal(l.tables[2029], undefined);
 });
 
-// Task 14 E1：已存年份的 source 只接受 'file' 或以 https:// 开头的下载网址；其他一律丢弃该年（绝不默默变成 'online'）
+// Task 14 E1：已存年份的 source 只接受 'file' 或以 https:// 開頭的下載網址；其他一律丟棄該年（絕不默默變成 'online'）
 test('store: a stored source must be exactly \'file\' or start with https:// — anything else drops the year', () => {
   const s = memStore();
   const v = validateHolidayYear(file2027(), 2027);
@@ -539,7 +539,7 @@ test('store: a stored source must be exactly \'file\' or start with https:// —
   assert.deepEqual(Object.keys(l.tables).sort(), ['2027', '2031']);
 });
 
-// ---- R32：结果区一次一个，最新的用户操作优先 ----
+// ---- R32：結果區一次一個，最新的使用者操作優先 ----
 test('R32: an in-flight manual check does not overwrite a newer import result; auto-check never replaces a user result', async () => {
   let release;
   const gate = new Promise((r) => { release = r; });
@@ -552,7 +552,7 @@ test('R32: an in-flight manual check does not overwrite a newer import result; a
   assert.match(h.last().result.text, /^已导入 2027 年假期表/, 'import result kept after the older check finished');
   assert.equal(h.last().checking, false);
 
-  // 后台自动检查（暂未发布）不替换刚显示的导入结果
+  // 後臺自動檢查（暫未釋出）不替換剛顯示的匯入結果
   let rel2;
   const gate2 = new Promise((r) => { rel2 = r; });
   const a = harness({ tables: NO_2027, fetchImpl: async () => { await gate2; return resp(fx('holiday-cn-2027-empty.json')); } });
@@ -561,7 +561,7 @@ test('R32: an in-flight manual check does not overwrite a newer import result; a
   rel2();
   await auto;
   assert.equal(a.last().result.text, '文件里没有可用的年份和放假数据，未导入');
-  // 手动检查之后再按一次：最新那次的结果
+  // 手動檢查之後再按一次：最新那次的結果
   const m = harness({ tables: NO_2027, fetchImpl: byHost({ '2026.json': resp(fx('holiday-cn-2026.json')), '2027.json': resp(fx('holiday-cn-2027-empty.json')) }) });
   await Promise.all([m.api.checkNow(), m.api.checkNow()]);
   assert.equal(m.last().result.tone, 'info');
@@ -570,14 +570,14 @@ test('R32: an in-flight manual check does not overwrite a newer import result; a
 // ---- R32：抓取加固 ----
 test('R32: wall-clock backstop: a fetch that ignores the signal still ends as 连接超时 and frees the queue', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const never = () => new Promise(() => {}); // 不理会 AbortSignal、永远不结束
+  const never = () => new Promise(() => {}); // 不理會 AbortSignal、永遠不結束
   const p = fetchHolidayYear(2027, { sources: ['https://a/{year}'], fetchImpl: never, timeoutMs: 8000 });
   t.mock.timers.tick(8000);
   const r = await p;
   assert.equal(r.ok, false);
   assert.equal(r.kind, 'network');
   assert.deepEqual(r.reason, { code: 'timeout' });
-  // 经由流程：按钮不会停在「检查中…」，之后的检查照常排队执行
+  // 經由流程：按鈕不會停在「檢查中…」，之後的檢查照常排隊執行
   const h = harness({ now: new Date(2026, 5, 1, 9), fetchImpl: never });
   const c1 = h.api.checkNow();
   for (let i = 0; i < 3; i++) { await Promise.resolve(); t.mock.timers.tick(5000); await new Promise((res) => setImmediate(res)); }
@@ -608,11 +608,11 @@ test('R32: bodies over 256 KB rejected before JSON.parse; a redirect to non-http
   assert.equal(ok.ok, true, 'https redirect target is fine');
 });
 
-// ---- R47：「查看格式示例」只跟着格式 / 内容不合格的拒绝出现 ----
+// ---- R47：「檢視格式示例」只跟著格式 / 內容不合格的拒絕出現 ----
 test('R47: fetchHolidayYear marks validateHolidayYear failures as format:true; size / not-JSON / not-https / network are not', async () => {
   const body = (text, extra = {}) => ({ ok: true, status: 200, url: 'https://a/2027.json', headers: { get: () => null }, text: async () => text, ...extra });
   const one = (b) => fetchHolidayYear(2027, { sources: ['https://a/{year}'], fetchImpl: async () => b });
-  const badMakeup = { ...file2027(), days: [...file2027().days, { name: '元旦', date: '2027-01-04', isOffDay: false }] }; // 2027-01-04 是周一
+  const badMakeup = { ...file2027(), days: [...file2027().days, { name: '元旦', date: '2027-01-04', isOffDay: false }] }; // 2027-01-04 是週一
   const r1 = await one(body(JSON.stringify(badMakeup)));
   assert.deepEqual([r1.ok, r1.kind, r1.format], [false, 'invalid', true]);
   assert.equal(r1.reason.code, 'makeupNotWeekend');
@@ -653,7 +653,7 @@ test('R47: the format example shown (and copied) is a complete file the validato
   const v = validateHolidayYear(json, json.year);
   assert.equal(v.ok, true, v.reason);
   assert.deepEqual(v.table, { off: { '2026-01-01': '元旦' }, makeup: { '2026-01-04': '元旦' } });
-  // 内容就是 holiday-cn 2026.json 的真实数据（出处链接与这两天）
+  // 內容就是 holiday-cn 2026.json 的真實資料（出處連結與這兩天）
   const real = fx('holiday-cn-2026.json');
   assert.deepEqual(json.papers, real.papers);
   for (const d of json.days) assert.ok(real.days.some((x) => x.date === d.date && x.name === d.name && x.isOffDay === d.isOffDay), d.date);

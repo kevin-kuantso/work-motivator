@@ -1,4 +1,4 @@
-// 纯函数：月历格子模型（design-spec §7.2，周一为一周起始）。tables 缺省时用内置假期表。
+// 純函式：月曆格子模型（design-spec §7.2，週一為一週起始）。tables 預設時用內建假期表。
 import { dayInfo } from '../calendar.js';
 import { ymd } from './format.js';
 
@@ -25,7 +25,7 @@ export function cellKind(date, cfg, marks, tables) {
 export function monthGrid(year, monthIndex, cfg, marks, today, tables) {
   const first = new Date(year, monthIndex, 1);
   const days = new Date(year, monthIndex + 1, 0).getDate();
-  const lead = (first.getDay() + 6) % 7; // 周一 = 0
+  const lead = (first.getDay() + 6) % 7; // 週一 = 0
   const todayKey = today ? ymd(today) : null;
   const cells = [];
   for (let i = 0; i < lead; i++) cells.push(null);

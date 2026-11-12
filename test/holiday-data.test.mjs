@@ -24,7 +24,7 @@ const fixDay = (d) => ({ name: '春节', date: '2027-02-06', isOffDay: true, ...
 test('real 2026 file passes and equals built-in table day by day', () => {
   const r = validateHolidayYear(real2026(), 2026);
   assert.equal(r.ok, true);
-  // 日期逐日一致（节日名称的叫法允许不同，例如「清明节」与「清明」）
+  // 日期逐日一致（節日名稱的叫法允許不同，例如「清明節」與「清明」）
   assert.deepEqual(Object.keys(r.table.off).sort(), Object.keys(HOLIDAYS_CN[2026].off).sort());
   assert.deepEqual(Object.keys(r.table.makeup).sort(), Object.keys(HOLIDAYS_CN[2026].makeup).sort());
   assert.equal(Object.keys(r.table.off).length, 33);
@@ -35,14 +35,14 @@ test('real 2026 file passes and equals built-in table day by day', () => {
 test('empty 2027 file is rejected', () => {
   const r = validateHolidayYear(fx('holiday-cn-2027-empty.json'), 2027);
   assert.equal(r.ok, false);
-  // 空文件两项都空：按校验顺序先命中 papersMissing，由流程的「未发布」判断另行识别（fetch 里 kind = unpublished）
+  // 空檔案兩項都空：按校驗順序先命中 papersMissing，由流程的「未釋出」判斷另行識別（fetch 裡 kind = unpublished）
   assert.equal(r.code, 'papersMissing');
   assert.equal(typeof r.reason, 'undefined', '纯校验不产出任何一种语言的句子');
   assert.equal(renderReason(r, STRINGS.holidayData), STRINGS.holidayData.papersMissing);
 });
 
 test('rejections (no coercion, whole file, code per check)', () => {
-  // 每个变异不只是「被拒绝」，还要落到该检查的稳定 code（顺序即校验顺序，先命中的赢）
+  // 每個變異不只是「被拒絕」，還要落到該檢查的穩定 code（順序即校驗順序，先命中的贏）
   const rej = (expected, mut, year = 2027) => {
     const j = okFile();
     mut(j);
@@ -50,7 +50,7 @@ test('rejections (no coercion, whole file, code per check)', () => {
     assert.equal(r.ok, false);
     assert.equal(r.code, expected);
     assert.equal(typeof r.reason, 'undefined');
-    // 翻成文字后才是给用户看的句子：必须是中文，且不漏字段名 / 实现细节
+    // 翻成文字後才是給使用者看的句子：必須是中文，且不漏欄位名 / 實現細節
     const text = renderReason(r, STRINGS.holidayData);
     assert.match(text, /[一-鿿]/);
     assert.doesNotMatch(text, /isOffDay|papers|undefined|\[object/);
@@ -68,10 +68,10 @@ test('rejections (no coercion, whole file, code per check)', () => {
   rej('daysEmpty', (j) => { j.days = {}; });
   rej('yearMismatch', (j) => { j.year = '2027'; });
   rej('yearMismatch', (j) => { j.year = 2026; });
-  // 调休上班日必须在周末（先于重复检查）
-  rej('makeupNotWeekend', (j) => { j.days[1].date = '2027-01-04'; }); // 周一
-  rej('makeupNotWeekend', (j) => { j.days[1].date = '2027-01-01'; }); // 周五
-  rej('dayDuplicate', (j) => { j.days[0].date = '2027-01-02'; }); // 与周六调休日同一天
+  // 調休上班日必須在週末（先於重複檢查）
+  rej('makeupNotWeekend', (j) => { j.days[1].date = '2027-01-04'; }); // 週一
+  rej('makeupNotWeekend', (j) => { j.days[1].date = '2027-01-01'; }); // 週五
+  rej('dayDuplicate', (j) => { j.days[0].date = '2027-01-02'; }); // 與週六調休日同一天
   rej('dayOutOfYear', (j) => { j.days[0].date = '2026-12-31'; });
   rej('dayNotReal', (j) => { j.days[0].date = '2027-02-30'; });
   rej('dayDate', (j) => { j.days[0].date = '2027-1-1'; });
@@ -84,19 +84,19 @@ test('rejections (no coercion, whole file, code per check)', () => {
   rej('dayShape', (j) => { j.days[0] = null; });
   rej('dayShape', (j) => { j.days[0] = 'x'; });
   rej('dayName', (j) => { j.days[0].name = 'x'.repeat(1e6); });
-  // 带参数的 code：参数是原始值，由显示端交给字典函数
+  // 帶引數的 code：引數是原始值，由顯示端交給字典函式
   const y = rej('dayOutOfYear', (j) => { j.days[0].date = '2001-01-01'; });
   assert.equal(y.params, 2027);
   const m = rej('yearMismatch', (j) => { j.year = 2026; });
   assert.equal(m.params, 2027);
   assert.match(renderReason(m, STRINGS.holidayData), /2027/);
   const ok = validateHolidayYear(okFile(), 2027);
-  assert.equal(ok.ok, true); // 2027-01-02 是周六
+  assert.equal(ok.ok, true); // 2027-01-02 是週六
 });
 
 test('file with only make-up days (no off days) is rejected with the specific reason', () => {
   const j = okFile();
-  j.days = [{ name: '元旦', date: '2027-01-09', isOffDay: false }]; // 周六
+  j.days = [{ name: '元旦', date: '2027-01-09', isOffDay: false }]; // 週六
   const r = validateHolidayYear(j, 2027);
   assert.equal(r.ok, false);
   assert.equal(r.code, 'noOffDays');
@@ -166,7 +166,7 @@ test('fetch: HTTP error, non-JSON, empty file all fall through; all fail -> reas
   });
   assert.equal(r.ok, false);
   assert.equal(r.kind, 'invalid');
-  // 404 → network、<html> → notJson、空文件 → unpublished：invalid 最有信息量，取它；reason 是那一条失败本身
+  // 404 → network、<html> → notJson、空檔案 → unpublished：invalid 最有資訊量，取它；reason 是那一條失敗本身
   assert.deepEqual(r.reason, { code: 'notJson' });
   assert.equal(renderReason(r.reason, STRINGS.holidayData), STRINGS.holidayData.notJson);
   assert.equal(i, 3);
@@ -198,7 +198,7 @@ test('fetch: timeout aborts and moves on; never throws', async () => {
 });
 
 test('fetch: a rejected file carries the validator code (not an empty reason)', async () => {
-  // invalid 分支：reason 必须是 validateHolidayYear 的 code，且 params 原样带出
+  // invalid 分支：reason 必須是 validateHolidayYear 的 code，且 params 原樣帶出
   const badPapers = await fetchHolidayYear(2027, {
     sources: [SRC[0]],
     fetchImpl: async () => resp(JSON.stringify({ ...okFile(), papers: ['https://evil.example/x'] })),
@@ -214,7 +214,7 @@ test('fetch: a rejected file carries the validator code (not an empty reason)', 
   });
   assert.deepEqual(badYear.reason, { code: 'dayOutOfYear', params: 2027 });
 
-  // unpublished 分支同样只给 code（这一份是「年份相符、papers/days 都空」，先命中 papersMissing）
+  // unpublished 分支同樣只給 code（這一份是「年份相符、papers/days 都空」，先命中 papersMissing）
   const unpub = await fetchHolidayYear(2027, {
     sources: [SRC[0]],
     fetchImpl: async () => resp(JSON.stringify({ year: 2027, papers: [], days: [] })),
@@ -225,7 +225,7 @@ test('fetch: a rejected file carries the validator code (not an empty reason)', 
 });
 
 test('fetch: failures are codes, rendered by whatever dictionary is current', async () => {
-  // 网络失败 + 没有数据源：reason 只描述「那个来源为什么失败」，没有拼好的整句
+  // 網路失敗 + 沒有資料來源：reason 只描述「那個來源為什麼失敗」，沒有拼好的整句
   const net = await fetchHolidayYear(2027, { sources: SRC, fetchImpl: async () => { throw new TypeError('net'); } });
   assert.equal(net.ok, false);
   assert.equal(net.kind, 'network');
@@ -233,7 +233,7 @@ test('fetch: failures are codes, rendered by whatever dictionary is current', as
   const http = await fetchHolidayYear(2027, { sources: [SRC[0]], fetchImpl: async () => resp('x', false, 503) });
   assert.deepEqual(http.reason, { code: 'httpFail', params: 503 });
   assert.match(renderReason(http.reason, STRINGS.holidayData), /503/);
-  // 同一份结果换字典就是另一种语言；缺键才退回自带文字，没有就空字符串
+  // 同一份結果換字典就是另一種語言；缺鍵才退回自帶文字，沒有就空字串
   const tw = { network: 'TW-NET', httpFail: (status) => `TW-HTTP(${status})` };
   assert.equal(renderReason(net.reason, tw), 'TW-NET');
   assert.equal(renderReason(http.reason, tw), 'TW-HTTP(503)');
@@ -251,7 +251,7 @@ test('default sources', () => {
 // ---- auto check ----
 const only2026 = { 2026: HOLIDAYS_CN[2026] };
 test('yearsToAutoCheck', () => {
-  // P9：2027 已内置 → 2026-11 起不再为次年抓取
+  // P9：2027 已內建 → 2026-11 起不再為次年抓取
   assert.deepEqual(yearsToAutoCheck(new Date(2026, 10, 4), HOLIDAYS_CN, null), []);
   assert.deepEqual(yearsToAutoCheck(new Date(2027, 0, 4), HOLIDAYS_CN, null), []);
   assert.deepEqual(yearsToAutoCheck(new Date(2028, 0, 4), HOLIDAYS_CN, null), [2028]);
@@ -274,7 +274,7 @@ test('tables param drives dayInfo / workdaysInMonth / snapshot; default unchange
   assert.equal(dayInfo(d, cfg, {}, only2026).source, 'statutory');
   assert.equal(dayInfo(d, cfg, {}, only2026).base, 'rest');
   assert.equal(dayInfo(new Date(2027, 0, 4), cfg, {}, only2026).source, 'rule');
-  // 默认（内置 2027 表）：表在，但 1/4 不在表内 → 普通工作日，source 仍是 rule
+  // 預設（內建 2027 表）：表在，但 1/4 不在表內 → 普通工作日，source 仍是 rule
   assert.equal(dayInfo(d, cfg, {}).source, 'builtin');
   const w = dayInfo(new Date(2027, 0, 4), cfg, {});
   assert.deepEqual([w.tableMissing, w.base, w.reason, w.source], [false, 'work', 'weekday', 'rule']);
@@ -304,14 +304,14 @@ test('store: save/load roundtrip, lastCheck, bad data discarded', () => {
   assert.equal(l.tables[2027].source, 'online');
   assert.deepEqual(l.tables[2027].off, v.table.off);
   assert.deepEqual(l.meta[2027], { source: 'https://b/2027.json', papers: v.papers, fetchedAt: 123 });
-  // 另存一年不丢 lastCheck 与旧年份
+  // 另存一年不丟 lastCheck 與舊年份
   saveOnlineYear(s, 2028, { table: { off: { '2028-01-01': '元旦' }, makeup: {} }, papers: ['https://www.gov.cn/x'], source: 'https://b/2028.json', fetchedAt: 1 });
   assert.equal(loadLastCheck(s), 456);
   assert.ok(loadOnlineTables(s).tables[2027] && loadOnlineTables(s).tables[2028]);
-  // 坏年份单独丢弃
+  // 壞年份單獨丟棄
   const rec = JSON.parse(s.m[HOLIDAYS_STORAGE_KEY]);
   rec.years['2027'].papers = ['http://evil'];
-  rec.years['2028'].table.makeup = { '2028-01-03': 'x' }; // 周一调休
+  rec.years['2028'].table.makeup = { '2028-01-03': 'x' }; // 週一調休
   rec.years['abcd'] = {};
   rec.years['2029'] = null;
   s.m[HOLIDAYS_STORAGE_KEY] = JSON.stringify(rec);

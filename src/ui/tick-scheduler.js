@@ -1,7 +1,7 @@
-// 计时调度（R46）：一般模式 100 ms 的 setInterval；减少动态模式（1 秒一跳）用自我校正的 setTimeout 链对齐墙上时钟的整秒
-// （延迟 = 1000 − now % 1000，至少 20 ms），倒数秒数不跳号、不重复。计时器跑在 host 上（主视窗或小窗）。
-// 不变式：任何时刻最多一个计时器。每次 start / stop 换一个世代号，过期的回调什么都不做；
-// 链在每次触发后按「此刻」的 reduced() 决定下一步——matchMedia 已翻转、change 事件还没到时，也会自己交接给另一种模式，不会断。
+// 計時排程（R46）：一般模式 100 ms 的 setInterval；減少動態模式（1 秒一跳）用自我校正的 setTimeout 鏈對齊牆上時鐘的整秒
+// （延遲 = 1000 − now % 1000，至少 20 ms），倒數秒數不跳號、不重複。計時器跑在 host 上（主視窗或小窗）。
+// 不變式：任何時刻最多一個計時器。每次 start / stop 換一個世代號，過期的回撥什麼都不做；
+// 鏈在每次觸發後按「此刻」的 reduced() 決定下一步——matchMedia 已翻轉、change 事件還沒到時，也會自己交接給另一種模式，不會斷。
 export const TICK_MS = 100;
 export const TICK_MS_REDUCED = 1000;
 export const TICK_MIN_DELAY_MS = 20;
@@ -10,7 +10,7 @@ export function alignedDelay(nowMs) {
   return Math.max(TICK_MIN_DELAY_MS, TICK_MS_REDUCED - (nowMs % TICK_MS_REDUCED));
 }
 
-// tick：每次要做的事；reduced()：当下是否减少动态；now()：墙上时钟毫秒（全域 Date.now，不是可注入的 clock）
+// tick：每次要做的事；reduced()：當下是否減少動態；now()：牆上時鐘毫秒（全域 Date.now，不是可注入的 clock）
 export function createTicker({ tick, reduced, now }) {
   let host = null;
   let interval = null;
@@ -34,17 +34,17 @@ export function createTicker({ tick, reduced, now }) {
       try {
         tick();
       } finally {
-        // tick 里可能已经重启（例如搬到小窗）：世代号变了就不再接续
+        // tick 裡可能已經重啟（例如搬到小窗）：世代號變了就不再接續
         if (g === gen && timeout === null && interval === null) {
           if (reduced()) scheduleAligned(g);
-          else startInterval(g); // 已不再减少动态：交接给 100 ms，不留空档
+          else startInterval(g); // 已不再減少動態：交接給 100 ms，不留空檔
         }
       }
     }, alignedDelay(now()));
   }
 
-  // 一般模式：每次 tick 后也按「此刻」的 reduced() 检查（round 2，与上面的方向对称）：
-  // 已改成减少动态、change 事件还没到时，清掉 interval，交接给对齐整秒的链
+  // 一般模式：每次 tick 後也按「此刻」的 reduced() 檢查（round 2，與上面的方向對稱）：
+  // 已改成減少動態、change 事件還沒到時，清掉 interval，交接給對齊整秒的鏈
   function startInterval(g) {
     interval = host.setInterval(() => {
       if (g !== gen) return;

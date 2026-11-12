@@ -22,13 +22,13 @@ test('pipHeight: at least 200, grows with content, capped at 640', () => {
   assert.equal(pipHeight(0), 200);
 });
 
-// 假卡片：只需要 measureSmallCard 真正碰到的东西（dataset / style / getBoundingClientRect）。
+// 假卡片：只需要 measureSmallCard 真正碰到的東西（dataset / style / getBoundingClientRect）。
 function fakeCard({ size, style = {}, height = 400 } = {}) {
   const card = {
     dataset: size === undefined ? {} : { size, other: 'x' },
     style: { width: '', minHeight: '', alignSelf: '', ...style },
     rects: 0,
-    // 量测期间看到的样式：用来断言「量之前已经改好」，不用猜顺序
+    // 量測期間看到的樣式：用來斷言「量之前已經改好」，不用猜順序
     seen: [],
     getBoundingClientRect() {
       card.rects += 1;
@@ -43,9 +43,9 @@ test('measureSmallCard: measures at the target width in the small-card form, the
   const card = fakeCard({ size: 'md', style: { width: '55px', minHeight: '320px', alignSelf: 'stretch' }, height: 412.6 });
   assert.equal(measureSmallCard(card, 372), 412.6);
   assert.equal(card.rects, 1);
-  // 量的时候：sm 形态 + 目标宽度 + 不被 pip-body 的 grid 拉满（align-self:start）+ 不受大卡片 min-height 影响
+  // 量的時候：sm 形態 + 目標寬度 + 不被 pip-body 的 grid 拉滿（align-self:start）+ 不受大卡片 min-height 影響
   assert.deepEqual(card.seen[0], { size: 'sm', width: '372px', minHeight: '0', alignSelf: 'start' });
-  // 量完原样还原
+  // 量完原樣還原
   assert.deepEqual(card.dataset, { size: 'md', other: 'x' });
   assert.deepEqual(card.style, { width: '55px', minHeight: '320px', alignSelf: 'stretch' });
 });
@@ -71,7 +71,7 @@ test('measureSmallCard: default width is the m 档 width', () => {
   assert.equal(card.seen[0].width, `${PIP_WIDTH}px`);
 });
 
-// 假的 PiP 视窗：只读 scrollingElement 的 scrollHeight / clientHeight
+// 假的 PiP 視窗：只讀 scrollingElement 的 scrollHeight / clientHeight
 function fakeWin(scroll, client) {
   return { document: { scrollingElement: { scrollHeight: scroll, clientHeight: client } } };
 }
@@ -81,7 +81,7 @@ test('pipFitsContent: true only when nothing needs scrolling; unknown readings s
   assert.equal(pipFitsContent(fakeWin(520, 520)), true, 'exactly fits');
   assert.equal(pipFitsContent(fakeWin(520.8, 520)), true, '1px tolerance eats sub-pixel rounding');
   assert.equal(pipFitsContent(fakeWin(560, 520)), false, 'needs scrolling');
-  // 读不到 → null（不报错、也不乱说「放不下」）
+  // 讀不到 → null（不報錯、也不亂說「放不下」）
   assert.equal(pipFitsContent(null), null);
   assert.equal(pipFitsContent({}), null);
   assert.equal(pipFitsContent({ document: {} }), null);

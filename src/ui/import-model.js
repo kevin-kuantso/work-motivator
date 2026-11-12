@@ -1,9 +1,9 @@
-// 纯函数：把 importState 的结果整理成导入报告（design-spec §8.2）。
-// 「已导入 N 项」= importState 实际套用的字段数（共享设置 + 按地区的月薪 + 按地区的月历标记）。
-// 字段路径带地区（salaries.CN、marksByRegion.TW.2026-05-04）时，报告要写明是哪一地的数据。
+// 純函式：把 importState 的結果整理成匯入報告（design-spec §8.2）。
+// 「已匯入 N 項」= importState 實際套用的欄位數（共享設定 + 按地區的月薪 + 按地區的月曆標記）。
+// 欄位路徑帶地區（salaries.CN、marksByRegion.TW.2026-05-04）時，報告要寫明是哪一地的資料。
 import { reasonText } from '../calc.js';
 
-// 地区名称：优先用字典的专用映射（t.regions），其次用设置面板的地区选项文案，最后退回稳定 ID。
+// 地區名稱：優先用字典的專用對映（t.regions），其次用設定面板的地區選項文案，最後退回穩定 ID。
 function regionName(t, id) {
   const fromMap = t.regions?.[id];
   if (typeof fromMap === 'string') return fromMap;
@@ -18,7 +18,7 @@ function regionFieldLabel(t) {
   return fromDict ?? 'region';
 }
 
-// 「月薪 · 中国大陆」：地区与字段用 ASCII 分隔符拼起来，不依赖任何一种语言的标点。
+// 「月薪 · 中國大陸」：地區與欄位用 ASCII 分隔符拼起來，不依賴任何一種語言的標點。
 const withRegion = (label, name) => `${label} · ${name}`;
 
 const SALARY_PREFIX = 'salaries.';
@@ -67,7 +67,7 @@ function valueText(field, state, t) {
   return im.keep(String(v));
 }
 
-// 已导入的项由 importState 判定（它知道跨字段校验和旧备份并入哪一地），这里只数结果。
+// 已匯入的項由 importState 判定（它知道跨欄位校驗和舊備份併入哪一地），這裡只數結果。
 export function importReport(result, t) {
   const applied = Array.isArray(result.applied) ? result.applied.length : 0;
   const rows = [

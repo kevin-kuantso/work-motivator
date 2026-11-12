@@ -1,6 +1,6 @@
-// R33：每 tick 变化的数字用固定宽度数字格，与字体本身的数字是否等宽无关。
-// 刻意换成本机上「比例数字」的字体组合（system-ui, sans-serif + font-variant-numeric: normal），
-// 先用纯文字证明它确实是比例数字（负对照），再证明数字格让同长度字符串宽度完全一样；主分页与 PiP stub 文件都测。
+// R33：每 tick 變化的數字用固定寬度數字格，與字型本身的數字是否等寬無關。
+// 刻意換成本機上「比例數字」的字型組合（system-ui, sans-serif + font-variant-numeric: normal），
+// 先用純文字證明它確實是比例數字（負對照），再證明數字格讓同長度字串寬度完全一樣；主分頁與 PiP stub 檔案都測。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -9,11 +9,11 @@ import { startServer, launch, openAt, expectedAutoUrls, pipStub, root } from './
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 
-// 本文件断言的是中国地区的数字格式（千分位、¥ 金额）：明确写入旧版（v1，无地区）设置，
-// 让应用走「旧数据一律归中国」的迁移路径，不依赖当前的新用户默认地区（台湾）。
+// 本檔案斷言的是中國地區的數字格式（千分位、¥ 金額）：明確寫入舊版（v1，無地區）設定，
+// 讓應用走「舊資料一律歸中國」的遷移路徑，不依賴當前的新使用者預設地區（臺灣）。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
-// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+// 與既有的 init 組在一起：字串相加、函式轉成字串、{ content } 加字首、null / undefined 只留種子、{ path } 原樣。
 const seeded = (init) => {
   if (init == null) return CN_SEED;
   if (typeof init === 'string') return `${CN_SEED}\n${init}`;
@@ -26,7 +26,7 @@ const GROUPS = [
   ['888.8888', '111.1111', '123.4567', '000.0000'],
   ['0.0000', '1.1111', '8.8888'],
 ];
-// 本机上量到是比例数字的旧字体组合（Chrome 在 macOS 上取 .SF NS，不开 tnum）
+// 本機上量到是比例數字的舊字型組合（Chrome 在 macOS 上取 .SF NS，不開 tnum）
 const PROPORTIONAL_CSS = '#status-card .amount, #status-card .card-countdown, #status-card .card-progress-text { font-family: system-ui, sans-serif !important; font-variant-numeric: normal !important; }';
 
 let server;
@@ -35,7 +35,7 @@ let helperJs;
 before(async () => {
   server = await startServer();
   browser = await launch();
-  // 把同一份 digits.js 打包成 window.__digits，用来把指定字符串画进真实的卡片元素
+  // 把同一份 digits.js 打包成 window.__digits，用來把指定字串畫進真實的卡片元素
   const out = await build({ entryPoints: [join(root, 'src/ui/digits.js')], bundle: true, format: 'iife', globalName: '__digits', write: false });
   helperJs = out.outputFiles[0].text;
 });
@@ -60,7 +60,7 @@ async function withPage(iso, fn, opts) {
 const spread = (w) => Math.max(...w) - Math.min(...w);
 const pipFrame = (page) => page.frames().find((f) => f !== page.mainFrame() && f.url() === 'about:blank');
 
-// 在 ctx（主分页或 PiP 的 frame）里：纯文字 vs 数字格，量 head + tail 的绘制宽度；同时独立量出该文件里最宽的数字
+// 在 ctx（主分頁或 PiP 的 frame）裡：純文字 vs 數字格，量 head + tail 的繪製寬度；同時獨立量出該檔案裡最寬的數字
 function measureGroups(groups) {
   const head = document.querySelector('#status-card .amount-head');
   const tail = document.querySelector('#status-card .amount-tail');
@@ -79,7 +79,7 @@ function measureGroups(groups) {
 function assertGroups(m, where) {
   console.log(`MEASURE ${JSON.stringify({ case: `digits-${where}`, font: m.font, fvn: m.fvn, widest: m.widest, digitW: m.digitW, plain: m.plain, cells: m.cells })}`);
   assert.equal(m.fvn, 'normal');
-  // 负对照：没有数字格时，这个字体的同长度字符串宽度不同（证明它是比例数字）
+  // 負對照：沒有數字格時，這個字型的同長度字串寬度不同（證明它是比例數字）
   assert.ok(m.plain.some((g) => spread(g) > 1), `${where}: negative control — plain text must be proportional here: ${JSON.stringify(m.plain)}`);
   for (const [i, g] of m.cells.entries()) assert.ok(spread(g) < 0.01, `${where}: same width with digit cells for ${GROUPS[i].join(' / ')}: ${g.join(' / ')}`);
   assert.equal(m.digitW, `${m.widest}px`, `${where}: --digit-w is the widest digit measured in this document`);
@@ -99,7 +99,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
     await page.locator('#btn-float').click();
     await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
     const frame = pipFrame(page);
-    // 只在 PiP 文件里换成比例字体（主文件维持原样），并分别统计两个文件建立的元素
+    // 只在 PiP 檔案裡換成比例字型（主檔案維持原樣），並分別統計兩個檔案建立的元素
     await frame.addStyleTag({ content: PROPORTIONAL_CSS });
     await page.evaluate(() => {
       const count = (proto, key) => {
@@ -110,7 +110,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
       count(Document.prototype, '__mainCreates');
       count(document.querySelector('iframe.pip-stub').contentWindow.Document.prototype, '__pipCreates');
     });
-    // 真实 tick（计时器在 PiP 视窗）：样式变了 → 签名变了 → 在 PiP 文件里重新量
+    // 真實 tick（計時器在 PiP 視窗）：樣式變了 → 簽名變了 → 在 PiP 檔案裡重新量
     const ticks = [];
     for (let i = 0; i < 20; i += 1) {
       await page.clock.runFor(100);
@@ -127,7 +127,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
     assert.ok(creates.pip >= 11, `measurement probe (1 + 10 digits) built in the PiP document (${creates.pip})`);
     assert.ok(new Set(ticks.map((t) => t.text)).size >= 15, 'the amount really changed on (almost) every tick');
     assert.ok(spread(ticks.map((t) => t.w)) < 0.01, `PiP amount width constant over 20 ticks: ${[...new Set(ticks.map((t) => t.w))].join(' / ')}`);
-    // 指定字符串（同一份 helper）：负对照 + 数字格；--digit-w 等于 PiP 文件里量到的最宽数字
+    // 指定字串（同一份 helper）：負對照 + 數字格；--digit-w 等於 PiP 檔案裡量到的最寬數字
     const m = await frame.evaluate(measureGroups, GROUPS);
     assertGroups(m, 'pip');
     assert.equal(ticks[0].digitW, m.digitW, 'the app measured the same width in the PiP document');
@@ -137,7 +137,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
 test('no layout shift: amount and 本月累计 rendered widths stay constant over 20 running ticks (proportional font)', () =>
   withPage(T1412, async (page) => {
     await page.addStyleTag({ content: PROPORTIONAL_CSS });
-    await page.clock.runFor(100); // 字体换了：下一个 tick 重新量
+    await page.clock.runFor(100); // 字型換了：下一個 tick 重新量
     const rows = [];
     for (let i = 0; i < 20; i += 1) {
       await page.clock.runFor(100);
@@ -203,14 +203,14 @@ test('copy gives the plain number; screen readers get the full text once (visual
     assert.equal(sel.progress.trim(), '已工作 4小时12分 / 共 7小时', 'copied once (the sr copy is not selectable)');
     assert.equal(sel.countdown, '距下班 2小时48分0秒');
     assert.deepEqual(sel.hidden, ['true', 'true', 'true', 'true']);
-    assert.deepEqual(sel.sr, ['¥ 194.2857', '距下班 2小时48分0秒', '已工作 4小时12分 / 共 7小时', '¥518.10']); // Task 19 M4: 倒数在进度头一行，先于进度文字
+    assert.deepEqual(sel.sr, ['¥ 194.2857', '距下班 2小时48分0秒', '已工作 4小时12分 / 共 7小时', '¥518.10']); // Task 19 M4: 倒數在進度頭一行，先於進度文字
     assert.equal(sel.digits, 7);
     const aria = await page.locator('#status-card').ariaSnapshot();
     for (const s of ['¥ 194.2857', '已工作 4小时12分 / 共 7小时', '距下班 2小时48分0秒', '¥518.10']) {
       assert.equal(aria.split(s).length - 1, 1, `accessible text "${s}" exactly once:\n${aria}`);
     }
     assert.ok(!/\b1 9 4\b/.test(aria), 'no digit-by-digit reading');
-    // sr-only 副本不在任何 live region 里（否则读屏每 100 毫秒念一次）
+    // sr-only 副本不在任何 live region 裡（否則讀屏每 100 毫秒念一次）
     const live = await page.evaluate(() => [...document.querySelectorAll('#status-card .sr-text')].map((el) => {
       const hits = [];
       for (let n = el; n; n = n.parentElement) {
@@ -219,7 +219,7 @@ test('copy gives the plain number; screen readers get the full text once (visual
       return hits;
     }));
     assert.deepEqual(live, [[], [], [], []], 'no sr-only copy has a live ancestor or a live role');
-    // 开启者的 polite 摘要（不变）：状态不变时最多每 60 秒更新一次，而数字格每 100 毫秒在变
+    // 開啟者的 polite 摘要（不變）：狀態不變時最多每 60 秒更新一次，而數字格每 100 毫秒在變
     const summary = page.locator('body > #app > div.visually-hidden[role=status][aria-live=polite]');
     assert.equal(await summary.textContent(), '上班中，今天已赚 194 元');
     await summary.evaluate((el) => {

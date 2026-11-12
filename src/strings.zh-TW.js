@@ -58,7 +58,7 @@ export const STRINGS = {
     // 匯入備份：說人話，不出現檔案格式名
     notJson: '這不是本工具匯出的備份檔案',
     notObject: '檔案內容的結構不正確',
-    // 地區與月薪分區的結構問題：各自說清楚是哪一段不對，避免全部退回「結構不正確」
+    // 地區與月薪分割槽的結構問題：各自說清楚是哪一段不對，避免全部退回「結構不正確」
     region: '地區代碼無法辨識，只接受臺灣（TW）與中國大陸（CN），該欄已略過、保留原本的值',
     salariesType: '各地區月薪的資料結構不正確，應為臺灣與中國大陸各自的月薪數字，已保留原本的月薪',
     futureVersion: '這份備份來自較新版本的上班鼓勵器，無法讀入；請改用該版本開啟，或先更新本程式再匯入',
@@ -123,7 +123,7 @@ export const STRINGS = {
     twManualHref: 'https://data.gov.tw/dataset/14718',
     twManualAfter: '',
     twManualFormats: '人事行政總處的辦公日曆表公告頁（www.dgpa.gov.tw/information?uid=30&pid=12982）提供 XLSX／PDF／ODS，這幾種格式本程式不能直接匯入；請用上方資料集的年度 CSV（UTF-8、全年逐日），不要選 Google 行事曆專用格式。',
-    // 「查看匯入檔案的格式範例」：範例取自 2026 年官方 CSV 的前三天，複製的就是顯示的這份
+    // 「檢視匯入檔案的格式範例」：範例取自 2026 年官方 CSV 的前三天，複製的就是顯示的這份
     exampleShow: '查看匯入檔案的格式範例',
     exampleHide: '收起匯入檔案的格式範例',
     exampleHead: '檔案內容範例（取自 2026 年官方資料，僅列前三天；實際檔案需全年逐日）',
@@ -190,7 +190,7 @@ export const STRINGS = {
     sessionOnly: '這份假日表只留在目前頁面，關掉就會消失（無法寫入瀏覽器儲存空間）；備份檔也不含假日表',
     sessionOnlySkipped: (yearsText) => `這份假日表只留在目前頁面，關掉就會消失（無法寫入瀏覽器儲存空間）；備份檔也不含假日表。以下年份已內建，未採用檔案中的資料：${yearsText}`,
     codeGeneric: (code) => `無法套用這份資料（${code ?? '未知原因'}）`,
-    // 解析 / 抓取失敗代碼 → 文字（由 holiday-update-tw 的 reasonText 以 params 物件呼叫）。
+    // 解析 / 抓取失敗程式碼 → 文字（由 holiday-update-tw 的 reasonText 以 params 物件呼叫）。
     // params 可能是物件或是單一值，兩種都讀得懂，不會顯示 undefined。
     codes: {
       cors: '政府資料開放平臺可能不允許瀏覽器跨來源直接讀取（CORS，未逐一驗證），請改用「匯入假日表檔案」',
@@ -271,7 +271,7 @@ export const STRINGS = {
       lastCheck: '上次檢查時間的格式不正確，未記錄',
       stale: '檢查期間已切換地區或重新載入，這次的結果已捨棄',
     },
-    // 資料來源與授權（政府資料開放授權條款第 1 版；顯名聲明）
+    // 資料來源與授權（政府資料開放授權條款第 1 版；顯名宣告）
     license: {
       label: '資料來源與授權',
       dataset: '行政院人事行政總處《中華民國政府行政機關辦公日曆表》，政府資料開放平臺資料集 14718',
@@ -389,7 +389,7 @@ export const STRINGS = {
       lunchOffPay: '關閉後，午休時段仍計入工時與薪資。',
     },
     autosaved: '已自動儲存',
-    // 分區導覽（窄面板 / 手機單欄才顯示）：名稱與卡片標題一致，跳到既有的卡片
+    // 分割槽導覽（窄面板 / 手機單欄才顯示）：名稱與卡片標題一致，跳到既有的卡片
     navLabel: '跳到設定分區',
     sections: {
       pay: '薪資與上班時間', holiday: '假日資料', backup: '資料與備份', advanced: '進階設定',
@@ -439,7 +439,7 @@ export const STRINGS = {
     paydayOption: (d) => `每月 ${d} 日`,
     // ---- 畫面設定：只管狀態卡顯示什麼，不改變任何計算 ----
     // 匯入報告按欄位名查標籤（import-model 的 t.settings[field]）：這些鍵在 settings 頂層也放一份，
-    // 報告才不會顯示成生欄位名。介面上的標籤仍然用下面的 display.*（措辭為避開同名控件的歧義）。
+    // 報告才不會顯示成生欄位名。介面上的標籤仍然用下面的 display.*（措辭為避開同名控制元件的歧義）。
     fontScale: '字級',
     showCardProgress: '顯示進度條', showCardMetrics: '顯示薪資明細', showCardDate: '顯示日期',
     showCardPayday: '顯示發薪提醒', showCardCheer: '顯示鼓勵文字',
@@ -456,7 +456,7 @@ export const STRINGS = {
       date: '日期',
       dateHint: '關閉後，農曆日期也一併隱藏。',
       // 開關標籤不能與「發薪日」「鼓勵語」兩個輸入框的標籤同名：讀屏與 getByLabel 都按子串比對，
-      // 同名會讓「發薪日」一次命中兩個控件。這裡用「提醒／文字」區分「顯示的是什麼」，提示語裡再寫全稱。
+      // 同名會讓「發薪日」一次命中兩個控制元件。這裡用「提醒／文字」區分「顯示的是什麼」，提示語裡再寫全稱。
       payday: '發薪提醒',
       paydayHint: '沒設定發薪日時本來就不顯示。',
       cheer: '鼓勵文字',
@@ -600,7 +600,7 @@ function yearList(years) {
   return String(years);
 }
 
-// 失敗代碼的 params 可能是物件（{ date }）或單一值（'2026-01-02'／400）；兩種都取得到值
+// 失敗程式碼的 params 可能是物件（{ date }）或單一值（'2026-01-02'／400）；兩種都取得到值
 function param(p, key) {
   if (p == null) return null;
   if (typeof p === 'object') return p[key] ?? null;

@@ -1,7 +1,7 @@
 import { mountApp } from './ui.js';
 
-// 部分环境（隐私设置、file:// 限制）连读取 localStorage 属性都会抛例外：
-// 改用一个必定失败的储存，让设置层回报「无法保存」而不是整页崩溃。
+// 部分環境（隱私設定、file:// 限制）連讀取 localStorage 屬性都會拋例外：
+// 改用一個必定失敗的儲存，讓設定層回報「無法儲存」而不是整頁崩潰。
 const unavailable = {
   getItem() { throw new Error('storage unavailable'); },
   setItem() { throw new Error('storage unavailable'); },

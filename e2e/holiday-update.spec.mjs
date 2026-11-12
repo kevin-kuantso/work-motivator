@@ -1,5 +1,5 @@
-// Task 11：联网更新假期 / 导入假期表 / 自定义网址（spec §12.3、§13.5–13.7）。
-// 网络：harness 默认中止所有外部请求并记录；需要回应的测试用 page.route 在三个来源主机上提供 fixture。
+// Task 11：聯網更新假期 / 匯入假期表 / 自定義網址（spec §12.3、§13.5–13.7）。
+// 網路：harness 預設中止所有外部請求並記錄；需要回應的測試用 page.route 在三個來源主機上提供 fixture。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -7,21 +7,21 @@ import { join } from 'node:path';
 import { startServer, launch, openAt, root, holidayIdle, expectedAutoUrls, isLocal, tipVisibleLines } from './harness.mjs';
 import { HOLIDAYS_CN } from '../src/holidays-cn.js';
 
-const JUNE = '2026-06-01T10:00:00+08:00'; // 11 月前：不应有任何外部请求
-// 2027 已有官方内置表（2026-11 通知）：11 月起的自动检查只会抓下一年（2028）
+const JUNE = '2026-06-01T10:00:00+08:00'; // 11 月前：不應有任何外部請求
+// 2027 已有官方內建表（2026-11 通知）：11 月起的自動檢查只會抓下一年（2028）
 const NOV4 = '2027-11-04T10:00:00+08:00';
-const JAN4 = '2028-01-04T10:00:00+08:00'; // 当年（2028）没有内置表
+const JAN4 = '2028-01-04T10:00:00+08:00'; // 當年（2028）沒有內建表
 const HOSTS = /^https:\/\/(raw\.githubusercontent\.com|cdn\.jsdelivr\.net|fastly\.jsdelivr\.net)\//;
-// R37：默认来源顺序 cdn.jsdelivr.net → fastly.jsdelivr.net → raw.githubusercontent.com
+// R37：預設來源順序 cdn.jsdelivr.net → fastly.jsdelivr.net → raw.githubusercontent.com
 const CDN = (y) => `https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/${y}.json`;
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當聯檢發佈'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用', '套用', '尚未公布', '网络不通', '档案'];
 
 const fx = (n) => readFileSync(join(root, 'test', 'fixtures', n), 'utf8');
 const REAL_2026 = fx('holiday-cn-2026.json');
-// 上游「该年还没发布」的形状（年份相符、papers / days 都是空的）。2027 已内置，只能用下一年构造。
+// 上游「該年還沒釋出」的形狀（年份相符、papers / days 都是空的）。2027 已內建，只能用下一年構造。
 const EMPTY_2028 = JSON.stringify({ year: 2028, papers: [], days: [] });
-// 测试用 2028 数据（虚构，不是官方安排）：元旦 1/1–1/3 放假，春节 2/6–2/12 放假、2/13（周日）调休上班
+// 測試用 2028 資料（虛構，不是官方安排）：元旦 1/1–1/3 放假，春節 2/6–2/12 放假、2/13（週日）調休上班
 const day = (date, isOffDay, name) => ({ name, date, isOffDay });
 const synth2028 = (patch = {}) => JSON.stringify({
   year: 2028,
@@ -34,8 +34,8 @@ const synth2028 = (patch = {}) => JSON.stringify({
   ...patch,
 });
 
-// 2027 已是内置年份：把内置表转成上游格式的「官方文件」，用于「内置年份不被覆盖 / 与内置不同」的测试。
-// 只比较日期与类型（节日名称不同不算差异），所以直接沿用内置表的名称即可。
+// 2027 已是內建年份：把內建錶轉成上游格式的「官方檔案」，用於「內建年份不被覆蓋 / 與內建不同」的測試。
+// 只比較日期與型別（節日名稱不同不算差異），所以直接沿用內建表的名稱即可。
 const fromTable = (year, table, papers) => JSON.stringify({
   year,
   papers,
@@ -45,7 +45,7 @@ const fromTable = (year, table, papers) => JSON.stringify({
   ],
 });
 const official2027 = () => fromTable(2027, HOLIDAYS_CN[2027], ['https://www.gov.cn/zhengce/content/202611/content_7085101.htm']);
-// 与内置 2027 有 2 天不同（少一天放假、少一天调休）：不采用，页面级提示
+// 與內建 2027 有 2 天不同（少一天放假、少一天調休）：不採用，頁面級提示
 const changed2027 = () => {
   const off = { ...HOLIDAYS_CN[2027].off };
   const makeup = { ...HOLIDAYS_CN[2027].makeup };
@@ -54,13 +54,13 @@ const changed2027 = () => {
   return fromTable(2027, { off, makeup }, ['https://www.gov.cn/zhengce/test-only-2027.htm']);
 };
 
-// 本文件断言的是中国地区的假期来源、文案与金额：明确写入旧版（v1，无地区）设置，
-// 让应用走「旧数据一律归中国」的迁移路径，不依赖应用当前的新用户默认地区（台湾）。
-// 全文件没有 seed: false：首次提示要求 localStorage 里没有设置，与写入中国设置互斥，
-// 所以凡是需要页面级提示的用例都直接断言差异提示本身，不构造「排在首次提示之后」。
+// 本檔案斷言的是中國地區的假期來源、文案與金額：明確寫入舊版（v1，無地區）設定，
+// 讓應用走「舊資料一律歸中國」的遷移路徑，不依賴應用當前的新使用者預設地區（臺灣）。
+// 全檔案沒有 seed: false：首次提示要求 localStorage 裡沒有設定，與寫入中國設定互斥，
+// 所以凡是需要頁面級提示的用例都直接斷言差異提示本身，不構造「排在首次提示之後」。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
-// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+// 與既有的 init 組在一起：字串相加、函式轉成字串、{ content } 加字首、null / undefined 只留種子、{ path } 原樣。
 const seeded = (init) => {
   if (init == null) return CN_SEED;
   if (typeof init === 'string') return `${CN_SEED}\n${init}`;
@@ -80,7 +80,7 @@ after(async () => {
   await server?.close();
 });
 
-// routes：{ [year]: body | (url) => body | { status } }，只作用在三个默认来源主机上；其余外部请求仍被 harness 中止
+// routes：{ [year]: body | (url) => body | { status } }，只作用在三個預設來源主機上；其餘外部請求仍被 harness 中止
 function serve(page, routes, log = []) {
   return page.route(HOSTS, async (route) => {
     const url = route.request().url();
@@ -107,7 +107,7 @@ async function withPage(iso, fn, opts = {}) {
   }
 }
 
-// Node 端轮询（页面时钟被暂停时，页内的 rAF / 计时器轮询不可靠）
+// Node 端輪詢（頁面時鐘被暫停時，頁內的 rAF / 計時器輪詢不可靠）
 async function until(page, fn, arg, timeout = 5000) {
   const t0 = Date.now();
   for (;;) {
@@ -116,8 +116,8 @@ async function until(page, fn, arg, timeout = 5000) {
     await new Promise((r) => setTimeout(r, 20));
   }
 }
-// 分页按钮的 id（#tab-settings / #tab-calendar）是稳定契约；role 名称随地区字典变化
-// （中国：基本设置 / 月历；台湾：基本設定 / 月曆），所以能认出来的名称一律换成 id 定位。
+// 分頁按鈕的 id（#tab-settings / #tab-calendar）是穩定契約；role 名稱隨地區字典變化
+// （中國：基本設定 / 月曆；臺灣：基本設定 / 月曆），所以能認出來的名稱一律換成 id 定位。
 const TAB_LABELS = { settings: ['基本设置', '基本設定'], calendar: ['月历', '月曆'] };
 const tab = (page, name) => {
   for (const [id, labels] of Object.entries(TAB_LABELS)) {
@@ -127,7 +127,7 @@ const tab = (page, name) => {
   return page.getByRole('tab', { name });
 };
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
-// 假期数据状态（Task 14：年份胶囊 + 上次检查）：可见胶囊的文字按顺序以「 · 」连起来；分组的无障碍名称必须是同一句
+// 假期資料狀態（Task 14：年份膠囊 + 上次檢查）：可見膠囊的文字按順序以「 · 」連起來；分組的無障礙名稱必須是同一句
 const statusLine = async (page) => {
   const r = await page.evaluate(() => {
     const el = document.getElementById('holiday-status');
@@ -197,19 +197,19 @@ test('from 2027-11-04: auto-check fetches 2028, applies it, quiet toast (no 「�
     assert.deepEqual(external, [CDN(2028)], 'no second request the same day');
   }, { routes: { 2028: synth2028() } }));
 
-// 2027 已是内置年份（国务院 2026-11 通知）：载入时不联网、不出现「未内置」，月历按内置表标出春节区间与调休上班日，
-// 每日工资按内置表算（2 月 15 个上班日）。这是内置表迁移后最直接的可视回归。
+// 2027 已是內建年份（國務院 2026-11 通知）：載入時不聯網、不出現「未內建」，月曆按內建表標出春節區間與調休上班日，
+// 每日工資按內建表算（2 月 15 個上班日）。這是內建表遷移後最直接的可視迴歸。
 test('2027 built-in: no auto-check, 春节 range + 调休 cells, 日薪 from the built-in table, manual check still 「已是最新」', () =>
   withPage('2027-02-16T10:00:00+08:00', async (page, { external, autoUrls }) => {
     assert.deepEqual(expectedAutoUrls('2027-02-16T10:00:00+08:00'), [], 'built-in year: nothing to auto-check before Nov');
     assert.deepEqual(autoUrls, []);
-    // 状态卡：内置表 → 没有「未内置」标签；日薪按 15 个上班日（6800 / 15 = 453.33）
+    // 狀態卡：內建表 → 沒有「未內建」標籤；日薪按 15 個上班日（6800 / 15 = 453.33）
     assert.equal(await page.locator('#status-card .card-year').isVisible(), false, '2027 is built-in');
     assert.equal(await text(page, '#status-card .card-badge'), '上班中');
     assert.equal(await page.locator('#status-card .card-tag').isVisible(), false, '2/16 is not a make-up day');
     assert.equal(await text(page, '#status-card .metric-daily .metric-value'), '¥453.33', '6800 / 15 (春节 2/5–2/13 放假)');
     assert.equal(await text(page, '#status-card .metric-month .metric-value'), '¥2,817.14', '2 月累计到 2/16 10:00');
-    // 月历：春节区间 + 2/14 调休上班；「依据」写在 note 的 title 里
+    // 月曆：春節區間 + 2/14 調休上班；「依據」寫在 note 的 title 裡
     await tab(page, '月历').click();
     assert.equal(await text(page, '.cal-title'), '2027 年 2 月');
     assert.equal(await yearTag(page).isVisible(), false, 'no 「未内置」 tag for a built-in year');
@@ -224,17 +224,17 @@ test('2027 built-in: no auto-check, 春节 range + 调休 cells, 日薪 from the
     assert.match(await cell('2027-02-14').getAttribute('aria-label'), /^2月14日 周日，调休上班（春节）/);
     assert.equal(await text(page, '.cal-grid button[data-key="2027-02-14"] .day-tag'), '班', 'make-up Sunday carries the 班 tag');
     assert.match(await cell('2027-02-16').getAttribute('aria-label'), /^2月16日 周二，今天，工作日/, 'an ordinary Tuesday stays a workday');
-    // 上月：元旦区间与 1/31（周日）调休上班
+    // 上月：元旦區間與 1/31（週日）調休上班
     await page.locator('.cal-prev').click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
     assert.equal(await text(page, '.cal-summary-text'), '本月应出勤 21 天 · 日薪 ¥323.81');
     assert.equal(await text(page, '.cal-note-text'), '元旦 1/1–1/3 放假；春节 1/31 调休上班');
     assert.match(await page.locator('.cal-grid button[data-key="2027-01-31"]').getAttribute('aria-label'), /^1月31日 周日，调休上班（春节）/);
     assert.equal(await text(page, '.cal-grid button[data-key="2027-01-31"] .day-tag'), '班');
-    // 基本设置：只有当年一个胶囊（2 月还没到 11 月，下一年也不内置）
+    // 基本設定：只有當年一個膠囊（2 月還沒到 11 月，下一年也不內建）
     await tab(page, '基本设置').click();
     assert.equal(await statusLine(page), '2027 年 · 内置', 'no 上次检查 yet: nothing was fetched');
-    // 手动检查：受保护年份 → 「已是最新」；官方数据与内置表一致时不产生差异提示
+    // 手動檢查：受保護年份 → 「已是最新」；官方資料與內建表一致時不產生差異提示
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: '' });
     assert.equal(await page.locator('.notices .banner-info[data-id="holidayDiff"]').count(), 0, 'identical data: no diff banner');
@@ -262,8 +262,8 @@ test('empty upstream 2028 file → 「数据来源暂未发布」 info (not an e
     assert.equal(await page.locator('.toast').isVisible(), false);
     await tab(page, '基本设置').click();
     assert.deepEqual(await result(page), { tone: 'info', text: '数据来源暂未发布 2028 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: '' });
-    // 信息通道的颜色由主题令牌决定（--state-before-bg / --state-before-fg），不写死某个主题的具体色值；
-    // 关键契约仍然是：info 用的是「未上班」这一组语义色，而不是 warn / error 的告警色。
+    // 資訊通道的顏色由主題令牌決定（--state-before-bg / --state-before-fg），不寫死某個主題的具體色值；
+    // 關鍵契約仍然是：info 用的是「未上班」這一組語義色，而不是 warn / error 的告警色。
     const tones = await page.locator('#holiday-result').evaluate((e) => {
       const probe = document.createElement('span');
       probe.style.color = 'var(--state-before-bg)';
@@ -293,7 +293,7 @@ test('empty upstream 2028 file → 「数据来源暂未发布」 info (not an e
     await goMonth(page, 2);
     assert.equal(await text(page, '.cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出', 'never treated as "no holidays"');
     assert.deepEqual(await holidayRecord(page).then((r) => r.years), {}, 'nothing saved (only lastCheck)');
-    // 手动检查同样是信息提示（2027 已内置：连不上也算受保护年份的失败，不影响非保护年份的结果）
+    // 手動檢查同樣是資訊提示（2027 已內建：連不上也算受保護年份的失敗，不影響非保護年份的結果）
     await checkNow(page);
     assert.equal((await result(page)).tone, 'info');
   }, { routes: { 2028: EMPTY_2028 } }));
@@ -306,7 +306,7 @@ test('auto-check failure is silent; manual check shows the specific message (检
     assert.equal(await page.locator('.toast').isVisible(), false, 'auto failure: no toast');
     await tab(page, '基本设置').click();
     assert.equal(await result(page), null, 'auto failure: no message');
-    // 手动：第一个年份（2027）的来源卡住 → 能看到「检查中…」
+    // 手動：第一個年份（2027）的來源卡住 → 能看到「檢查中…」
     await page.unrouteAll();
     await serve(page, { 2027: () => gate.then(() => undefined), 2028: undefined });
     await checkBtn(page).focus();
@@ -314,7 +314,7 @@ test('auto-check failure is silent; manual check shows the specific message (检
     await until(page, () => document.getElementById('btn-holiday-check').getAttribute('aria-disabled') === 'true');
     assert.equal(await text(page, '#btn-holiday-check'), '检查中…');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'btn-holiday-check', 'focus kept while checking');
-    await page.keyboard.press('Enter'); // 检查中再按：忽略
+    await page.keyboard.press('Enter'); // 檢查中再按：忽略
     release();
     assert.ok(await holidayIdle(page));
     assert.equal(await text(page, '#btn-holiday-check'), '检查更新');
@@ -329,7 +329,7 @@ test('auto-check failure is silent; manual check shows the specific message (检
 test('rejected sources (non-gov.cn papers, weekday make-up day, no off days): specific reason, existing data intact', async () => {
   let body2028 = synth2028();
   await withPage(NOV4, async (page) => {
-    // 先拿到合法的 2028，并手动标记一天
+    // 先拿到合法的 2028，並手動標記一天
     await goMonth(page, 2);
     await page.locator('.cal-grid button[data-key="2028-01-05"]').click();
     await page.getByRole('menuitemradio', { name: /带薪假/ }).click();
@@ -375,7 +375,7 @@ test('manual update does not clear manual marks; 「已更新：新增 2028 年�
     assert.match(await page.locator('.cal-grid button[data-key="2028-01-04"]').getAttribute('aria-label'), /无薪假.*已手动标记/);
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: '' });
-    // L7：成功的结果前有装饰性 ✓（aria-hidden），文字本身不变
+    // L7：成功的結果前有裝飾性 ✓（aria-hidden），文字本身不變
     const check = page.locator('#holiday-result .holiday-result-text .icon-check');
     assert.equal(await check.count(), 1);
     assert.equal(await check.isVisible(), true);
@@ -391,12 +391,12 @@ test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: '' });
     assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').isVisible(), true);
-    // 没有差异时不发页面级提示（信息通道安静）
+    // 沒有差異時不發頁面級提示（資訊通道安靜）
     assert.equal(await page.locator('.notices .banner-info[data-id="holidayDiff"]').isVisible(), false);
     body = JSON.stringify(changed);
     await checkNow(page);
-    // 信息通道：差异提示直接出现（M4：经 createBanners 的真实路径）。首次提示需要 localStorage 里没有设置，
-    // 与本用例明确写入的中国设置互斥，所以这里不断言也不能构造「排在首次提示之后」。
+    // 資訊通道：差異提示直接出現（M4：經 createBanners 的真實路徑）。首次提示需要 localStorage 裡沒有設定，
+    // 與本用例明確寫入的中國設定互斥，所以這裡不斷言也不能構造「排在首次提示之後」。
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiff');
     assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与本机内置的有 2 天不同，暂按内置的计算');
     const btns = await page.locator('.notices .banner-info').getByRole('button').allTextContents();
@@ -404,7 +404,7 @@ test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed
     await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await page.locator('.notices .banner-info').isVisible(), false);
     assert.equal(await statusLine(page), '2026 年 · 内置 · 2027 年 · 内置 · 上次检查 06/01');
-    // 内置表没被覆盖：10/7 仍是法定假日，10/11 仍是周末
+    // 內建表沒被覆蓋：10/7 仍是法定假日，10/11 仍是週末
     await tab(page, '月历').click();
     await goMonth(page, 4);
     assert.match(await page.locator('.cal-grid button[data-key="2026-10-07"]').getAttribute('aria-label'), /法定假日/);
@@ -478,7 +478,7 @@ test('高级设置: aria-expanded toggles; invalid 自定义网址 rejected and 
     assert.equal((await result(page)).text, '已更新：新增 2028 年假期表');
     const settingsRaw = await page.evaluate(() => localStorage.getItem('work-motivator-v1') ?? '');
     assert.doesNotMatch(settingsRaw, /mirror|customUrl/, 'not part of the settings / backup data');
-    // 清空 = 未设置
+    // 清空 = 未設定
     await input.fill('');
     await input.blur();
     assert.equal(await text(page, '.adv-summary'), '自定义数据网址：未设置');
@@ -506,7 +506,7 @@ test('two tabs: holidays key change in one tab refreshes the other (status line,
     await tab(p2, '基本设置').click();
     assert.equal(await statusLine(p2), '2027 年 · 内置 · 2028 年 · 已导入文件 · 上次检查 11/04');
     assert.equal(await p2.evaluate(() => window.__hWrites), w0, 'applying a remote change does not write');
-    // 自定义网址也同步
+    // 自定義網址也同步
     await p1.locator('.adv-toggle').click();
     await p1.getByLabel('自定义数据网址').fill('https://mirror.example.org/{year}.json');
     await p1.getByLabel('自定义数据网址').blur();
@@ -541,7 +541,7 @@ test('a11y + keyboard: the new controls have names and are reachable by Tab; mai
     await tab(page, '基本设置').click();
     for (const name of ['检查更新', '导入假期表文件']) assert.equal(await page.getByRole('button', { name }).count(), 1, name);
     assert.equal(await page.getByRole('button', { name: /高级设置/ }).count(), 1);
-    // 高级设置可用键盘展开，并进入自定义网址输入框。
+    // 進階設定可用鍵盤展開，並進入自定義網址輸入框。
     await page.locator('#adv-toggle').focus();
     await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
@@ -549,7 +549,7 @@ test('a11y + keyboard: the new controls have names and are reachable by Tab; mai
     const acc = await page.getByRole('textbox', { name: '自定义数据网址' }).count();
     assert.equal(acc, 1);
     assert.deepEqual(await page.locator('#holiday-result').evaluate((e) => [e.getAttribute('role'), e.getAttribute('aria-live')]), ['status', 'polite'], 'result area is a live status region');
-    // 每种状态的文字都扫一遍
+    // 每種狀態的文字都掃一遍
     const texts = [];
     const grab = async () => texts.push(await page.locator('#panel-settings').innerText(), await page.locator('.notices').innerText());
     await grab();
@@ -574,7 +574,7 @@ test('1280×585: 基本设置 shows the holiday group in every state without pag
     ['network failure (2 lines + reason)', NOV4, {}, async (page) => checkNow(page)],
     ['updated', NOV4, { routes: { 2027: official2027(), 2028: synth2028() } }, async (page) => checkNow(page)],
   ];
-  // 最坏情况：错误条（设置损坏）+ 信息条（与内置表不同）+ 3 行的失败结果：允许分页内部滚动，但页面不滚、结果在视野内
+  // 最壞情況：錯誤條（設定損壞）+ 資訊條（與內建表不同）+ 3 行的失敗結果：允許分頁內部滾動，但頁面不滾、結果在視野內
   states.push(['worst: error + info + failure', NOV4, {
     routes: { 2027: changed2027(), 2028: undefined },
     init: `if (!sessionStorage.getItem('seeded')) { localStorage.setItem('work-motivator-v1', '{oops'); sessionStorage.setItem('seeded', '1'); }`,
@@ -625,23 +625,23 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     assert.match(desc, /来源：导入文件/);
     assert.match(desc, /1月1日 周六，农历腊月初五，法定假日（元旦），来源：导入文件，/, 'lunar date is in the accessible description');
     assert.doesNotMatch(desc, /联网更新|官方通知/, 'no claim of origin for a file');
-    // 盖在格子上的提示用短写：2028-02 是 5 周月份，放得下 4 行（含来源）
+    // 蓋在格子上的提示用短寫：2028-02 是 5 周月份，放得下 4 行（含來源）
     await goMonth(page, 1);
     await page.locator('.cal-grid button[data-key="2028-02-06"]').hover();
-    await page.clock.runFor(500); // 悬停 0.4 秒后出现提示
-    // 农历行插在日期之后；格子放不下时整行不显示（aria-describedby 仍有，见上）
+    await page.clock.runFor(500); // 懸停 0.4 秒後出現提示
+    // 農曆行插在日期之後；格子放不下時整行不顯示（aria-describedby 仍有，見上）
     const lines = await tipVisibleLines(page);
     const base = lines.filter((l) => !l.startsWith('农历'));
     const lunar = lines.find((l) => l.startsWith('农历'));
     assert.deepEqual(base, ['2月6日 周日', '法定假日·春节', '导入文件', '计薪 ¥0.00'], `date / status / source / pay lines: ${JSON.stringify(lines)}`);
     assert.equal(lunar, '农历正月十二');
     assert.equal(lines[1], lunar, 'lunar line right under the date');
-    // 联网有不同的 2028：不覆盖导入的文件，页面级提示
+    // 聯網有不同的 2028：不覆蓋匯入的檔案，頁面級提示
     const changed = JSON.parse(synth2028());
     changed.days = changed.days.filter((d) => d.date !== '2028-01-03');
     body2028 = JSON.stringify(changed);
     await checkNow(page);
-    // 页面级提示直接就是文件差异这一条：首次提示需要 localStorage 里没有设置，与本用例明确写入的中国设置互斥
+    // 頁面級提示直接就是檔案差異這一條：首次提示需要 localStorage 裡沒有設定，與本用例明確寫入的中國設定互斥
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiffFile');
     assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与你导入的文件有 1 天不同，暂按导入的文件计算');
     assert.equal((await holidayRecord(page)).years['2028'].source, 'file');
@@ -718,7 +718,7 @@ test('harness self-check (R19/R32): protocol-relative //host, wss:// and ws:// a
   }
 });
 
-// R47 / M14：格式错误展开唯一的示例入口，高级设置仍可导航到示例。
+// R47 / M14：格式錯誤展開唯一的示例入口，進階設定仍可導航到示例。
 async function revealedByHelp(page, btnSel) {
   await page.locator(btnSel).click();
   return page.evaluate(() => {
@@ -751,7 +751,7 @@ test('R47: import format errors show the example without a duplicate action', ()
     await importHoliday(page, REAL_2026);
     await wait('2026 年假期已内置，未采用导入的数据');
     assert.equal(await page.locator('#btn-result-example').count(), 0);
-    await importHoliday(page, synth2028({ days: [day('2028-01-01', true, '元旦'), day('2028-01-04', false, '元旦')] })); // 1/4 是周二
+    await importHoliday(page, synth2028({ days: [day('2028-01-01', true, '元旦'), day('2028-01-04', false, '元旦')] })); // 1/4 是週二
     await wait('假期数据中有调休上班日不在周六或周日');
     assert.equal(await page.locator('#holiday-example').isVisible(), true);
     assert.equal(await page.locator('#btn-example').getAttribute('aria-expanded'), 'true');
@@ -797,7 +797,7 @@ test('R47: 高级设置 hint + 「查看格式示例」 expands the example in �
     assert.equal(await page.locator('#btn-adv-example').textContent(), '查看格式示例');
     assert.equal(await page.locator('#holiday-example').isVisible(), false);
     assert.deepEqual(await revealedByHelp(page, '#btn-adv-example'), REVEALED);
-    // 再按一次：已展开时仍只是带进视野、聚焦，不会收起
+    // 再按一次：已展開時仍只是帶進視野、聚焦，不會收起
     await page.locator('#adv-toggle').scrollIntoViewIfNeeded();
     assert.deepEqual(await revealedByHelp(page, '#btn-adv-example'), REVEALED);
   }));

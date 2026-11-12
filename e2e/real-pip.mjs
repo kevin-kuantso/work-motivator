@@ -1,19 +1,19 @@
-// 真实环境验证（Mac Chrome，有头）：以 file:// 开启成品，经 CDP 送出「受信任」的滑鼠事件
-// （Input.dispatchMouseEvent => 真实 user activation），驱动 Document Picture-in-Picture。
-// 不属于 npm test / npm run e2e；用 `npm run e2e:real` 执行。
-// !! 不得与其他驱动 Chrome 的测试（npm run e2e、Playwright、另一个 e2e:real）同时执行：
-//    并发时曾出现整段卡住约 25 分钟、以及 documentPictureInPicture.window 为 null 的崩溃（受信任点击 / 视窗焦点被抢走）。
-// 防护：整体硬性逾时（HARD_TIMEOUT_MS，默认 5 分钟）→ 杀掉 Chrome、删除临时 profile、以非 0 结束；
-//       每个 CDP 调用 / HTTP 请求都有单步逾时；PiP 视窗可能为 null 的地方一律判空并记为 FAIL，而不是抛 TypeError。
-// 只量测、只回报：任何数字都是本次实际量到的，没有量到的不会被声称。
+// 真實環境驗證（Mac Chrome，有頭）：以 file:// 開啟成品，經 CDP 送出「受信任」的滑鼠事件
+// （Input.dispatchMouseEvent => 真實 user activation），驅動 Document Picture-in-Picture。
+// 不屬於 npm test / npm run e2e；用 `npm run e2e:real` 執行。
+// !! 不得與其他驅動 Chrome 的測試（npm run e2e、Playwright、另一個 e2e:real）同時執行：
+//    併發時曾出現整段卡住約 25 分鐘、以及 documentPictureInPicture.window 為 null 的崩潰（受信任點選 / 視窗焦點被搶走）。
+// 防護：整體硬性逾時（HARD_TIMEOUT_MS，預設 5 分鐘）→ 殺掉 Chrome、刪除臨時 profile、以非 0 結束；
+//       每個 CDP 呼叫 / HTTP 請求都有單步逾時；PiP 視窗可能為 null 的地方一律判空並記為 FAIL，而不是拋 TypeError。
+// 只量測、只回報：任何數字都是本次實際量到的，沒有量到的不會被聲稱。
 //
-// 测试用的措施（仅在 harness 内，不进成品）：
-//  - init script 把页面的 Date 平移到 2026-11-03(二) 14:12:00 本地时间后照真实速度往前走（本机现在是晚上，会不跳金额）。
-//  - 网络（R19）：时钟在 2026-11-03，app 开页会检查「还没有内置表」的年份。2026 与 2027 都已内置
-//    （2027 为国务院办公厅 2026-11 通知），所以开页不产生任何外部请求。为了不碰真实网络又保持确定性，
-//    经 CDP Fetch 域拦截所有 http(s) 请求：一个都不回应，任何外部请求一律 failRequest 并记为 FAIL
-//    （步骤 9 断言整个过程 0 个请求）。
-//  - init script 包装 setInterval/clearInterval 以计算「存活的 100ms 计时器」数量；包装 requestWindow 以记录 app 要求的尺寸。
+// 測試用的措施（僅在 harness 內，不進成品）：
+//  - init script 把頁面的 Date 平移到 2026-11-03(二) 14:12:00 本地時間後照真實速度往前走（本機現在是晚上，會不跳金額）。
+//  - 網路（R19）：時鐘在 2026-11-03，app 開頁會檢查「還沒有內建表」的年份。2026 與 2027 都已內建
+//    （2027 為國務院辦公廳 2026-11 通知），所以開頁不產生任何外部請求。為了不碰真實網路又保持確定性，
+//    經 CDP Fetch 域攔截所有 http(s) 請求：一個都不回應，任何外部請求一律 failRequest 並記為 FAIL
+//    （步驟 9 斷言整個過程 0 個請求）。
+//  - init script 包裝 setInterval/clearInterval 以計算「存活的 100ms 計時器」數量；包裝 requestWindow 以記錄 app 要求的尺寸。
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,7 +27,7 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 9300 + Math.floor(Math.random() * 600);
 const HIDDEN_MS = Number(process.env.HIDDEN_MS ?? 60000);
 const HARD_TIMEOUT_MS = Number(process.env.HARD_TIMEOUT_MS ?? 5 * 60 * 1000);
-const STEP_MS = 20000; // 单个 CDP 调用 / HTTP 请求的上限
+const STEP_MS = 20000; // 單個 CDP 呼叫 / HTTP 請求的上限
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const withTimeout = (p, ms, what) => {
   let timer;
@@ -36,15 +36,15 @@ const withTimeout = (p, ms, what) => {
     new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`step timeout after ${ms}ms: ${what}`)), ms); }),
   ]).finally(() => clearTimeout(timer));
 };
-// PiP 文件的安全取法：视窗已关闭时得到 null（而不是抛错）
-// 只用于诊断：把「本该一个都没有的假期数据请求」单独点名（不回应任何请求）。
+// PiP 檔案的安全取法：視窗已關閉時得到 null（而不是拋錯）
+// 只用於診斷：把「本該一個都沒有的假期資料請求」單獨點名（不回應任何請求）。
 const HOLIDAY_HOSTS = /^https:\/\/(raw\.githubusercontent\.com\/NateScarlet\/holiday-cn\/master|cdn\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master|fastly\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master)\/\d{4}\.json$/;
-// 每次 reload 前只清掉假期数据键（含 lastCheck）：2026 / 2027 都是内置表，清掉后仍应正常显示内置数据、
-// 且依旧不发任何请求——顺带覆盖「本地没有联网记录时内置表照样够用」。「每天最多一次」由 npm test / npm run e2e 覆盖。设置键不受影响。
+// 每次 reload 前只清掉假期資料鍵（含 lastCheck）：2026 / 2027 都是內建表，清掉後仍應正常顯示內建資料、
+// 且依舊不發任何請求——順帶覆蓋「本地沒有聯網記錄時內建表照樣夠用」。「每天最多一次」由 npm test / npm run e2e 覆蓋。設定鍵不受影響。
 const CLEAR_HOLIDAYS = `localStorage.removeItem('work-motivator-v1-holidays')`;
 const PIPDOC = '(documentPictureInPicture.window ? documentPictureInPicture.window.document : null)';
 
-// ---------- 结果表 ----------
+// ---------- 結果表 ----------
 const rows = [];
 function rec(item, status, name, detail) {
   rows.push({ item, status, name, detail });
@@ -96,7 +96,7 @@ async function waitFor(c, expr, timeout = 5000, step = 25) {
   }
 }
 
-// 真实（受信任）点击：先把元素捲进视窗，再送 mouseMoved / mousePressed / mouseReleased。
+// 真實（受信任）點選：先把元素捲進視窗，再送 mouseMoved / mousePressed / mouseReleased。
 async function trustedClick(c, sel) {
   await c.send('Page.bringToFront');
   const p = await ev(c, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'center' }); const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
@@ -106,7 +106,7 @@ async function trustedClick(c, sel) {
   await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
 }
 
-// ---------- 注入页面的 harness ----------
+// ---------- 注入頁面的 harness ----------
 const INIT = `(() => {
   if (!sessionStorage.getItem('realPipSeeded')) {
     localStorage.setItem('work-motivator-v1', JSON.stringify({version: 2, salary: 6800, lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00'}));
@@ -268,7 +268,7 @@ async function main() {
         consoleMsgs.push(`log.${m.params.entry.level}: ${m.params.entry.text} ${m.params.entry.url ?? ''}`);
       }
     });
-    // ---- 网络：拦截全部 http(s)，一个都不回应（不碰真实网络）；2026 / 2027 已内置，本该一个请求都没有 ----
+    // ---- 網路：攔截全部 http(s)，一個都不回應（不碰真實網路）；2026 / 2027 已內建，本該一個請求都沒有 ----
     const refused = [];
     A.on((m) => {
       if (m.method !== 'Fetch.requestPaused') return;
@@ -286,7 +286,7 @@ async function main() {
     await A.send('Page.bringToFront');
     await sleep(500);
 
-    // ===== 9 假期数据：2026 与 2027 都已内置 → 开页不发任何请求，也不出现「暂未发布」信息 =====
+    // ===== 9 假期資料：2026 與 2027 都已內建 → 開頁不發任何請求，也不出現「暫未釋出」資訊 =====
     const idle9 = await waitFor(A, '!!document.getElementById("btn-holiday-check") && !document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && (document.getElementById("holiday-status").getAttribute("aria-label") || "").includes("2027 年 · 内置")', 10000);
     const h9 = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { hidden: r.hidden, tone: r.dataset.tone, text: r.querySelector('.holiday-result-text').textContent, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), tagHidden: [...document.querySelectorAll('.cal-year-tag')].map((e) => e.hidden), rec: localStorage.getItem('work-motivator-v1-holidays'), errBar: !document.querySelector('.notices .banner-error').hidden, toast: !document.querySelector('.toast').hidden }; })()`);
     check('9', idle9 !== null && refused.length === 0, '2026 / 2027 都已内置 -> 开页不请求任何假期数据（CDP Fetch 仍全量拦截，0 个请求）', `refused=${JSON.stringify(refused)} idle after ~${idle9}ms`);
@@ -296,7 +296,7 @@ async function main() {
     info('0', 'page', `${await ev(A, 'location.href')} ; app Date = ${await ev(A, 'new Date().toString()')} ; reduced-motion=${await ev(A, 'matchMedia("(prefers-reduced-motion: reduce)").matches')}`);
     await shot(A, 'main-before');
 
-    // ===== 1 开启 =====
+    // ===== 1 開啟 =====
     const enabled = await ev(A, '!document.getElementById("btn-float").disabled && document.getElementById("btn-float").getAttribute("aria-disabled") !== "true"');
     check('1', enabled, '悬浮按钮可用 (PiP supported)', `disabled=${!enabled}`);
     const openMs = await openPip(A);
@@ -312,7 +312,7 @@ async function main() {
     check('1', !/时薪/.test(p1.text) && !/今日满勤可得/.test(p1.text), 'PiP 不含「时薪」「今日满勤可得」(innerText)', `lg-only computed display=${p1.lgOnlyDisplay}`);
     check('1', p1.openerIv100 === 0 && p1.iv100 === 1, '计时器已移到 PiP（开启者 0 个、PiP 1 个 100ms interval）', `opener=${p1.openerIv100} pip=${p1.iv100}`);
 
-    // 地區切換不重建卡片：實際 PiP 與主文件必須同步語言、幣別和主題。
+    // 地區切換不重建卡片：實際 PiP 與主檔案必須同步語言、幣別和主題。
     const switchRegion = async (region) => ev(A, `(() => { const el = document.getElementById('f-region'); el.value = '${region}'; el.dispatchEvent(new Event('change', {bubbles:true})); })()`);
     await switchRegion('TW');
     await sleep(300);
@@ -335,7 +335,7 @@ async function main() {
     info('2', 'PiP document.compatMode', p1.compat);
     const h1 = p1.inner[1];
 
-    // ===== 8a 截图 =====
+    // ===== 8a 截圖 =====
     const targets = await http('/json/list');
     info('8', 'CDP targets (PiP 开启时)', targets.map((t) => `${t.type}:${t.url.slice(0, 50)}`).join(' | '));
     info('8', '开启者页面截图', await shot(A, 'opener-with-pip'));
@@ -353,7 +353,7 @@ async function main() {
     }
     info('8', 'PiP 窗口截图 (经 /json 目标)', pipTarget ? `target ${pipTarget.type} url=${pipTarget.url.slice(0, 40)} -> ${pipShot}` : '未找到 PiP 的 CDP page 目标，无法截图');
 
-    // ===== 3 跳动 =====
+    // ===== 3 跳動 =====
     if (!(await ev(A, `(() => { const d = ${PIPDOC}; if (!d) return false; __watchAmount(d); return true; })()`))) throw new Error('PiP window null before the foreground tick check');
     await sleep(5000);
     const s5 = statsOf(await ev(A, '__chg'), 5000);
@@ -380,7 +380,7 @@ async function main() {
     T.ws.close();
     await sleep(500);
 
-    // ===== 4 占位卡收回 =====
+    // ===== 4 佔位卡收回 =====
     await ev(A, 'window.scrollTo(0, 0)');
     const c4 = await closeAndMeasure(A, 'placeholder');
     check('4', c4.ok, '受信任点击占位卡后卡片回到主文件', `delay click->card back in main doc = ${c4.delay}ms (in-page performance.now; pagehide is async after close())`);
@@ -394,7 +394,7 @@ async function main() {
     const m4b = await ev(A, MAIN_INFO);
     check('4', s4.perSec >= 8 && s4.perSec <= 11 && m4b.iv100 === 1, '收回后金额续跳且只有一个计时来源', `changes/s=${s4.perSec} (3s window, maxGap=${s4.maxGap}ms) active 100ms intervals in opener=${m4b.iv100}`);
 
-    // ===== 5 齿轮 / X =====
+    // ===== 5 齒輪 / X =====
     const o5 = await openPip(A);
     check('5', o5 !== null, '重开 PiP (受信任点击)', `~${o5}ms`);
     await sleep(300);
@@ -405,7 +405,7 @@ async function main() {
     await sleep(900);
     const after = await ev(A, MAIN_INFO);
     check('5', c5.ok && after.cardInMain && after.size === 'lg' && after.placeholderHidden, 'PiP 内齿轮(页内 click) -> 卡片回主文件', `delay=${c5.delay}ms; inMain=${after.cardInMain} size=${after.size} placeholderHidden=${after.placeholderHidden}${c5.why ? ` (${c5.why})` : ''} (gear click was dispatched via element.click() inside the PiP document, no Chrome block observed)`);
-    // 新版面（spec §13.1）：齿轮 = 切到「基本设置」分页并把焦点放在分页标签（取代旧的「捲到设置区」）
+    // 新版面（spec §13.1）：齒輪 = 切到「基本設定」分頁並把焦點放在分頁標籤（取代舊的「捲到設定區」）
     check('5', !before.settingsSelected && after.settingsSelected && after.settingsPanelShown && after.focusId === 'tab-settings' && after.settingsTop >= 0 && !after.pageScrolls, '齿轮后切到「基本设置」分页、焦点在分页标签、设置区在视窗内',
       `selected ${before.settingsSelected} -> ${after.settingsSelected}; panel shown=${after.settingsPanelShown}; focus=${after.focusId}; settings top=${after.settingsTop}px; page scrolls=${after.pageScrolls}`);
     await ev(A, `document.getElementById('tab-calendar').click()`);
@@ -417,7 +417,7 @@ async function main() {
     const afterX = await ev(A, MAIN_INFO);
     check('5', o5b !== null && c5x.ok && afterX.cardInMain && afterX.size === 'lg' && afterX.placeholderHidden && afterX.iv100 === 1, 'documentPictureInPicture.window.close() (模拟 X) -> 同样还原', `delay=${c5x.delay}ms; inMain=${afterX.cardInMain} size=${afterX.size} placeholderHidden=${afterX.placeholderHidden} btn="${afterX.btn}" activeIv100=${afterX.iv100}`);
 
-    // ===== 6 鼓励语 + 发薪日 =====
+    // ===== 6 鼓勵語 + 發薪日 =====
     await ev(A, `localStorage.setItem('work-motivator-v1', JSON.stringify({ version: 1, cheer: '今天也要加油，下班就能吃好吃的！', payday: 15 }))`);
     await ev(A, CLEAR_HOLIDAYS);
     await A.send('Page.reload');
@@ -449,7 +449,7 @@ async function main() {
       } catch (e) { info('8', 'PiP 窗口截图(第二次)', `ERR ${e.message}`); }
     }
 
-    // ===== 7 PiP 开着时 reload =====
+    // ===== 7 PiP 開著時 reload =====
     const tgtBefore = (await http('/json/list')).filter((t) => t.id !== tab.id && t.type === 'page').map((t) => `${t.type}:${t.url.slice(0, 40)}`);
     await ev(A, CLEAR_HOLIDAYS);
     await A.send('Page.reload');
@@ -464,8 +464,8 @@ async function main() {
     await sleep(2000);
     const s7 = statsOf(await ev(A, '__chg'), 2000);
     check('7', s7.perSec >= 8, 'reload 后金额照常跳动', `changes/s=${s7.perSec}`);
-    // 本脚本共载入 3 次（开页、步骤 6 reload、步骤 7 reload），每次之前都清掉假期数据键；
-    // 2026 / 2027 都是内置表 → 3 次载入合计仍应是 0 个外部请求，且结果区始终隐藏。
+    // 本指令碼共載入 3 次（開頁、步驟 6 reload、步驟 7 reload），每次之前都清掉假期資料鍵；
+    // 2026 / 2027 都是內建表 → 3 次載入合計仍應是 0 個外部請求，且結果區始終隱藏。
     await waitFor(A, '!document.getElementById("btn-holiday-check").hasAttribute("aria-disabled") && (document.getElementById("holiday-status").getAttribute("aria-label") || "").includes("2027 年 · 内置")', 5000);
     const h9bAll = await ev(A, `(() => { const r = document.getElementById('holiday-result'); return { hidden: r.hidden, tone: r.dataset.tone, line: document.getElementById('holiday-status').getAttribute('aria-label').replace(/^假期数据状态：/, ''), busy: document.getElementById('btn-holiday-check').getAttribute('aria-disabled'), rec: localStorage.getItem('work-motivator-v1-holidays'), now: Date.now() }; })()`);
     info('9', 'reload 后假期数据区', JSON.stringify(h9bAll));
@@ -476,7 +476,7 @@ async function main() {
     check('7', o7 !== null && c7.ok, 'reload 后可再次开启并关闭 PiP', `open ~${o7}ms; close delay=${c7.delay}ms${c7.why ? ` (${c7.why})` : ''}`);
     info('8', '收回后主页面截图', await shot(A, 'main-after'));
 
-    // ===== 10 R45：开启者在后台时按 PiP 齿轮 → window.focus() 把开启者带回前面并切到「基本设置」=====
+    // ===== 10 R45：開啟者在後臺時按 PiP 齒輪 → window.focus() 把開啟者帶回前面並切到「基本設定」=====
     await ev(A, `document.getElementById('tab-calendar').click()`);
     const o10 = await openPip(A);
     check('10', o10 !== null, '重开 PiP（受信任点击）', `~${o10}ms`);
@@ -536,7 +536,7 @@ async function main() {
 }
 
 console.log(`e2e:real — do NOT run concurrently with other Chrome-driven tests (npm run e2e, Playwright, another e2e:real). Hard timeout ${Math.round(HARD_TIMEOUT_MS / 1000)}s.`);
-// 硬性逾时：不论卡在哪一步，都杀掉 Chrome、删 profile，并以非 0 结束（不会再卡 25 分钟）
+// 硬性逾時：不論卡在哪一步，都殺掉 Chrome、刪 profile，並以非 0 結束（不會再卡 25 分鐘）
 const hard = setTimeout(async () => {
   console.error(`\n[FAIL] X harness hard timeout: no completion after ${Math.round(HARD_TIMEOUT_MS / 1000)}s — killing Chrome (was another Chrome-driven test running concurrently?)`);
   await cleanup();

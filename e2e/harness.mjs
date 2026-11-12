@@ -1,4 +1,4 @@
-// e2e 共用：以本机 node http 提供 dist/，用系统 Chrome（playwright-core，不下载浏览器）。
+// e2e 共用：以本機 node http 提供 dist/，用系統 Chrome（playwright-core，不下載瀏覽器）。
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, normalize, dirname } from 'node:path';
@@ -29,9 +29,9 @@ export async function startServer() {
 
 export const launch = () => chromium.launch({ channel: 'chrome', headless: true });
 
-// 本机（e2e 服务器）以外的 http(s) 请求一律中止并记录（R19）：测试永远不碰真实网络。
-// 需要回应的测试用 page.route(...) 提供 fixture（page.route 优先于这里的 context.route）。
-// 只有 http / https 到 localhost / 127.0.0.1 才算本机（R32）；ws / wss、协议相对网址解析出的外部主机、其他一切都中止并计数。
+// 本機（e2e 伺服器）以外的 http(s) 請求一律中止並記錄（R19）：測試永遠不碰真實網路。
+// 需要回應的測試用 page.route(...) 提供 fixture（page.route 優先於這裡的 context.route）。
+// 只有 http / https 到 localhost / 127.0.0.1 才算本機（R32）；ws / wss、協議相對網址解析出的外部主機、其他一切都中止並計數。
 export const isLocal = (u) => {
   try {
     const { protocol, hostname } = new URL(u);
@@ -43,7 +43,7 @@ export const isLocal = (u) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 全新储存、无自定义网址时，开页自动检查「应该」请求的网址（按北京时间的日期算，与页面一致）。
+// 全新儲存、無自定義網址時，開頁自動檢查「應該」請求的網址（按北京時間的日期算，與頁面一致）。
 export function expectedAutoUrls(iso, region = 'CN') {
   if (region === 'TW') return [];
   const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date(iso)).split('-').map(Number);
@@ -52,7 +52,7 @@ export function expectedAutoUrls(iso, region = 'CN') {
     .flatMap((yr) => DEFAULT_HOLIDAY_SOURCES.map((s) => buildSourceUrl(s, yr)));
 }
 
-// 等到假期数据检查结束（「检查更新」按钮不再是检查中）。用 Node 端轮询：页面时钟被暂停时，页内计时器不可靠。
+// 等到假期資料檢查結束（「檢查更新」按鈕不再是檢查中）。用 Node 端輪詢：頁面時鐘被暫停時，頁內計時器不可靠。
 export async function holidayIdle(page, timeout = 5000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeout) {
@@ -66,11 +66,11 @@ export async function holidayIdle(page, timeout = 5000) {
   return false;
 }
 
-// 新 context = 清空的储存；时区固定为北京时间，时钟由 page.clock 控制。
-// 返回 external：页面发出的所有外部请求网址（含被中止的、被 page.route 回应的）；
-// consoleErrors：console.error（被中止的外部请求在 Chrome 里会记一条「Failed to load resource」，那一条单独计入 blockedLogs，不算错误）。
-// beforeGoto(page)：在载入前装 page.route（让开页的自动检查拿到 fixture）。
-// autoUrls：开页后、自动检查结束时已发出的外部请求。
+// 新 context = 清空的儲存；時區固定為北京時間，時鐘由 page.clock 控制。
+// 返回 external：頁面發出的所有外部請求網址（含被中止的、被 page.route 回應的）；
+// consoleErrors：console.error（被中止的外部請求在 Chrome 裡會記一條「Failed to load resource」，那一條單獨計入 blockedLogs，不算錯誤）。
+// beforeGoto(page)：在載入前裝 page.route（讓開頁的自動檢查拿到 fixture）。
+// autoUrls：開頁後、自動檢查結束時已發出的外部請求。
 export async function openAt(browser, url, iso, { init, reducedMotion, viewport, beforeGoto } = {}) {
   const context = await browser.newContext({
     timezoneId: 'Asia/Shanghai',
@@ -81,7 +81,7 @@ export async function openAt(browser, url, iso, { init, reducedMotion, viewport,
   const external = [];
   context.on('request', (r) => { if (!isLocal(r.url())) external.push(r.url()); });
   await context.route((u) => !isLocal(u.href), (route) => route.abort('internetdisconnected'));
-  // WebSocket 不走 route：另外拦截（记录后直接关闭，不连到任何服务器）
+  // WebSocket 不走 route：另外攔截（記錄後直接關閉，不連到任何伺服器）
   await context.routeWebSocket((u) => !isLocal(u.href), (ws) => { external.push(ws.url()); ws.close(); });
   const page = await context.newPage();
   page.setDefaultTimeout(5000);
@@ -97,8 +97,8 @@ export async function openAt(browser, url, iso, { init, reducedMotion, viewport,
   });
   if (init) await page.addInitScript(init);
   if (beforeGoto) await beforeGoto(page);
-  // 先装在目标时刻前 5 秒，载入后暂停在目标时刻，再触发一次 visibilitychange
-  // 让画面以「恰好」目标时刻重算（之后由 runFor / pauseAt 推进）。
+  // 先裝在目標時刻前 5 秒，載入後暫停在目標時刻，再觸發一次 visibilitychange
+  // 讓畫面以「恰好」目標時刻重算（之後由 runFor / pauseAt 推進）。
   const at = new Date(iso);
   await page.clock.install({ time: new Date(at.getTime() - 5000) });
   await page.goto(url);
@@ -109,8 +109,8 @@ export async function openAt(browser, url, iso, { init, reducedMotion, viewport,
   return { context, page, errors, external, consoleErrors, blockedLogs, autoUrls: external.slice() };
 }
 
-// 悬浮小窗 stub（pip.spec / digits.spec 共用）：requestWindow 回传一个 iframe 的 window（独立 document），
-// 其 setInterval / clearInterval（与 setTimeout / clearTimeout）转给已被 page.clock 接管的主视窗计时器，并记录存活的 id。
+// 懸浮小窗 stub（pip.spec / digits.spec 共用）：requestWindow 回傳一個 iframe 的 window（獨立 document），
+// 其 setInterval / clearInterval（與 setTimeout / clearTimeout）轉給已被 page.clock 接管的主視窗計時器，並記錄存活的 id。
 // 以 addInitScript 的 content 注入：`(${pipStub})(${JSON.stringify(opts)})`。
 export function pipStub(opts) {
   const reg = { calls: [], wins: [] };
@@ -122,7 +122,7 @@ export function pipStub(opts) {
       if (opts.reject) throw new DOMException('denied', 'NotAllowedError');
       const f = document.createElement('iframe');
       f.className = 'pip-stub';
-      f.style.cssText = `position:fixed;left:0;bottom:0;width:${o.width}px;height:${o.height}px;border:0;z-index:9`; // 尺寸 = 请求的视口
+      f.style.cssText = `position:fixed;left:0;bottom:0;width:${o.width}px;height:${o.height}px;border:0;z-index:9`; // 尺寸 = 請求的視口
       document.documentElement.append(f);
       const w = f.contentWindow;
       const entry = { active: new Set(), closed: false };
@@ -135,7 +135,7 @@ export function pipStub(opts) {
         entry.active.delete(id);
         window.clearInterval(id);
       };
-      // 减少动态模式的对齐计时（R46）用 setTimeout：同样转给主视窗，记录在 timeouts（触发或清除后移除）
+      // 減少動態模式的對齊計時（R46）用 setTimeout：同樣轉給主視窗，記錄在 timeouts（觸發或清除後移除）
       entry.timeouts = new Set();
       w.setTimeout = (fn, ms) => {
         const id = window.setTimeout(() => { entry.timeouts.delete(id); fn(); }, ms);
@@ -146,7 +146,7 @@ export function pipStub(opts) {
         entry.timeouts.delete(id);
         window.clearTimeout(id);
       };
-      // 真实浏览器：close()（程序或按 X）都会触发 pagehide
+      // 真實瀏覽器：close()（程式或按 X）都會觸發 pagehide
       w.close = () => {
         if (entry.closed) return;
         entry.closed = true;
@@ -154,8 +154,8 @@ export function pipStub(opts) {
         dp.window = null;
         f.remove();
       };
-      // Document PiP 的 resizeTo 需要手势、浏览器可能拒绝；stub 里记录调用并把 iframe 调成该尺寸，
-      // 同时派发 resize（真实窗口大小改变也会派发），让「记住使用者拉动的尺寸」逻辑有东西可量。
+      // Document PiP 的 resizeTo 需要手勢、瀏覽器可能拒絕；stub 裡記錄呼叫並把 iframe 調成該尺寸，
+      // 同時派發 resize（真實視窗大小改變也會派發），讓「記住使用者拉動的尺寸」邏輯有東西可量。
       entry.resizes = [];
       w.resizeTo = (width, height) => {
         entry.resizes.push({ width, height });
@@ -171,7 +171,7 @@ export function pipStub(opts) {
   Object.defineProperty(window, 'documentPictureInPicture', { value: dp, configurable: true });
 }
 
-// 提示的可见行（V1 里计薪金额在窄格子会另起一行，innerText 会把「计薪 / 金额」拆开；这里按行元素取 textContent）。
+// 提示的可見行（V1 裡計薪金額在窄格子會另起一行，innerText 會把「計薪 / 金額」拆開；這裡按行元素取 textContent）。
 export const tipVisibleLines = (page) => page.evaluate(() => {
   const tip = document.querySelector('.day-tooltip');
   return [...tip.children].filter((x) => getComputedStyle(x).display !== 'none').map((x) => x.textContent);

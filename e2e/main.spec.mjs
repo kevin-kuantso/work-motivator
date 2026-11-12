@@ -5,19 +5,19 @@ import { join } from 'node:path';
 import { startServer, launch, openAt, root, expectedAutoUrls } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
-// 常见繁体字（简体中不存在的字形）+ 台湾用语；只用来检查「中国大陆界面」，不对整包成品扫描
-// （成品同时内置繁中字典，繁中字样是预期内容）。
+// 常見繁體字（簡體中不存在的字形）+ 臺灣用語；只用來檢查「中國大陸介面」，不對整包成品掃描
+// （成品同時內建繁中字典，繁中字樣是預期內容）。
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', '请改成你的月薪', '字串', '物件', 'JSON 文字', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用'];
 const VOID_NUMBERS = ['312.64', '44.66', '187.5862', '500.23', '6,565.52', '5,627.59', '21.75', '0.0124'];
 
-// 新版默认值是台湾（NT$40,000、午休关闭）。中国大陆回归要靠一份「旧版用户」存档：
-// 无 region、version < 3 的设置按规格并入 CN，旧默认月薪 6800、午休 11:30–13:00，
-// 这样既有的 ¥ 金额、CN 文案与假期表断言全部照旧成立。
+// 新版預設值是臺灣（NT$40,000、午休關閉）。中國大陸迴歸要靠一份「舊版使用者」存檔：
+// 無 region、version < 3 的設定按規格併入 CN，舊預設月薪 6800、午休 11:30–13:00，
+// 這樣既有的 ¥ 金額、CN 文案與假期表斷言全部照舊成立。
 const CN_SEED = { version: 2, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true };
 const SEED_CN = `if (!localStorage.getItem('work-motivator-v1')) localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_SEED))});`;
 
-// H1：首次提示的数字来自真实默认设置（台湾默认：月薪 40000、08:30–17:00）
+// H1：首次提示的數字來自真實預設設定（臺灣預設：月薪 40000、08:30–17:00）
 const FRESH_HINT = '目前按預設月薪 NT$40,000、08:30–17:00 計算，請改成你自己的';
 
 let server;
@@ -34,7 +34,7 @@ after(async () => {
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
 const visible = (page, sel) => page.locator(sel).first().isVisible();
 const card = '#status-card';
-// 在 node 端轮询（页面的 rAF / setTimeout 都被 page.clock 接管且暂停，不能用 waitForFunction）
+// 在 node 端輪詢（頁面的 rAF / setTimeout 都被 page.clock 接管且暫停，不能用 waitForFunction）
 async function until(page, sel, expected, ms = 3000) {
   const end = Date.now() + ms;
   let last;
@@ -54,7 +54,7 @@ function assertNoTraditional(s, where) {
   assert.deepEqual(terms, [], `non-mainland terms in ${where}: ${terms.join('、')}`);
 }
 
-// 全部既有用例都是中国大陆回归：默认先写入旧版（CN）存档；`{ fresh: true }` 保留真正的全新用户。
+// 全部既有用例都是中國大陸迴歸：預設先寫入舊版（CN）存檔；`{ fresh: true }` 保留真正的全新使用者。
 function withPage(iso, fn, opts = {}) {
   const { fresh, ...rest } = opts;
   const init = fresh ? rest.init : [SEED_CN, typeof rest.init === 'function' ? `(${String(rest.init)})()` : rest.init].filter(Boolean).join('\n');
@@ -64,7 +64,7 @@ function withPage(iso, fn, opts = {}) {
 async function openPage(iso, fn, opts) {
   const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
   try {
-    // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
+    // R19：開頁只會請求「自動檢查」該請求的網址（11 月前為 0 個）；一律被 harness 中止（離線）
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
     assert.deepEqual(errors.map(String), [], 'no uncaught page errors');
@@ -75,8 +75,8 @@ async function openPage(iso, fn, opts) {
   }
 }
 
-// 设置在设置分页里：先切过去（spec §13.1）。分页名随地区字典变化（简体「基本设置」/ 繁体「基本設定」），
-// 所以按当前页面语言选名字，而不是把某一个地区的文案写死。
+// 設定在設定分頁裡：先切過去（spec §13.1）。分頁名隨地區字典變化（簡體「基本設定」/ 繁體「基本設定」），
+// 所以按當前頁面語言選名字，而不是把某一個地區的文案寫死。
 const openSettings = (page) => page.getByRole('tab', { name: /^(基本设置|基本設定)$/ }).click();
 const errorBar = '.notices .banner-error';
 const infoBar = '.notices .banner-info';
@@ -170,7 +170,7 @@ test('calendar legend remains fully visible on narrow screens in every theme', (
 
 test('fresh storage shows numbers derived from defaults, no setup card, no payday row', () =>
   withPage(T1412, async (page) => {
-    // 全新用户：台湾默认（NT$40,000、午休关闭 → 8.5 小时）
+    // 全新使用者：臺灣預設（NT$40,000、午休關閉 → 8.5 小時）
     assert.equal(await page.title(), '上班鼓勵器');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-TW');
     assert.equal(await text(page, `${card} .card-date`), '2026/11/03 週二');
@@ -192,7 +192,7 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     assert.ok(!all.includes('快速开始'), 'no quick-start card');
     for (const n of VOID_NUMBERS) assert.ok(!all.includes(n), `void ÷21.75 number ${n} must not appear`);
     assert.ok(!all.includes('发薪日：每月 5 号'));
-    // 首次提示：说清现在用的默认值（H1），可关闭、关闭后记住
+    // 首次提示：說清現在用的預設值（H1），可關閉、關閉後記住
     const hint = page.getByText(FRESH_HINT);
     assert.equal(await hint.isVisible(), true);
     assert.equal(await page.locator(infoBar).getByRole('button', { name: '去修改' }).isVisible(), true);
@@ -209,7 +209,7 @@ test('ticks at 100ms and recomputes on visibilitychange', () =>
     assert.notEqual(await text(page, `${card} .card-amount`), before, 'amount moves while working');
     await page.clock.pauseAt(new Date('2026-11-03T14:12:01+08:00'));
     await page.clock.setSystemTime(new Date('2026-11-03T14:22:01+08:00'));
-    // 时钟暂停：没有计时器触发，只有 visibilitychange 能让数字更新
+    // 時鐘暫停：沒有計時器觸發，只有 visibilitychange 能讓數字更新
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     assert.equal(await text(page, `${card} .card-amount`), '¥ 202.0083');
   }));
@@ -223,8 +223,8 @@ test('reduced motion: display updates at 1 Hz', () =>
     assert.notEqual(await text(page, `${card} .card-amount`), a);
   }, { reducedMotion: true }));
 
-// R46：减少动态模式（1 秒一跳）对齐墙上时钟的整秒：每次倒数变化都发生在整秒（Date.now() % 1000 < 20），
-// 120 秒内秒数逐一递减，不跳号、不重复。打开时刻故意落在 .600（旧的 setInterval 版本相位 = 载入时刻，不在整秒上）。
+// R46：減少動態模式（1 秒一跳）對齊牆上時鐘的整秒：每次倒數變化都發生在整秒（Date.now() % 1000 < 20），
+// 120 秒內秒數逐一遞減，不跳號、不重複。開啟時刻故意落在 .600（舊的 setInterval 版本相位 = 載入時刻，不在整秒上）。
 test('R46: reduced-motion ticks align to wall-clock seconds; the countdown never skips or repeats over 120 s', () =>
   withPage('2026-11-03T14:12:00.600+08:00', async (page) => {
     const secs = (s) => {
@@ -251,7 +251,7 @@ test('R46: reduced-motion ticks align to wall-clock seconds; the countdown never
 test('payday row appears after setting payday and persists', () =>
   withPage(T1412, async (page) => {
     await openSettings(page);
-    // 发薪日 / 周末开关已从高级设置移到「周末与发薪日」组；高级设置折叠，只剩占位
+    // 發薪日 / 週末開關已從進階設定移到「週末與發薪日」組；進階設定摺疊，只剩佔位
     const adv = page.getByRole('button', { name: /高级设置/ });
     assert.equal(await adv.getAttribute('aria-expanded'), 'false');
     assert.match(await adv.textContent(), /自定义数据网址：未设置/);
@@ -277,7 +277,7 @@ test('salary edits reflect immediately; invalid input shows error and keeps last
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33');
     assert.equal(await text(page, `${card} .card-amount`), '¥ 200.0000');
     assert.equal(await visible(page, '.autosave'), true, 'autosave indicator shown');
-    // 不做任何转换：逗号、全角数字、句号一律拒绝（Kevin 的 no-coercion 规则）
+    // 不做任何轉換：逗號、全形數字、句號一律拒絕（Kevin 的 no-coercion 規則）
     for (const bad of ['6,800', '６８００', '6800。', '']) {
       await salary.fill(bad);
       assert.equal(await text(page, '#err-salary'), '请输入大于 0 的数字，只用半角数字、不加逗号，例如 6800', `rejects ${JSON.stringify(bad)}`);
@@ -331,12 +331,12 @@ test('calendar: day menu marks today as paid then unpaid leave; weekend → make
     assert.equal(await text(page, `${card} .card-badge`), '无薪假', 'marks persisted');
     await choose('11月3日', /^恢复为工作日/);
     assert.equal(await text(page, `${card} .card-badge`), '上班中', '恢复为工作日 returns to default');
-    // 休息日：默认 → 调休上班 → 默认
+    // 休息日：預設 → 調休上班 → 預設
     await choose('11月7日', /改为上班/);
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /调休上班/);
     await choose('11月7日', /^恢复为休息日/);
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
-    // 撤销
+    // 撤銷
     await choose('11月7日', /改为上班/);
     await page.getByRole('button', { name: '撤销', exact: true }).click();
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
@@ -360,10 +360,10 @@ test('calendar shows holiday names, legend, and a summary-row tag for years with
     await page.getByRole('button', { name: /下月/ }).click();
     await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2027 年 1 月');
-    // 2027 已有内置表（国务院 2026-11 通知）：不再出现「未内置」标签
+    // 2027 已有內建表（國務院 2026-11 通知）：不再出現「未內建」標籤
     assert.equal(await visible(page, '.cal-year-tag'), false);
     assertNoTraditional(await bodyText(page), 'rest day + 2027 view');
-    // 2028 仍无内置表 → 标签回来
+    // 2028 仍無內建表 → 標籤回來
     for (let i = 0; i < 12; i++) await page.getByRole('button', { name: /下月/ }).click();
     assert.equal(await text(page, '.cal-title'), '2028 年 1 月');
     assert.equal(await text(page, '.cal-summary .cal-year-tag'), '2028 年只标了法定假日，补假和调休未标出');
@@ -378,7 +378,7 @@ test('2028 (no built-in holiday table): the status card says so', () =>
     assert.equal(await visible(page, `${card} .card-year`), true);
     assert.equal(await text(page, `${card} .card-year`), '2028 年只标了法定假日，补假和调休未标出');
     assert.equal(await page.locator(`${card} .card-year`).getAttribute('title'), '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出');
-    // R39：1/1 是固定法定假日 → 1 月 17 个工作日（无补假 / 调休数据）、日薪 400.00；10:00 已赚 400 × 5400/25200 = 85.7143
+    // R39：1/1 是固定法定假日 → 1 月 17 個工作日（無補假 / 調休資料）、日薪 400.00；10:00 已賺 400 × 5400/25200 = 85.7143
     assert.equal(await text(page, `${card} .card-amount`), '¥ 85.7143');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥400.00');
     assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥485.71');
@@ -441,7 +441,7 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     assertNoTraditional(await bodyText(page), 'import report');
     await report.getByRole('button', { name: '知道了' }).click();
     assert.equal(await report.isVisible(), false);
-    // 「去设置里修改」：在同一分页里聚焦对应字段
+    // 「去設定裡修改」：在同一分頁裡聚焦對應欄位
     await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'c.json', mimeType: 'application/json', buffer: Buffer.from('{"salary":-1}') });
     await report.waitFor({ state: 'visible' });
     await report.getByRole('button', { name: '去设置里修改' }).click();
@@ -507,7 +507,7 @@ test('storage failure shows the warning bar and the app keeps working', () =>
     await openSettings(page);
     await page.getByLabel('月薪').fill('7000');
     assert.equal(await text(page, `${errorBar} .banner-text`), '无法保存设置，关闭页面后会丢失。请先导出备份');
-    // 恢复前不可关闭；条内有导出 / 导入快捷按钮
+    // 恢復前不可關閉；條內有匯出 / 匯入快捷按鈕
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).count(), 0);
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '导出备份' }).isVisible(), true);
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '导入备份' }).isVisible(), true);
@@ -520,12 +520,12 @@ test('storage failure shows the warning bar and the app keeps working', () =>
 test('storage unreadable at load: warning bar from the start, defaults still tick', () =>
   withPage(T1412, async (page) => {
     assert.equal(await text(page, `${errorBar} .banner-text`), '无法保存设置，关闭页面后会丢失。请先导出备份');
-    // 读不到存档 = 保守回退（CN、月薪 5000、午休关闭），不是全新用户
+    // 讀不到存檔 = 保守回退（CN、月薪 5000、午休關閉），不是全新使用者
     assert.equal(await text(page, `${card} .card-amount`), '¥ 159.6639');
     assert.equal(await page.locator(`${infoBar}[data-id=firstRun]`).count(), 0, 'not treated as first run');
   }, { fresh: true, init: () => { Storage.prototype.getItem = () => { throw new DOMException('denied', 'SecurityError'); }; } }));
 
-// 直接写入原始存档（可用来写入坏内容）：默认 init 里已经有 CN 种子，这里覆盖它。
+// 直接寫入原始存檔（可用來寫入壞內容）：預設 init 裡已經有 CN 種子，這裡覆蓋它。
 const seed = (raw) => `if (!sessionStorage.getItem('seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(raw)}); sessionStorage.setItem('seeded', '1'); }`;
 
 test('corrupt saved settings: visible dismissible notice, not a silent first run', () =>
@@ -533,7 +533,7 @@ test('corrupt saved settings: visible dismissible notice, not a silent first run
     assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。');
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '导入备份' }).isVisible(), true, 'the bar offers the button its text refers to');
     assert.equal(await page.locator(`${infoBar}[data-id=firstRun]`).count(), 0, 'not treated as first run');
-    // 坏存档 → 保守回退（CN、月薪 5000、午休关闭），不会冒用台湾默认
+    // 壞存檔 → 保守回退（CN、月薪 5000、午休關閉），不會冒用臺灣預設
     assert.equal(await text(page, `${card} .card-amount`), '¥ 159.6639');
     assertNoTraditional(await bodyText(page), 'corrupt-load notice');
     await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).click();
@@ -548,7 +548,7 @@ test('partly invalid saved settings: notice lists field labels, other fields sti
   }, { init: seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } })) }));
 
 test('two tabs: a change in one tab reaches the other without reload and is never reverted', async () => {
-  // 只记录设置键的写入次数（测试用 init script，不是成品钩子）
+  // 只記錄設定鍵的寫入次數（測試用 init script，不是成品鉤子）
   const count = () => {
     window.__settingsWrites = 0;
     const orig = Storage.prototype.setItem;
@@ -569,11 +569,11 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     await openSettings(p1);
     await p2.getByLabel('月薪').fill('9000');
     assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57');
-    // 第 1 页不重新整理：storage 事件到达后立即反映
+    // 第 1 頁不重新整理：storage 事件到達後立即反映
     await until(p1, `${card} .metric-daily .metric-value`, '¥428.57');
     assert.equal(await p1.getByLabel('月薪').inputValue(), '9000', 'settings panel synced');
     assert.equal(await p1.evaluate(() => window.__settingsWrites), 0, 'applying a remote change does not write storage');
-    // 第 1 页再改鼓励语：不得把第 2 页的月薪改回 6800
+    // 第 1 頁再改鼓勵語：不得把第 2 頁的月薪改回 6800
     await p1.getByLabel('鼓励语').fill('加油');
     const saved = JSON.parse(await p1.evaluate(() => localStorage.getItem('work-motivator-v1')));
     assert.equal(saved.region, 'CN');
@@ -586,7 +586,7 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     await p1.getByRole('menuitemradio', { name: /^带薪假/ }).click();
     assert.equal(await p1.locator('.cal-undo').getAttribute('aria-disabled'), 'false');
     await p2.waitForFunction(() => JSON.parse(localStorage.getItem('work-motivator-v1')).marksByRegion.CN['2026-11-02'] === 'paidLeave');
-    // 月历标记同样同步
+    // 月曆標記同樣同步
     await p2.getByRole('tab', { name: '月历' }).click();
     await p2.locator('.cal-grid button[aria-label^="11月3日 "]').click();
     await p2.getByRole('menuitemradio', { name: /^带薪假/ }).click();
@@ -594,7 +594,7 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     assert.equal(await p1.locator('.cal-undo').getAttribute('aria-disabled'), 'true', 'remote mark change invalidates local undo');
     await p1.locator('.cal-undo').evaluate((button) => button.click());
     assert.match(await p1.locator('.cal-grid button[aria-label^="11月3日 "]').getAttribute('aria-label'), /带薪假/);
-    // 其他分页清空储存（key === null）：回到新安装默认值（台湾、NT$40,000）
+    // 其他分頁清空儲存（key === null）：回到新安裝預設值（臺灣、NT$40,000）
     await p2.evaluate(() => localStorage.clear());
     await until(p1, `${card} .metric-daily .metric-value`, 'NT$1,904.76');
     assert.equal(await p1.getByLabel('月薪').inputValue(), '40000');
@@ -606,7 +606,7 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
 
 test('first successful save shows one-time backup nudge and requests persistence (failure tolerated)', () =>
   withPage(T1412, async (page) => {
-    // 全新用户（台湾默认）：首次提示 → 保存后换成备份提醒
+    // 全新使用者（臺灣預設）：首次提示 → 儲存後換成備份提醒
     assert.equal(await visible(page, infoBar), true, 'first-run hint');
     await openSettings(page);
     await page.getByLabel('月薪').fill('7000');
@@ -636,8 +636,8 @@ test('crossing 00:00 switches the date', () =>
     assert.doesNotMatch(await todayCell(page, '11月3日').getAttribute('aria-label'), /今天/);
   }));
 
-// 成品同时内置繁中字典，所以「整包不得出现繁体」不再成立；这里守的是中国大陆界面本身，
-// 并确认成品没把繁中字典丢掉（切换地区要用）。
+// 成品同時內建繁中字典，所以「整包不得出現繁體」不再成立；這裡守的是中國大陸介面本身，
+// 並確認成品沒把繁中字典丟掉（切換地區要用）。
 test('CN UI has no Traditional characters; the shipped file bundles both regional dictionaries', () =>
   withPage(T1412, async (page) => {
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-CN');
@@ -651,8 +651,8 @@ test('CN UI has no Traditional characters; the shipped file bundles both regiona
     assert.ok(html.includes('今天已經賺了'), 'dist also carries the Traditional Chinese dictionary');
   }, { fresh: false }));
 
-// Task 14 fix round 1 · D1：运行中切换减少动态（reduce → 关 → reduce），时钟在 change 事件送到之前就走：
-// 每次观察都恰好一个计时器（100 ms 的 setInterval 或对齐整秒的 setTimeout），金额更新没有超过 1 秒的空档
+// Task 14 fix round 1 · D1：執行中切換減少動態（reduce → 關 → reduce），時鐘在 change 事件送到之前就走：
+// 每次觀察都恰好一個計時器（100 ms 的 setInterval 或對齊整秒的 setTimeout），金額更新沒有超過 1 秒的空檔
 test('D1: toggling reduced motion at runtime keeps exactly one ticker and no gap > 1 s (ticks may land before the change event)', () =>
   withPage(T1412, async (page) => {
     await page.evaluate(() => {
@@ -663,7 +663,7 @@ test('D1: toggling reduced motion at runtime keeps exactly one ticker and no gap
       const ct = window.clearTimeout.bind(window);
       window.setInterval = (fn, ms, ...a) => { const id = si(fn, ms, ...a); if (ms === 100) live.set(id, 'i'); return id; };
       window.clearInterval = (id) => { live.delete(id); ci(id); };
-      // 对齐计时的延迟落在 20–1000 ms；测试期间没有其他这种延迟的计时（不悬停、不复制）
+      // 對齊計時的延遲落在 20–1000 ms；測試期間沒有其他這種延遲的計時（不懸停、不復制）
       window.setTimeout = (fn, ms, ...a) => {
         const aligned = ms >= 20 && ms <= 1000;
         const id = st((...x) => { live.delete(id); fn(...x); }, ms, ...a);
@@ -676,10 +676,10 @@ test('D1: toggling reduced motion at runtime keeps exactly one ticker and no gap
       const el = document.querySelector('#status-card .amount-tail');
       new MutationObserver(() => window.__upd.push(Date.now())).observe(el, { childList: true, characterData: true, subtree: true });
     });
-    // 让主分页按包装后的计时函数重建计时器
+    // 讓主分頁按包裝後的計時函式重建計時器
     await page.evaluate(() => { window.__mq = new Promise((r) => matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', r, { once: true })); });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.evaluate(() => window.__mq); // change 事件是异步派发的（不经过被暂停的假时钟）
+    await page.evaluate(() => window.__mq); // change 事件是非同步派發的（不經過被暫停的假時鐘）
     const obs = [];
     const look = async (what) => obs.push([what, await page.evaluate(() => [...window.__live.values()].join(''))]);
     for (const v of ['no-preference', 'reduce', 'no-preference', 'reduce']) {
@@ -692,8 +692,8 @@ test('D1: toggling reduced motion at runtime keeps exactly one ticker and no gap
     assert.ok(Math.max(...gaps) <= 1000, `no update gap > 1 s (max ${Math.max(...gaps)})`);
   }));
 
-// Task 14 fix round 2 · D：一般模式 → 减少动态，change 事件被扣住（matches 已翻转、事件未送达）：
-// 100 ms 的 interval 在下一次 tick 时自己交接给对齐整秒的链；每次观察恰好一个计时器
+// Task 14 fix round 2 · D：一般模式 → 減少動態，change 事件被扣住（matches 已翻轉、事件未送達）：
+// 100 ms 的 interval 在下一次 tick 時自己交接給對齊整秒的鏈；每次觀察恰好一個計時器
 const GATE_MQ = `(() => {
   const add = MediaQueryList.prototype.addEventListener;
   const queued = [];
@@ -725,7 +725,7 @@ test('D round 2: off → reduce with the change event withheld — the 100 ms in
       const el = document.querySelector('#status-card .amount-tail');
       new MutationObserver(() => window.__ticks.push(Date.now())).observe(el, { childList: true, characterData: true, subtree: true });
     });
-    // 先让 app 用包装后的计时函数重建一次（不扣事件）：reduce → 关
+    // 先讓 app 用包裝後的計時函式重建一次（不扣事件）：reduce → 關
     for (const v of ['reduce', 'no-preference']) {
       await page.evaluate(() => { window.__mq = new Promise((r) => matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', r, { once: true })); });
       await page.emulateMedia({ reducedMotion: v });

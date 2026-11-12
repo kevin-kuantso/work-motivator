@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt } from './harness.mjs';
 
-// 这些用例断言的是中国（简体、¥）地区的既有文案；应用默认地区已改为台湾，所以显式种入旧版（v1 = 中国）设置。
+// 這些用例斷言的是中國（簡體、¥）地區的既有文案；應用預設地區已改為臺灣，所以顯式種入舊版（v1 = 中國）設定。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded','1'); }`;
 

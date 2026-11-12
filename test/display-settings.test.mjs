@@ -1,5 +1,5 @@
-// 画面设置（Task 24）：全局字号五档 + 状态卡五个显隐开关。
-// 这里只测纯行为：默认值不改画面、旧存档静默兼容、非法值逐字段丢弃并回报、备份往返、错误原因的两种语言。
+// 畫面設定（Task 24）：全域性字號五檔 + 狀態卡五個顯隱開關。
+// 這裡只測純行為：預設值不改畫面、舊存檔靜默相容、非法值逐欄位丟棄並回報、備份往返、錯誤原因的兩種語言。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -34,7 +34,7 @@ test('默认值：中号 + 五项全部显示（旧版画面不变）', () => {
   assert.equal(DEFAULTS.fontScale, 'm');
   for (const f of TOGGLES) assert.equal(DEFAULTS[f], true, `${f} 默认显示`);
   assert.deepEqual([...FONT_SCALES], ['xs', 's', 'm', 'l', 'xl']);
-  // 新用户的默认状态与 DEFAULTS 同一份值：第一次开页看到的卡与旧版一致。
+  // 新使用者的預設狀態與 DEFAULTS 同一份值：第一次開頁看到的卡與舊版一致。
   assert.equal(defaultState().cfg.fontScale, 'm');
   for (const f of TOGGLES) assert.equal(defaultState().cfg[f], true, f);
 });
@@ -48,11 +48,11 @@ test('旧存档（缺这六个键）静默载入：套默认值，不产生任�
   const st = fakeStorage({ [STORAGE_KEY]: JSON.stringify(legacy) });
   const r = loadState(st);
   assert.equal(r.corrupt, false);
-  // 关键：不存在 ≠ 不合法。缺键绝不能变成面板上的「部分设置已改用默认值」警告。
+  // 關鍵：不存在 ≠ 不合法。缺鍵絕不能變成面板上的「部分設定已改用預設值」警告。
   assert.deepEqual(r.dropped, []);
   assert.equal(r.state.cfg.fontScale, 'm');
   for (const f of TOGGLES) assert.equal(r.state.cfg[f], true, f);
-  // 原值一个都不动
+  // 原值一個都不動
   assert.equal(r.state.cfg.start, '09:00');
   assert.equal(r.state.cfg.showLunar, false);
   assert.equal(r.state.cfg.theme, 'blue');
@@ -85,7 +85,7 @@ test('合法的新值逐项生效（五档都能存回来）', () => {
     assert.equal(r.state.cfg.fontScale, scale, scale);
     assert.deepEqual(r.dropped, []);
   }
-  // 关掉两个开关：只动这两个，其余保持现值
+  // 關掉兩個開關：只動這兩個，其餘保持現值
   const off = importState(
     JSON.stringify({ version: 3, showCardCheer: false, showCardMetrics: false }),
     canonical({ cfg: { ...DEFAULTS, showLunar: false } }),
@@ -155,7 +155,7 @@ test('导入报告的标签：字典顶层能按字段名查到这六项（不�
       assert.equal(typeof label, 'string', f);
       assert.ok(label.length > 0, f);
     }
-    // 报告里的标签与面板上的开关用同一套叫法（报告写成「显示进度条」、面板写「进度条」是同一件事）
+    // 報告裡的標籤與面板上的開關用同一套叫法（報告寫成「顯示進度條」、面板寫「進度條」是同一件事）
     const d = dict.settings.display;
     assert.equal(dict.settings.fontScale, d.fontScale);
     for (const [flat, field] of [
@@ -170,10 +170,10 @@ test('导入报告的标签：字典顶层能按字段名查到这六项（不�
 test('开关标签不与既有输入框同名：发薪日 / 鼓励语只命中一个控件', () => {
   for (const dict of [STRINGS, TW]) {
     const { display, payday, cheer } = dict.settings;
-    // 读屏与 getByLabel 都按子串匹配：标签里出现「发薪日」「鼓励语」会让一组控件产生两处命中
+    // 讀屏與 getByLabel 都按子串匹配：標籤裡出現「發薪日」「鼓勵語」會讓一組控制元件產生兩處命中
     assert.equal(display.payday.includes(payday), false, display.payday);
     assert.equal(display.cheer.includes(cheer), false, display.cheer);
-    // 但提示文字仍要写清楚显示的是什么，用户不必猜
+    // 但提示文字仍要寫清楚顯示的是什麼，使用者不必猜
     assert.ok(display.paydayHint.includes(payday), display.paydayHint);
     assert.ok(display.cheerHint.includes(cheer), display.cheerHint);
   }
@@ -186,7 +186,7 @@ test('画面设置的说明把边界讲清楚：日期连带农历、状态标�
     assert.match(d.statusNote, /状态标签|狀態標籤/);
     assert.match(d.scope, /不会改变|不會改變/);
     assert.ok(d.fontScaleOptions.xs && d.fontScaleOptions.xl, '五档都有文字');
-    // 农历仍是独立开关：画面设置不能声称已取代它
+    // 農曆仍是獨立開關：畫面設定不能聲稱已取代它
     assert.equal(typeof dict.settings.showLunar, 'string');
   }
 });

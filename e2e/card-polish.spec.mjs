@@ -1,6 +1,6 @@
-// Task 19 · Batch A（状态卡打磨）：九种状态 × 主要视窗的卡高稳定、文字不截断、倒数 / 进度头一行、进度条、法定假日色调、
-// 小窗 340px 不截断且徽章不碰齿轮、卡片铺满小窗、数字格不抖；首次提示条 + 错误条同时出现时的左栏余量。
-// 量测以 `MEASURE {...}` 打印。
+// Task 19 · Batch A（狀態卡打磨）：九種狀態 × 主要視窗的卡高穩定、文字不截斷、倒數 / 進度頭一行、進度條、法定假日色調、
+// 小窗 340px 不截斷且徽章不碰齒輪、卡片鋪滿小窗、數字格不抖；首次提示條 + 錯誤條同時出現時的左欄餘量。
+// 量測以 `MEASURE {...}` 列印。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -47,7 +47,7 @@ async function withState(name, fn, { viewport = { width: 1280, height: 585 }, ex
   }
 }
 
-// 卡片里所有可见的文字元素是否被截断（横向溢出）；鼓励语是用户文字，本来就允许省略
+// 卡片裡所有可見的文字元素是否被截斷（橫向溢位）；鼓勵語是使用者文字，本來就允許省略
 const truncated = (root) => root.evaluate((c) => [...c.querySelectorAll('.card-label, .card-badge, .card-tag, .card-date, .badge-text, .badge-name, .card-progress-title, .card-progress-aside, .card-countdown, .card-progress-text, .metric-label, .metric-value, .card-payday, .card-year, .card-amount')]
   .filter((el) => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 0.5).map((el) => `${el.className}: ${el.textContent}`));
 
@@ -102,8 +102,8 @@ test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown rig
     assert.equal(r.standaloneVisible, false, 'no second countdown line while the bar is shown');
   });
   await withState('lunch', async (page) => {
-    // 主题令牌（--state-lunch-fill）随主题色变化，测试不再写死某一主题的具体色值：
-    // 读渲染后的令牌，再断言实际填充色与它一致（颜色仍由主题决定，不是任意值）。
+    // 主題令牌（--state-lunch-fill）隨主題色變化，測試不再寫死某一主題的具體色值：
+    // 讀渲染後的令牌，再斷言實際填充色與它一致（顏色仍由主題決定，不是任意值）。
     const c = await page.evaluate(() => {
       const probe = document.createElement('span');
       probe.style.color = 'var(--state-lunch-fill)';
@@ -115,7 +115,7 @@ test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown rig
     assert.equal(c.fill, c.token, `lunch bar fill follows --state-lunch-fill (${c.token})`);
     assert.equal(await page.locator('#status-card .card-countdown').textContent(), '45 分钟后继续上班');
   });
-  // 没有进度条的状态：倒数 / 说明是单独一行，进度头不出现
+  // 沒有進度條的狀態：倒數 / 說明是單獨一行，進度頭不出現
   await withState('rest', async (page) => {
     assert.equal(await page.locator('#status-card .card-progress').isVisible(), false);
     assert.equal(await page.locator('#status-card .card-countdown-slot').isVisible(), true);
@@ -181,7 +181,7 @@ test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, 32px her
     assert.equal(await c.locator('.card-label').textContent(), '今天不计薪');
     assert.equal(await c.locator('.card-label').evaluate((e) => getComputedStyle(e).fontSize), '32px');
   });
-  // 值取自设置，不写死
+  // 值取自設定，不寫死
   await withState('before', async (page) => {
     assert.equal(await page.locator('#status-card .card-label').textContent(), '09:15 开始计薪');
     assert.ok(!(await page.locator('#status-card').innerText()).includes('08:30'), 'the old default time appears nowhere');
@@ -193,7 +193,7 @@ test('H3 / H8 / M1 / H2: per-state card content and look (tone colours, 32px her
 
 test('R33: countdown (head row), worked text and amount keep one width for the same text length while ticking, across a minute boundary', async () => {
   await withState('working', async (page) => {
-    const seen = new Map(); // 文字长度 → 宽度（同一长度必须同一宽度；位数变了（如 10秒 → 9秒）是文字本身变短，不算抖动）
+    const seen = new Map(); // 文字長度 → 寬度（同一長度必須同一寬度；位數變了（如 10秒 → 9秒）是文字本身變短，不算抖動）
     for (let i = 0; i < 130; i += 1) {
       const r = await page.evaluate(() => ['.card-countdown', '.card-progress-text', '.card-amount'].map((s) => {
         const e = document.querySelector(`#status-card ${s}`);
@@ -214,9 +214,9 @@ test('M4: first-run + error banners at 1280×585 leave ≥ 12px page slack and t
   const init = `Storage.prototype.setItem = function () { throw new DOMException('quota', 'QuotaExceededError'); };`;
   const { context, page, errors } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport: { width: 1280, height: 585 }, init });
   try {
-    // 分页按钮的 id（#tab-settings / #tab-calendar）与地区无关；role 名称会随语言变化（基本设置 / 基本設定）。
+    // 分頁按鈕的 id（#tab-settings / #tab-calendar）與地區無關；role 名稱會隨語言變化（基本設定 / 基本設定）。
     await page.locator('#tab-settings').click();
-    await page.getByLabel('月薪').fill('7000'); // 触发储存失败 → 错误条
+    await page.getByLabel('月薪').fill('7000'); // 觸發儲存失敗 → 錯誤條
     await page.locator('#tab-calendar').click();
     const m = await page.evaluate(() => ({
       banners: document.querySelectorAll('.notices .banner').length,
@@ -238,7 +238,7 @@ test('M4: first-run + error banners at 1280×585 leave ≥ 12px page slack and t
   }
 });
 
-// ---- 小窗（340px，stub 的 iframe 视口 = 请求的 340 × 高度）----
+// ---- 小窗（340px，stub 的 iframe 視口 = 請求的 340 × 高度）----
 const pipCard = (page) => page.frameLocator('iframe.pip-stub').locator('#status-card');
 
 test('float 340px: every state — no truncated text, badges end before the gear (≥ 4px), holiday badge only 「法定假日」, card fills the window', async () => {

@@ -1,14 +1,14 @@
-// 画面设置（设置 › 显示）：全局字号 xs…xl 与状态卡五个显隐开关。
-// 这里只检查「使用者看得到的后果」：整页字号变、卡片区块真的不见、日期开关不藏状态标签、
-// 存盘后重开还在、悬浮小窗跟着换窗口尺寸。配色 / 对比度由 main.spec 与 card-polish.spec 负责。
+// 畫面設定（設定 › 顯示）：全域性字號 xs…xl 與狀態卡五個顯隱開關。
+// 這裡只檢查「使用者看得到的後果」：整頁字號變、卡片區塊真的不見、日期開關不藏狀態標籤、
+// 存檔後重開還在、懸浮小窗跟著換視窗尺寸。配色 / 對比度由 main.spec 與 card-polish.spec 負責。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt, pipStub } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
-// 断言的是中国大陆文案与金额：写入旧版（v1、无地区）设置，让应用走「旧数据归中国」的迁移路径。
+// 斷言的是中國大陸文案與金額：寫入舊版（v1、無地區）設定，讓應用走「舊資料歸中國」的遷移路徑。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true };
-// 只在第一次注入：重载（page.reload）时不能把使用者刚存的设置盖回旧档，否则「重开还在」测不到。
+// 只在第一次注入：過載（page.reload）時不能把使用者剛存的設定蓋回舊檔，否則「重開還在」測不到。
 const CN_SEED = { content: `if (!sessionStorage.getItem('display-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('display-seeded', '1'); }` };
 
 let server;
@@ -22,7 +22,7 @@ after(async () => {
   await server?.close();
 });
 
-// 种子脚本要排在最前面：init 支持 { content }，多个内容按顺序串起来。
+// 種子指令碼要排在最前面：init 支援 { content }，多個內容按順序串起來。
 function withPage(iso, fn, opts = {}) {
   const extra = opts.init?.content ? `\n${opts.init.content}` : '';
   const init = { content: `${CN_SEED.content}${extra}` };
@@ -40,7 +40,7 @@ async function openPage(iso, fn, opts) {
   }
 }
 
-// 页面的 rAF / setTimeout 都在 page.clock 下暂停，不能用 waitForFunction：在 node 端轮询。
+// 頁面的 rAF / setTimeout 都在 page.clock 下暫停，不能用 waitForFunction：在 node 端輪詢。
 async function until(check, ms = 2000, label = 'condition') {
   const end = Date.now() + ms;
   let last;
@@ -57,7 +57,7 @@ const pickScale = (page, scale) => page.locator('#f-fontScale').selectOption(sca
 const stored = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('work-motivator-v1')));
 const fontSize = (page, sel) => page.evaluate((s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize), sel);
 const attr = (page, name) => page.evaluate((n) => document.documentElement.getAttribute(n), name);
-// 区块开关写在卡片根节点上（data-show-*），不是 <html>：与 card.js 的契约一致
+// 區塊開關寫在卡片根節點上（data-show-*），不是 <html>：與 card.js 的契約一致
 const flag = (page, name) => page.evaluate((n) => document.querySelector('#status-card').dataset[n], `show${name[0].toUpperCase()}${name.slice(1)}`);
 const shown = (page, sel) => page.evaluate((s) => {
   const el = document.querySelector(s);
@@ -108,7 +108,7 @@ test('reduced motion rotates nonblank encouragement without animation', () =>
 test('font scale changes the whole page at once and is remembered after reload', () =>
   withPage(T1412, async (page) => {
     await openSettings(page);
-    // 默认中号：与未加这个设置时一致（属性有值、整页系数为 1）
+    // 預設中號：與未加這個設定時一致（屬性有值、整頁係數為 1）
     assert.equal(await attr(page, 'data-font-scale'), 'm');
     const base = await fontSize(page, '.card-label');
 
@@ -122,10 +122,10 @@ test('font scale changes the whole page at once and is remembered after reload',
     const xl = await fontSize(page, '.card-label');
     assert.ok(xl > base, `xl should be larger: ${xl} > ${base}`);
 
-    // 存盘写成稳定 ID（xs…xl），不是像素或译文
+    // 存檔寫成穩定 ID（xs…xl），不是畫素或譯文
     assert.equal((await stored(page)).fontScale, 'xl');
 
-    // 重开后照旧：档位从存档套用到 <html>，版面立刻是 xl
+    // 重開後照舊：檔位從存檔套用到 <html>，版面立刻是 xl
     await page.reload();
     await until(async () => (await attr(page, 'data-font-scale')) === 'xl', 3000, 'scale after reload');
     assert.equal(await fontSize(page, '.card-label'), xl);
@@ -150,7 +150,7 @@ test('each card switch hides exactly its own block; dates never hide the status 
   withPage(T1412, async (page) => {
     await openSettings(page);
     const card = '#status-card';
-    // 默认全开：区块都在（进度条、指标、日期、鼓励语都在折算后的版面里）
+    // 預設全開：區塊都在（進度條、指標、日期、鼓勵語都在折算後的版面裡）
     assert.equal(await flag(page, 'progress'), 'true');
     assert.ok(await shown(page, `${card} .card-date-group`), 'date group visible by default');
 
@@ -159,7 +159,7 @@ test('each card switch hides exactly its own block; dates never hide the status 
     await toggle('showCardDate');
     assert.equal(await flag(page, 'date'), 'false');
     await until(async () => !(await shown(page, `${card} .card-date-group`)), 2000, 'date group hidden');
-    // 日期开关只藏日期与农历：状态标签（上班中 / 午休 / 已下班）必须还在
+    // 日期開關只藏日期與農曆：狀態標籤（上班中 / 午休 / 已下班）必須還在
     assert.ok(await shown(page, `${card} .card-badge`), 'status badge must stay visible');
 
     await toggle('showCardMetrics');
@@ -169,21 +169,21 @@ test('each card switch hides exactly its own block; dates never hide the status 
 
     await toggle('showCardProgress');
     await until(async () => !(await shown(page, `${card} .card-progress`)), 2000, 'progress hidden');
-    // 收起进度条不能连倒数一起收掉：倒数只是换到另一行
+    // 收起進度條不能連倒數一起收掉：倒數只是換到另一行
     assert.ok(await shown(page, `${card} .card-countdown`), 'countdown survives hidden progress');
 
     await toggle('showCardPayday');
     await until(async () => (await flag(page, 'payday')) === 'false', 2000, 'payday off');
     await toggle('showCardCheer');
     await until(async () => (await flag(page, 'cheer')) === 'false', 2000, 'cheer off');
-    // 发薪日与鼓励语在旧档里本来就可能是空的：开关关掉后无论如何都不能出现
+    // 發薪日與鼓勵語在舊檔裡本來就可能是空的：開關關掉後無論如何都不能出現
     assert.ok(!(await shown(page, `${card} .card-payday`)), 'payday hidden');
     assert.ok(!(await shown(page, `${card} .card-cheer`)), 'cheer hidden');
-    // 全部关掉后卡片仍然有内容（状态与金额），不会变成空框
+    // 全部關掉後卡片仍然有內容（狀態與金額），不會變成空框
     assert.ok(await shown(page, `${card} .card-badge`), 'badge still visible after hiding everything');
     assert.ok(await shown(page, `${card} .card-amount`), 'amount still visible after hiding everything');
 
-    // 五个开关都写进存档，重开后保持
+    // 五個開關都寫進存檔，重開後保持
     const cfg = await stored(page);
     for (const k of ['showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer']) {
       assert.equal(cfg[k], false, `${k} stored as false`);
@@ -198,15 +198,15 @@ test('changing the scale while floating resizes the PiP window to that scale wid
   return withPage(T1412, async (page) => {
     await page.locator('#btn-float').click();
     await until(() => page.evaluate(() => (window.__pip?.calls ?? []).length > 0), 3000, 'pip opened');
-    // 中号开窗：宽度 340（与既有版本一致）
+    // 中號開窗：寬度 340（與既有版本一致）
     assert.equal(await page.evaluate(() => window.__pip.calls[0].width), 340);
-    // 小窗文件也要拿到同一档位（卡片字号由该文件的 <html> 决定）
+    // 小窗檔案也要拿到同一檔位（卡片字號由該檔案的 <html> 決定）
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window?.document?.documentElement?.getAttribute('data-font-scale')), 'm');
     const initialAmountSize = await page.evaluate(() => parseFloat(getComputedStyle(window.documentPictureInPicture.window.document.querySelector('.card-amount')).fontSize));
 
     await openSettings(page);
     await pickScale(page, 'xl');
-    // 小窗开着：字号换档同时把窗口改宽（best-effort：浏览器可能拒绝，stub 里会记录）
+    // 小窗開著：字號換檔同時把視窗改寬（best-effort：瀏覽器可能拒絕，stub 裡會記錄）
     const resized = await until(
       () => page.evaluate(() => (window.__pip.wins[0].resizes ?? []).at(-1)?.width ?? 0),
       3000,

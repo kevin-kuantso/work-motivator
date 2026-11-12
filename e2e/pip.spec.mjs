@@ -1,7 +1,7 @@
-// 悬浮小窗（Document PiP）：以 stub 取代 documentPictureInPicture。
-// stub 的 requestWindow 回传一个 iframe 的 window（独立 document），
-// 其 setInterval / clearInterval 转给已被 page.clock 接管的主视窗计时器，并记录存活的 id，
-// 用来检查「计时器跑在 PiP 视窗」与「关闭后没有残留计时器」。真实 PiP 留给 Task 7 实机验证。
+// 懸浮小窗（Document PiP）：以 stub 取代 documentPictureInPicture。
+// stub 的 requestWindow 回傳一個 iframe 的 window（獨立 document），
+// 其 setInterval / clearInterval 轉給已被 page.clock 接管的主視窗計時器，並記錄存活的 id，
+// 用來檢查「計時器跑在 PiP 視窗」與「關閉後沒有殘留計時器」。真實 PiP 留給 Task 7 實機驗證。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harness.mjs';
@@ -9,11 +9,11 @@ import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harnes
 const T1412 = '2026-11-03T14:12:00+08:00';
 const T1830 = '2026-11-03T18:30:00+08:00';
 
-// 本文件断言的是中国地区文案与金额：明确写入旧版（v1，无地区）设置，让应用走「旧数据一律归中国」的迁移路径，
-// 不依赖应用当前的新用户默认地区（台湾）。旧设置里午休 11:30–13:00 与「开启午休」是一组合法值。
+// 本檔案斷言的是中國地區文案與金額：明確寫入舊版（v1，無地區）設定，讓應用走「舊資料一律歸中國」的遷移路徑，
+// 不依賴應用當前的新使用者預設地區（臺灣）。舊設定裡午休 11:30–13:00 與「開啟午休」是一組合法值。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
-// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+// 與既有的 init 組在一起：字串相加、函式轉成字串、{ content } 加字首、null / undefined 只留種子、{ path } 原樣。
 const seeded = (init) => {
   if (init == null) return CN_SEED;
   if (typeof init === 'string') return `${CN_SEED}\n${init}`;
@@ -41,7 +41,7 @@ after(async () => {
 async function withPage(iso, fn, opts) {
   const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...opts, init: seeded(opts?.init) });
   try {
-    // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
+    // R19：開頁只會請求「自動檢查」該請求的網址（11 月前為 0 個）；一律被 harness 中止（離線）
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
     assert.deepEqual(errors.map(String), [], 'no uncaught page errors');
@@ -97,22 +97,22 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     assert.equal(await c.locator('.card-gear').isVisible(), true, 'gear shows in the small window');
     assert.equal(await c.locator('.metric-hourly').isVisible(), true, '时薪也显示在小窗');
     assert.equal(await c.locator('.metric-daily').isVisible(), true, '今日满勤可得也显示在小窗');
-    // 样式与语言复制进 PiP 文档
+    // 樣式與語言複製進 PiP 文件
     assert.equal(await pip(page).locator('html').getAttribute('lang'), 'zh-CN');
     assert.equal(await pip(page).locator('body').evaluate((b) => getComputedStyle(b).margin), '0px');
 
-    // 主分页：占位卡出现，按钮文案变「收回小窗」
+    // 主分頁：佔位卡出現，按鈕文案變「收回小窗」
     assert.equal(await placeholder(page).isVisible(), true);
     assert.equal(await txt(page.locator('.pip-placeholder-note')), '状态卡正显示在悬浮小窗里');
     assert.equal(await placeholder(page).getAttribute('aria-describedby'), 'pip-placeholder-note');
     assert.equal(await txt(floatBtn(page)), '收回小窗');
-    // R38：「请保持本页开启」在左栏按钮下方，悬浮时才出现，并作为按钮的描述
+    // R38：「請保持本頁開啟」在左欄按鈕下方，懸浮時才出現，並作為按鈕的描述
     assert.equal(await txt(page.locator('.card-col #float-keep')), '请保持本页开启：关闭本页，小窗也会一起关闭');
     assert.equal(await page.locator('#float-keep').isVisible(), true);
     assert.equal(await floatBtn(page).getAttribute('aria-describedby'), 'float-keep');
     assert.ok(!(await page.locator('#card-slot').innerText()).includes('194'), 'placeholder shows no amount');
 
-    // 使用者按 PiP 的 X：浏览器触发 pagehide
+    // 使用者按 PiP 的 X：瀏覽器觸發 pagehide
     await page.evaluate(() => window.documentPictureInPicture.window.close());
     assert.equal(await page.locator('#card-slot #status-card').count(), 1, 'card back in the main page');
     assert.equal(await page.locator('#status-card').getAttribute('data-size'), 'lg');
@@ -150,7 +150,7 @@ test('placeholder click, the float button and gear all close the PiP; gear opens
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab-settings', 'focus on the 基本设置 tab');
   }, { init: stub() }));
 
-// R45：齿轮先 window.focus()（开启者视窗，Chrome 123+ 在小窗内的点击手势下会把开启者带到前面），再收回小窗，再切到「基本设置」
+// R45：齒輪先 window.focus()（開啟者視窗，Chrome 123+ 在小窗內的點選手勢下會把開啟者帶到前面），再收回小窗，再切到「基本設定」
 async function gearOrder(page, focusImpl) {
   await page.evaluate((mode) => {
     window.__order = [];
@@ -170,7 +170,7 @@ async function gearOrder(page, focusImpl) {
     w.close = () => { window.__order.push('close'); orig(); };
   });
   await pip(page).locator('#status-card .card-gear').click();
-  await page.evaluate(() => new Promise((r) => queueMicrotask(r))); // MutationObserver 回调
+  await page.evaluate(() => new Promise((r) => queueMicrotask(r))); // MutationObserver 回撥
   return page.evaluate(() => window.__order);
 }
 
@@ -193,7 +193,7 @@ test('R45: a throwing window.focus() does not prevent closing the PiP and the ta
 
 test('PiP timer keeps updating while the opener is hidden; no ghost timers after reopen', () =>
   withPage(T1412, async (page) => {
-    // 在主视窗计时器上加记录（所有存活的 interval id，包括 stub 转来的 PiP 计时器）
+    // 在主視窗計時器上加記錄（所有存活的 interval id，包括 stub 轉來的 PiP 計時器）
     await page.evaluate(() => {
       const live = new Set();
       const si = window.setInterval.bind(window);
@@ -202,13 +202,13 @@ test('PiP timer keeps updating while the opener is hidden; no ghost timers after
       window.clearInterval = (id) => { live.delete(id); ci(id); };
       window.__live = live;
     });
-    // 让主分页重建一次计时器，使它进入记录
+    // 讓主分頁重建一次計時器，使它進入記錄
     for (const v of ['reduce', 'no-preference']) {
       await page.evaluate(() => {
         window.__mq = new Promise((r) => matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', r, { once: true }));
       });
       await page.emulateMedia({ reducedMotion: v });
-      await page.evaluate(() => window.__mq); // change 事件是异步派发的
+      await page.evaluate(() => window.__mq); // change 事件是非同步派發的
     }
     const state = () => page.evaluate(() => ({
       live: [...window.__live],
@@ -224,7 +224,7 @@ test('PiP timer keeps updating while the opener is hidden; no ghost timers after
       assert.equal(s.live.length, 1, `round ${round}: exactly one live timer while floating`);
       assert.deepEqual(s.pip[round], s.live, `round ${round}: the live timer belongs to the PiP window`);
 
-      // 主分页进入背景：PiP 计时器照常更新
+      // 主分頁進入背景：PiP 計時器照常更新
       await page.evaluate(() => {
         Object.defineProperty(document, 'visibilityState', { get: () => 'hidden', configurable: true });
         document.dispatchEvent(new Event('visibilitychange'));
@@ -244,14 +244,14 @@ test('PiP timer keeps updating while the opener is hidden; no ghost timers after
       assert.ok(s.pip.every((a) => a.length === 0), `round ${round}: no PiP timers left`);
       assert.ok(!s.pip.flat().includes(s.live[0]));
     }
-    // 收回后主分页计时器仍在跑
+    // 收回後主分頁計時器仍在跑
     const main = page.locator('#status-card .card-amount');
     const before = await txt(main);
     await page.clock.runFor(1000);
     assert.notEqual(await txt(main), before);
   }, { init: stub() }));
 
-// R46：减少动态模式下，悬浮时由小窗的 setTimeout 对齐整秒驱动；收回后小窗不留计时器，主分页接手
+// R46：減少動態模式下，懸浮時由小窗的 setTimeout 對齊整秒驅動；收回後小窗不留計時器，主分頁接手
 test('reduced motion while floating: the PiP window drives aligned 1 s ticks; nothing left behind after closing', () =>
   withPage('2026-11-03T14:12:00.600+08:00', async (page) => {
     await floatBtn(page).click();
@@ -278,13 +278,13 @@ test('reduced motion while floating: the PiP window drives aligned 1 s ticks; no
     assert.notEqual(await txt(main), before, 'main page ticks again');
   }, { init: stub(), reducedMotion: true }));
 
-// 高度随内容（spec §4.2）：开窗前量好，小窗内不出现卷轴
+// 高度隨內容（spec §4.2）：開窗前量好，小窗內不出現卷軸
 async function floatFits(page) {
   await floatBtn(page).click();
   await pip(page).locator('#status-card').waitFor();
   const [req] = await page.evaluate(() => window.__pip.calls);
   assert.equal(req.width, 340, 'width fixed');
-  // about:blank 文档是 quirks 模式：卷动元素是 body，不是 html，故用 scrollingElement
+  // about:blank 文件是 quirks 模式：捲動元素是 body，不是 html，故用 scrollingElement
   const m = await pip(page).locator('html').evaluate((el) => {
     const se = el.ownerDocument.scrollingElement;
     return { sh: se.scrollHeight, ch: se.clientHeight, card: el.ownerDocument.getElementById('status-card').getBoundingClientRect().height };
@@ -357,7 +357,7 @@ test('2026: no year note in the PiP card', () =>
 test('unsupported browser: float button disabled with explanatory text', () =>
   withPage(T1412, async (page) => {
     assert.equal(await page.evaluate(() => 'documentPictureInPicture' in window), false);
-    // R52：aria-disabled（仍可聚焦、读得到原因），不是原生 disabled
+    // R52：aria-disabled（仍可聚焦、讀得到原因），不是原生 disabled
     assert.equal(await floatBtn(page).getAttribute('aria-disabled'), 'true');
     assert.equal(await floatBtn(page).evaluate((b) => b.disabled), false);
     const note = page.getByText('当前浏览器不支持悬浮小窗，请使用 Edge 或 Chrome（116 及以上）');

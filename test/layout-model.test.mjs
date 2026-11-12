@@ -1,4 +1,4 @@
-// 版面重设计（spec §13）的纯逻辑：提示条两条通道的合并 / 排队规则，以及月历格子颜色的对比度（实算）。
+// 版面重設計（spec §13）的純邏輯：提示條兩條通道的合併 / 排隊規則，以及月曆格子顏色的對比度（實算）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mergeErrors, pickInfo } from '../src/ui/banners.js';

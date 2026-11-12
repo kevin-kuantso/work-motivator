@@ -67,7 +67,7 @@ function daysInMonth(year, month) {
 function dateInfo(year, month, day) {
   if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31)) return null;
   const dt = new Date(Date.UTC(2000, month - 1, day));
-  dt.setUTCFullYear(year); // 避開 Date.UTC 對 0-99 年的 +1900 映射
+  dt.setUTCFullYear(year); // 避開 Date.UTC 對 0-99 年的 +1900 對映
   if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
   return { dow: dt.getUTCDay(), key: `${year}-${pad2(month)}-${pad2(day)}` };
 }
@@ -251,7 +251,7 @@ export function parseTwCsv(text, opts = {}) {
     }
     if (seen.has(info.key)) return fail('invalid', 'duplicateDay', { date: info.key }, true);
     seen.add(info.key);
-    const remark = row[3].replace(/\r\n?/g, '\n').trim(); // 跨行備註先統一成 LF，再驗證與保存
+    const remark = row[3].replace(/\r\n?/g, '\n').trim(); // 跨行備註先統一成 LF，再驗證與儲存
     // 每一列的備註都先驗一次（含上班日與無名稱週末的備註），壞字元不會等到正規化後才被發現。
     if (remark !== '' && !isValidName(remark)) return fail('invalid', 'name', { date: info.key }, true);
     if (!byYear.has(year)) byYear.set(year, new Map());

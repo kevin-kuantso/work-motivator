@@ -1,4 +1,4 @@
-// Task 17：已下班正反馈。文案 / 进度百分比 / 一次性高亮（实时转入才有；载入已下班、减少动态都没有）/ 版面不变 / PiP 宽度不截断。
+// Task 17：已下班正反饋。文案 / 進度百分比 / 一次性高亮（即時轉入才有；載入已下班、減少動態都沒有）/ 版面不變 / PiP 寬度不截斷。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harness.mjs';
@@ -18,11 +18,11 @@ const card = '#status-card';
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
 const celebrating = (page) => page.evaluate(() => document.querySelector('#status-card .card-amount').classList.contains('is-celebrating'));
 
-// 本文件断言的是中国地区文案与金额：明确写入旧版（v1，无地区）设置，让应用走「旧数据一律归中国」的迁移路径，
-// 不依赖应用当前的新用户默认地区（台湾）。旧设置里午休 11:30–13:00 与「开启午休」是一组合法值。
+// 本檔案斷言的是中國地區文案與金額：明確寫入舊版（v1，無地區）設定，讓應用走「舊資料一律歸中國」的遷移路徑，
+// 不依賴應用當前的新使用者預設地區（臺灣）。舊設定裡午休 11:30–13:00 與「開啟午休」是一組合法值。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
-// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+// 與既有的 init 組在一起：字串相加、函式轉成字串、{ content } 加字首、null / undefined 只留種子、{ path } 原樣。
 const seeded = (init) => {
   if (init == null) return CN_SEED;
   if (typeof init === 'string') return `${CN_SEED}\n${init}`;
@@ -44,7 +44,7 @@ async function withPage(iso, fn, opts) {
   }
 }
 
-// 载入时就是目标时刻（harness 会提前 5 秒载入，会被算成实时转入，所以这里自己开）
+// 載入時就是目標時刻（harness 會提前 5 秒載入，會被算成即時轉入，所以這裡自己開）
 async function openLoadedAt(iso, reducedMotion = false) {
   const context = await browser.newContext({ timezoneId: 'Asia/Shanghai', locale: 'zh-CN', viewport: { width: 1200, height: 900 }, reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
   await context.route((u) => !/^(localhost|127\.0\.0\.1)$/.test(u.hostname), (route) => route.abort('internetdisconnected'));
@@ -80,7 +80,7 @@ test('other statuses keep the old copy (working, lunch, before, rest day, paid l
     assert.equal(await text(page, `${card} .card-label`), '08:30 开始计薪'); // Task 19 M1
     assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪'); // Task 19 mini round (F6)
   });
-  await withPage('2026-11-07T18:00:00+08:00', async (page) => { // 周六
+  await withPage('2026-11-07T18:00:00+08:00', async (page) => { // 週六
     assert.equal(await text(page, `${card} .card-badge`), '休息日');
     const body = await page.evaluate(() => document.body.innerText);
     assert.ok(!body.includes('收工'), 'no wrap-up copy on a rest day');
@@ -124,7 +124,7 @@ test('transition 16:59:58 -> 17:00:02 applies the highlight class once, then rem
 test('a >5 s clock jump across 17:00 (hidden tab / sleep) does not apply the highlight', () =>
   withPage('2026-11-04T16:59:58+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '上班中');
-    await page.clock.fastForward(10000); // 一次跳过 17:00，下一次绘制距上次 > 5 s
+    await page.clock.fastForward(10000); // 一次跳過 17:00，下一次繪製距上次 > 5 s
     await page.clock.runFor(100);
     assert.equal(await text(page, `${card} .card-badge`), '已下班');
     assert.equal(await text(page, `${card} .card-label`), '今天辛苦了，收工！');
@@ -164,7 +164,7 @@ test('the highlight style exists in the PiP document and is a real animation (no
     assert.match(flat, /\.card-amount\.is-celebrating\{[^}]*animation:wm-cheer1\.2s/);
     assert.match(flat, /@keyframeswm-cheer/);
     assert.match(flat, /prefers-reduced-motion:reduce\)\{\.card-amount\.is-celebrating\{animation:none;?\}\}/);
-    // 同一份 <style> 文字由 copyDocumentLook 原样复制到 PiP，所以 PiP 里也有；这里实测计算样式
+    // 同一份 <style> 文字由 copyDocumentLook 原樣複製到 PiP，所以 PiP 裡也有；這裡實測計算樣式
     await page.evaluate(() => { document.querySelector('#status-card .card-amount').classList.add('is-celebrating'); });
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#status-card .card-amount')).animationName), 'wm-cheer');
   });

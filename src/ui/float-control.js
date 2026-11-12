@@ -1,9 +1,9 @@
-// 左栏状态卡下方的「悬浮成小窗」按钮（R38）、按钮下的说明（不支持的原因 / 悬浮时「请保持本页开启」）、
-// 主分页占位卡，以及开 / 关小窗的状态同步。
-// 小窗尺寸：宽度按字号档位，高度按内容（含时薪、今日满勤这些按内容出现的指标）；手动拉过的尺寸留给同档重开时使用。
-// 切换字号时清除目标档位的旧尺寸，重设为该档默认；内容高度仍受 PIP_MAX_HEIGHT 限制。
-// resizeTo 需要手势，浏览器可能静默拒绝：设完尺寸等一拍读回实际大小，确实放不下就如实说明（#float-size-note），
-// 让使用者自己拉，而不是假装已经调好了。
+// 左欄狀態卡下方的「懸浮成小窗」按鈕（R38）、按鈕下的說明（不支援的原因 / 懸浮時「請保持本頁開啟」）、
+// 主分頁佔位卡，以及開 / 關小窗的狀態同步。
+// 小窗尺寸：寬度按字號檔位，高度按內容（含時薪、今日滿勤這些按內容出現的指標）；手動拉過的尺寸留給同檔重開時使用。
+// 切換字號時清除目標檔位的舊尺寸，重設為該檔預設；內容高度仍受 PIP_MAX_HEIGHT 限制。
+// resizeTo 需要手勢，瀏覽器可能靜默拒絕：設完尺寸等一拍讀回實際大小，確實放不下就如實說明（#float-size-note），
+// 讓使用者自己拉，而不是假裝已經調好了。
 import { isPipSupported, openFloat, measureSmallCard, pipWidth, pipHeight, pipFitsContent, PIP_MAX_HEIGHT } from '../pip.js';
 import { h, setText, show } from './dom.js';
 import { icon } from './icons.js';
@@ -21,20 +21,20 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
   const scale = () => getScale?.() ?? 'm';
   const saved = (s) => getSize?.(s) ?? null;
 
-  // 不支持：按钮停用 + 原因（黄字，常驻）；支持时悬浮中才显示「请保持本页开启」
+  // 不支援：按鈕停用 + 原因（黃字，常駐）；支援時懸浮中才顯示「請保持本頁開啟」
   const note = h(doc, 'p', { class: 'float-note is-warn', id: 'float-note', hidden: supported, text: f.unsupported });
   const keepOpen = h(doc, 'p', { class: 'float-note', id: 'float-keep', hidden: true, text: f.keepOpen });
-  // 尺寸提示（黄字）：浏览器拒绝了程序改窗口大小、内容又确实放不下时才出现（默认藏起来，不占版面）
+  // 尺寸提示（黃字）：瀏覽器拒絕了程式改視窗大小、內容又確實放不下時才出現（預設藏起來，不佔版面）
   const sizeNote = h(doc, 'p', { class: 'float-note is-warn', id: 'float-size-note', role: 'status', hidden: true, text: f.sizeLimited });
   const label = h(doc, 'span', { class: 'float-label', text: t.header.float });
-  // 不支持：aria-disabled（不用原生 disabled），按钮仍可聚焦、读屏读得到原因（R52）；按下什么都不做
+  // 不支援：aria-disabled（不用原生 disabled），按鈕仍可聚焦、讀屏讀得到原因（R52）；按下什麼都不做
   const button = h(doc, 'button', {
     type: 'button', class: 'btn btn-primary float-btn', id: 'btn-float',
     'aria-disabled': supported ? undefined : 'true', 'aria-describedby': supported ? undefined : 'float-note',
     onclick: () => { if (supported) toggle(); },
   }, icon(doc, 'pip'), label);
-  // 整张占位卡是一个按钮；不显示金额，避免两处同时跳动与重复朗读（design §4.4）
-  // 可访问名称 = 「已悬浮 · 点此收回」；说明作为描述
+  // 整張佔位卡是一個按鈕；不顯示金額，避免兩處同時跳動與重複朗讀（design §4.4）
+  // 可訪問名稱 = 「已懸浮 · 點此收回」；說明作為描述
   const placeholder = h(doc, 'button', {
     type: 'button', class: 'pip-placeholder', hidden: true, onclick: close,
     'aria-labelledby': 'pip-placeholder-title', 'aria-describedby': 'pip-placeholder-note',
@@ -49,8 +49,8 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     else open();
   }
 
-  // 按钮的描述 = 「请保持本页开启」（悬浮中）+ 放不下时的尺寸提示，两者都只在真的显示时才挂上去。
-  // 不支持时按钮的 aria-describedby 是建的时候就写死的 float-note，别覆盖。
+  // 按鈕的描述 = 「請保持本頁開啟」（懸浮中）+ 放不下時的尺寸提示，兩者都只在真的顯示時才掛上去。
+  // 不支援時按鈕的 aria-describedby 是建的時候就寫死的 float-note，別覆蓋。
   function syncButtonDesc() {
     if (!supported) return;
     if (!floating) {
@@ -65,16 +65,16 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     syncButtonDesc();
   }
 
-  // 这行提示只说明一件事：「我们请浏览器调大小，浏览器没答应，内容确实放不下」。
-  // 所以只有 syncSize 的确认能把它打开；这里只负责在已经在提示时复核、能放得下就收掉
-  // （使用者把窗口拉大、内容变矮）。内容变高 / 使用者自己拉小都不该凭空冒出这行字。
+  // 這行提示只說明一件事：「我們請瀏覽器調大小，瀏覽器沒答應，內容確實放不下」。
+  // 所以只有 syncSize 的確認能把它開啟；這裡只負責在已經在提示時複核、能放得下就收掉
+  // （使用者把視窗拉大、內容變矮）。內容變高 / 使用者自己拉小都不該憑空冒出這行字。
   function refreshSizeNote() {
     if (sizeNote.hidden) return;
     setSizeNote(pipFitsContent(pipWin) === false);
   }
 
-  // syncSize 的确认：设完尺寸等一拍，内容确实还放不下就是「浏览器没让我们调」，如实说明；
-  // 放得下就撤掉。读不到（null）不表态，免得把没验证过的事说成失败。
+  // syncSize 的確認：設完尺寸等一拍，內容確實還放不下就是「瀏覽器沒讓我們調」，如實說明；
+  // 放得下就撤掉。讀不到（null）不表態，免得把沒驗證過的事說成失敗。
   function confirmSizeNote(w) {
     const fits = pipFitsContent(w);
     if (fits === null) return;
@@ -92,7 +92,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     syncButtonDesc();
   }
 
-  // 卡片在主分页时该有的高度（R52）：悬浮中卡片在小窗里，用一份不可见的复本在占位位置量（同步，不会绘制）
+  // 卡片在主分頁時該有的高度（R52）：懸浮中卡片在小窗裡，用一份不可見的複本在佔位位置量（同步，不會繪製）
   function liveCardHeight() {
     if (cardRoot.ownerDocument === doc && cardRoot.isConnected) return cardRoot.offsetHeight;
     const slot = placeholder.parentNode;
@@ -153,7 +153,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
   async function open() {
     if (opening) return;
     opening = true;
-    const placeholderHeight = cardRoot.offsetHeight; // 占位卡高度 = 大卡片在主分页时的样子（与尺寸无关）
+    const placeholderHeight = cardRoot.offsetHeight; // 佔位卡高度 = 大卡片在主分頁時的樣子（與尺寸無關）
     const { width, height } = targetSize();
     let w;
     try {
@@ -173,8 +173,8 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     onOpen(w);
   }
 
-  // 使用者自己拉窗口（不是我们程序设的尺寸）：按当前档位记住，下次开窗沿用。
-  // Document PiP 的窗口属性在多数实现上是只读的，所以「记住」只影响下一次开窗的 requestWindow。
+  // 使用者自己拉視窗（不是我們程式設的尺寸）：按當前檔位記住，下次開窗沿用。
+  // Document PiP 的視窗屬性在多數實現上是隻讀的，所以「記住」隻影響下一次開窗的 requestWindow。
   let programmatic = false;
   let programmaticTimer = null;
   let rememberTimer = null;
@@ -182,18 +182,18 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     w.addEventListener('resize', () => {
       if (programmatic || !Number.isFinite(w.innerWidth) || w.innerWidth <= 0) return;
       measured = contentMeasure(w);
-      // 拖动窗口会连续派发 resize：停下来 250 ms 再写一次，别把每次移动都变成一次储存写入
+      // 拖動視窗會連續派發 resize：停下來 250 ms 再寫一次，別把每次移動都變成一次儲存寫入
       clearTimeout(rememberTimer);
       rememberTimer = win.setTimeout(() => {
         rememberSize?.(scale(), { width: Math.round(w.innerWidth), height: Math.round(w.innerHeight) });
-        refreshSizeNote(); // 使用者自己把窗口拉大了：放得下就把黄色提示收掉
+        refreshSizeNote(); // 使用者自己把視窗拉大了：放得下就把黃色提示收掉
       }, 250);
     });
   }
 
-  // 字号档位 / 内容改了：小窗开着就同步一次尺寸。
-  // resizeTo 需要使用者手势，浏览器可能静默拒绝（不抛异常、也没有返回值）：设完尺寸读回实际大小，
-  // 确实放不下就如实说明（#float-size-note），让使用者自己拉；放得下 / 读不到就撤掉提示，不假装。
+  // 字號檔位 / 內容改了：小窗開著就同步一次尺寸。
+  // resizeTo 需要使用者手勢，瀏覽器可能靜默拒絕（不拋異常、也沒有返回值）：設完尺寸讀回實際大小，
+  // 確實放不下就如實說明（#float-size-note），讓使用者自己拉；放得下 / 讀不到就撤掉提示，不假裝。
   let sizeTimer = null;
   function cancelSizeCheck() {
     if (sizeTimer === null) return;
@@ -213,19 +213,19 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     try {
       w.resizeTo?.(width, height);
     } catch {
-      // 浏览器拒绝或没有 resizeTo：维持原尺寸，下面按读回的实际大小决定要不要说明
+      // 瀏覽器拒絕或沒有 resizeTo：維持原尺寸，下面按讀回的實際大小決定要不要說明
     }
     clearTimeout(programmaticTimer);
-    // 计时器一律挂主视窗：小窗自己的计时器只有「减少动态」对齐整秒那一个，e2e 与真实行为都不该多出别的
+    // 計時器一律掛主視窗：小窗自己的計時器只有「減少動態」對齊整秒那一個，e2e 與真實行為都不該多出別的
     programmaticTimer = win.setTimeout(() => { programmatic = false; }, 350);
-    // 先同步读回一次：已经放得下就立刻撤掉旧提示（换字号时不闪黄字）。放不下先别喊，等下面那一拍确认——
-    // 真实浏览器的尺寸变更可能滞后，同步这一瞬间的读数不作数。
+    // 先同步讀回一次：已經放得下就立刻撤掉舊提示（換字號時不閃黃字）。放不下先別喊，等下面那一拍確認——
+    // 真實瀏覽器的尺寸變更可能滯後，同步這一瞬間的讀數不作數。
     if (pipFitsContent(w) === true) setSizeNote(false);
-    // 再等一拍确认：拒绝是静默的，此时窗口没变、内容要卷动才看得全，只能请使用者自己拉大。
-    // 计时器挂在主视窗上（不是小窗）：不干扰小窗自己的对齐计时，关闭后也不会留下东西。
+    // 再等一拍確認：拒絕是靜默的，此時視窗沒變、內容要捲動才看得全，只能請使用者自己拉大。
+    // 計時器掛在主視窗上（不是小窗）：不干擾小窗自己的對齊計時，關閉後也不會留下東西。
     sizeTimer = win.setTimeout(() => {
       sizeTimer = null;
-      if (pipWin !== w) return; // 期间已经收回 / 重开
+      if (pipWin !== w) return; // 期間已經收回 / 重開
       if (fit && pipFitsContent(w) === true && Math.abs(w.innerHeight - height) <= 2) {
         rememberSize?.(scale(), { width: Math.round(w.innerWidth), height: Math.round(w.innerHeight) });
       }
@@ -233,7 +233,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     }, 200);
   }
 
-  // pagehide 时调用（按 X、占位卡、按钮、齿轮都走这里）
+  // pagehide 時呼叫（按 X、佔位卡、按鈕、齒輪都走這裡）
   function restored() {
     const refocus = doc.activeElement === placeholder;
     cardObserver?.disconnect();
@@ -256,7 +256,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     pipWin?.close();
   }
 
-  // 切换地区：只换文字（按钮名称、说明、不支持的原因、尺寸提示、占位卡），按钮与占位状态原样保留
+  // 切換地區：只換文字（按鈕名稱、說明、不支援的原因、尺寸提示、佔位卡），按鈕與佔位狀態原樣保留
   function setProfile(nextT) {
     if (nextT === t) return;
     t = nextT;

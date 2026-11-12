@@ -1,13 +1,13 @@
-// 固定宽度数字格（R33）：每个 0–9 放进等宽的 span.digit，宽度 = 当前字体里最宽的数字字形（量出来，不是猜的）。
-// 这样不论字体本身数字是否等宽（Segoe UI Semibold、YaHei Light 等是比例数字），每 tick 变化的数字都不会左右抖动。
-// 只用 el.ownerDocument 建节点 / 量宽度（主分页与 PiP 文件各自量各自的），从不碰全域 document。
+// 固定寬度數字格（R33）：每個 0–9 放進等寬的 span.digit，寬度 = 當前字型裡最寬的數字字形（量出來，不是猜的）。
+// 這樣不論字型本身數字是否等寬（Segoe UI Semibold、YaHei Light 等是比例數字），每 tick 變化的數字都不會左右抖動。
+// 只用 el.ownerDocument 建節點 / 量寬度（主分頁與 PiP 檔案各自量各自的），從不碰全域 document。
 // 文字一律走 textContent，不用 innerHTML。
 export const DIGIT_FALLBACK = '0.62em';
 const DIGITS = '0123456789';
 
 export const isDigit = (c) => c >= '0' && c <= '9' && c.length === 1;
 
-// 纯函数：从旧文字变到新文字，哪些位置要改、要追加哪些字符、从哪里开始删除。
+// 純函式：從舊文字變到新文字，哪些位置要改、要追加哪些字元、從哪裡開始刪除。
 export function planCells(prev, next) {
   const n = Math.min(prev.length, next.length);
   const change = [];
@@ -19,11 +19,11 @@ export function planCells(prev, next) {
   };
 }
 
-// 影响数字字形宽度的所有计算样式。
+// 影響數字字形寬度的所有計算樣式。
 const SIG_PROPS = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontStretch', 'fontVariantNumeric', 'fontFeatureSettings', 'fontVariationSettings', 'letterSpacing'];
 export const fontSignature = (cs) => SIG_PROPS.map((p) => cs[p] ?? '').join('|');
 
-// 十个数字的宽度 → 最宽者；不完整或没排版（全 0）→ null。
+// 十個數字的寬度 → 最寬者；不完整或沒排版（全 0）→ null。
 export function widestDigit(widths) {
   if (!Array.isArray(widths) || widths.length !== DIGITS.length) return null;
   if (!widths.every((w) => Number.isFinite(w) && w > 0)) return null;
@@ -35,7 +35,7 @@ export function createWidthCache() {
   return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), clear: () => m.clear(), get size() { return m.size; } };
 }
 
-// 按签名查缓存，没有就量；只缓存成功的结果（元素暂时隐藏时量不到，下次显示再量）。
+// 按簽名查快取，沒有就量；只快取成功的結果（元素暫時隱藏時量不到，下次顯示再量）。
 export function resolveDigitWidth(cache, sig, measure) {
   const hit = cache.get(sig);
   if (hit !== undefined) return hit;
@@ -52,7 +52,7 @@ export function resolveDigitWidth(cache, sig, measure) {
 }
 
 // ---- DOM 部分 ----
-// 每个文件一份缓存；字体载入完成、视窗尺寸 / 缩放改变时清空（下次 render 重新量）。
+// 每個檔案一份快取；字型載入完成、視窗尺寸 / 縮放改變時清空（下次 render 重新量）。
 const perDoc = new WeakMap();
 function cacheFor(doc) {
   let c = perDoc.get(doc);
@@ -64,15 +64,15 @@ function cacheFor(doc) {
     fonts?.ready?.then?.(() => c.clear(), () => {});
     fonts?.addEventListener?.('loadingdone', () => c.clear());
   } catch {
-    // 不支持 FontFaceSet：只靠签名变化重新量
+    // 不支援 FontFaceSet：只靠簽名變化重新量
   }
   doc.defaultView?.addEventListener?.('resize', () => c.clear());
   return c;
 }
 
-// 在同一个文件、同一个元素里放一个看不见的量尺：字体相关样式全部继承，量到的就是实际绘制用的字形宽度。
+// 在同一個檔案、同一個元素裡放一個看不見的量尺：字型相關樣式全部繼承，量到的就是實際繪製用的字形寬度。
 function measureIn(el) {
-  if (typeof el.getClientRects !== 'function' || el.getClientRects().length === 0) return null; // 未显示
+  if (typeof el.getClientRects !== 'function' || el.getClientRects().length === 0) return null; // 未顯示
   const doc = el.ownerDocument;
   const probe = doc.createElement('span');
   probe.setAttribute('aria-hidden', 'true');
@@ -106,11 +106,11 @@ function makeCell(doc, ch) {
   return s;
 }
 
-// 把文字画进 el（每个字符一个 span，数字带 class digit）；只改有变化的格子。返回改动的格子数。
+// 把文字畫進 el（每個字元一個 span，數字帶 class digit）；只改有變化的格子。返回改動的格子數。
 export function renderDigits(el, text) {
   const doc = el.ownerDocument;
   let st = state.get(el);
-  // 别人（例如测试）直接改了内容：重建
+  // 別人（例如測試）直接改了內容：重建
   if (st && (st.cells.length !== el.childNodes.length || st.cells.some((c, i) => el.childNodes[i] !== c))) st = null;
   if (!st) {
     st = { text: '', cells: [], width: null };

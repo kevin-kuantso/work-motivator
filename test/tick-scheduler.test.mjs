@@ -1,5 +1,5 @@
-// Task 14 fix round 1 · Block D：计时调度（R46）。一般模式 100 ms setInterval；减少动态模式对齐整秒的 setTimeout 链。
-// 用假的计时宿主（虚拟时钟）与可注入的 reduced() 测试：任何时刻最多一个计时器；matchMedia 翻转而 change 事件还没到时链不中断。
+// Task 14 fix round 1 · Block D：計時排程（R46）。一般模式 100 ms setInterval；減少動態模式對齊整秒的 setTimeout 鏈。
+// 用假的計時宿主（虛擬時鐘）與可注入的 reduced() 測試：任何時刻最多一個計時器；matchMedia 翻轉而 change 事件還沒到時鏈不中斷。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { alignedDelay, createTicker, TICK_MS, TICK_MIN_DELAY_MS } from '../src/ui/tick-scheduler.js';
@@ -16,7 +16,7 @@ function fakeHost(clock) {
   };
   return host;
 }
-// 推进虚拟时钟，按时间顺序触发到期的计时器；每次触发后记录所有宿主上存活的计时器数
+// 推進虛擬時鐘，按時間順序觸發到期的計時器；每次觸發後記錄所有宿主上存活的計時器數
 function run(clock, hosts, ms, onFire = () => {}) {
   const end = clock.t + ms;
   for (;;) {
@@ -28,7 +28,7 @@ function run(clock, hosts, ms, onFire = () => {}) {
     else next.h.timers.delete(next.i);
     try {
       next.x.fn();
-    } catch { /* 浏览器会报告例外，但计时器照常 */ }
+    } catch { /* 瀏覽器會報告例外，但計時器照常 */ }
     onFire(hosts.reduce((n, h) => n + h.timers.size, 0));
   }
   clock.t = end;
@@ -72,14 +72,14 @@ test('D1: reduce → off flips and a tick lands BEFORE the change event: the cha
   const tk = createTicker({ tick: () => at.push(clock.t), reduced: () => reduced, now: () => clock.t });
   tk.start(h);
   run(clock, [h], 1000); // 1 次整秒 tick
-  reduced = false; // matchMedia 已翻转，change 事件还没送到
+  reduced = false; // matchMedia 已翻轉，change 事件還沒送到
   const live = [];
   run(clock, [h], 1500, (n) => live.push(n));
   assert.ok(live.every((n) => n === 1), `exactly one timer: ${live}`);
   const gaps = at.slice(1).map((x, i) => x - at[i]);
   assert.ok(Math.max(...gaps) <= 1000, `no gap > 1 s: ${gaps}`);
   assert.ok(at.filter((x) => x > 2000).length >= 4, 'now ticking at 100 ms');
-  tk.start(); // change 事件终于到了：重启，仍只有一个计时器
+  tk.start(); // change 事件終於到了：重啟，仍只有一個計時器
   assert.equal(h.timers.size, 1);
 });
 
@@ -91,7 +91,7 @@ test('D1 (round 2): off → reduce flips and ticks run before the change event: 
   const tk = createTicker({ tick: () => at.push(clock.t), reduced: () => reduced, now: () => clock.t });
   tk.start(h);
   run(clock, [h], 300);
-  reduced = true; // matchMedia 已翻转，change 事件被扣住
+  reduced = true; // matchMedia 已翻轉，change 事件被扣住
   at.length = 0;
   const live = [];
   run(clock, [h], 3000, (n) => live.push(n));
@@ -99,12 +99,12 @@ test('D1 (round 2): off → reduce flips and ticks run before the change event: 
   assert.equal([...h.timers.values()][0].every, null, 'now an aligned setTimeout, not the 100 ms interval');
   assert.ok(at.slice(1).every((x) => x % 1000 === 0), `after the first (handover) tick everything is on whole seconds: ${at}`);
   assert.ok(at.length <= 4, `no more 100 ms ticks (${at.length})`);
-  tk.start(); // change 事件终于到了
+  tk.start(); // change 事件終於到了
   assert.equal(h.timers.size, 1);
 });
 
-// 世代号守卫（tick-scheduler.js 回调开头与 finally 里的 g === gen）：在 tick 里调用 stop()，之后不能再有计时器；
-// 已经派发出去的过期回调（clear 时已在事件循环里排队）也不能再 tick
+// 世代號守衛（tick-scheduler.js 回撥開頭與 finally 裡的 g === gen）：在 tick 裡呼叫 stop()，之後不能再有計時器；
+// 已經派發出去的過期回撥（clear 時已在事件迴圈裡排隊）也不能再 tick
 test('generation guard: stop() inside a tick ends everything; a stale callback that still fires after stop/start does nothing', () => {
   for (const mode of [true, false]) {
     const clock = { t: 0 };
@@ -119,7 +119,7 @@ test('generation guard: stop() inside a tick ends everything; a stale callback t
     assert.equal(live[1], 0, `${mode ? 'aligned' : 'interval'}: zero timers right after the tick that called stop() (${live})`);
     assert.equal(h.timers.size, 0, `${mode ? 'aligned' : 'interval'}: no timer left after stop() inside a tick`);
   }
-  // 过期回调：记下第一次排定的回调，stop + start 之后手动再执行它（模拟 clear 时它已排进任务队列）
+  // 過期回撥：記下第一次排定的回撥，stop + start 之後手動再執行它（模擬 clear 時它已排進任務佇列）
   const clock = { t: 0 };
   const h = fakeHost(clock);
   let n = 0;
@@ -142,7 +142,7 @@ test('a throwing tick never ends the aligned chain; moving the timer to another 
     tick: () => {
       n++;
       if (n === 2) throw new Error('boom');
-      if (n === 4) tk.start(b); // 例如小窗打开：计时搬到小窗
+      if (n === 4) tk.start(b); // 例如小窗開啟：計時搬到小窗
     },
     reduced: () => true,
     now: () => clock.t,

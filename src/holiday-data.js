@@ -1,12 +1,12 @@
-// 纯校验：只回传稳定的 code（必要时附参数），绝不写死任何一种语言的句子。
-// 显示端在真正要显示时用当时的字典翻成文字：text = typeof dict[code] === 'function' ? dict[code](params) : dict[code]
-// 其中 dict 是 t.holidayData（年度数据）或 t.holidayUpdate（自定义网址）。params 是字典函数的唯一实参
-//（年份 / HTTP 状态码这类纯量；没有参数的 code 不带 params），因此换语言、加地区都不必改这里。
+// 純校驗：只回傳穩定的 code（必要時附引數），絕不寫死任何一種語言的句子。
+// 顯示端在真正要顯示時用當時的字典翻成文字：text = typeof dict[code] === 'function' ? dict[code](params) : dict[code]
+// 其中 dict 是 t.holidayData（年度資料）或 t.holidayUpdate（自定義網址）。params 是字典函式的唯一實參
+//（年份 / HTTP 狀態碼這類純量；沒有引數的 code 不帶 params），因此換語言、加地區都不必改這裡。
 
-// 默认数据源（{year} 会被替换为年份）。不使用任何第三方代理。
-// 顺序（R37）：大陆 OONI 测量（2026-05 至 11 月）cdn.jsdelivr.net 大多可达、raw.githubusercontent.com 在电信约一半失败、
-// fastly.jsdelivr.net 无数据——没有一个保证可达。jsDelivr @master 在 CDN 可能滞后最多 12 小时，
-// 所以某个来源给出空文件 / 不合格数据时仍继续尝试下一个（新发布的年份可能先出现在 raw 上）。
+// 預設資料來源（{year} 會被替換為年份）。不使用任何第三方代理。
+// 順序（R37）：大陸 OONI 測量（2026-05 至 11 月）cdn.jsdelivr.net 大多可達、raw.githubusercontent.com 在電信約一半失敗、
+// fastly.jsdelivr.net 無資料——沒有一個保證可達。jsDelivr @master 在 CDN 可能滯後最多 12 小時，
+// 所以某個來源給出空檔案 / 不合格資料時仍繼續嘗試下一個（新發布的年份可能先出現在 raw 上）。
 export const DEFAULT_HOLIDAY_SOURCES = Object.freeze([
   'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
   'https://fastly.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
@@ -17,29 +17,29 @@ const PAPERS_PREFIX = 'https://www.gov.cn/';
 const SCHEME = 'https://';
 const YEAR_TOKEN = '{year}';
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_BODY = 256 * 1024; // 一年的假期表约 3 KB；超过 256 KB 直接拒绝，不解析
+const MAX_BODY = 256 * 1024; // 一年的假期表約 3 KB；超過 256 KB 直接拒絕，不解析
 const byteLength = (str) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(str).length : str.length);
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
-// 真实日期检查；返回当天星期（0 = 周日），不是真实日期返回 null。
+// 真實日期檢查；返回當天星期（0 = 週日），不是真實日期返回 null。
 function weekdayOfRealDate(y, m, d) {
   const dt = new Date(Date.UTC(2000, m - 1, d));
-  dt.setUTCFullYear(y); // 避开 Date.UTC 对 0-99 年的 +1900 映射
+  dt.setUTCFullYear(y); // 避開 Date.UTC 對 0-99 年的 +1900 對映
   const real = dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
   return real ? dt.getUTCDay() : null;
 }
 
-// 把来源模板里的每个 {year} 换成年份。
+// 把來源模板裡的每個 {year} 換成年份。
 export function buildSourceUrl(template, year) {
   return String(template).split(YEAR_TOKEN).join(String(year));
 }
 
-// 用户填的「自定义网址」：不去空格、不改大小写（不猜测修补）。规则（R32）：
-// 只含可见 ASCII（拒绝空格、控制字符、零宽字符、中文等）；没有反斜杠；以 https:// 开头且含 {year}；
-// 用两个不同的样例年份解析：协议必须是 https:，不带用户名 / 密码，{year} 只能影响路径或查询参数（主机、端口、# 后面都不能变）。
+// 使用者填的「自定義網址」：不去空格、不改大小寫（不猜測修補）。規則（R32）：
+// 只含可見 ASCII（拒絕空格、控制字元、零寬字元、中文等）；沒有反斜槓；以 https:// 開頭且含 {year}；
+// 用兩個不同的樣例年份解析：協議必須是 https:，不帶使用者名稱 / 密碼，{year} 只能影響路徑或查詢引數（主機、埠、# 後面都不能變）。
 export function validateCustomUrl(s) {
-  // code 对应 t.holidayUpdate 的同名键（都是无参数的句子）
+  // code 對應 t.holidayUpdate 的同名鍵（都是無引數的句子）
   const bad = (code) => ({ ok: false, code });
   if (typeof s !== 'string') return bad('customUrlError');
   if (!/^[\x21-\x7E]+$/.test(s)) return bad('customUrlChars');
@@ -61,25 +61,25 @@ export function validateCustomUrl(s) {
   return { ok: true, url: s };
 }
 
-// 来源顺序：自定义网址（合法时）优先，再依次三个默认来源。
+// 來源順序：自定義網址（合法時）優先，再依次三個預設來源。
 export function sourcesWith(customUrl) {
   const custom = customUrl && validateCustomUrl(customUrl).ok ? [customUrl] : [];
   return [...custom, ...DEFAULT_HOLIDAY_SOURCES];
 }
 
-// 上游「该年还没发布」的真实形状：年份相符、papers 与 days 都是空数组（2027 实测如此）。不是「该年没有假日」。
+// 上游「該年還沒釋出」的真實形狀：年份相符、papers 與 days 都是空陣列（2027 實測如此）。不是「該年沒有假日」。
 export function isUnpublishedYear(json, year) {
   return isPlainObject(json) && json.year === year
     && Array.isArray(json.papers) && json.papers.length === 0
     && Array.isArray(json.days) && json.days.length === 0;
 }
 
-// 把 { code, params } 按传入的字典翻成文字（t.holidayData 或 t.holidayUpdate 整份传进来）。
-// 字典函数收 params 本身；params 是数组时展开。没有对应的键就退回 reason.text（旧流程遗留的句子），否则空字符串。
-// 与 calc.js 的 reasonText(reason, t) 分工不同：那个读 t.reasons 且有别名，这个的字典命名空间由调用端决定。
+// 把 { code, params } 按傳入的字典翻成文字（t.holidayData 或 t.holidayUpdate 整份傳進來）。
+// 字典函式收 params 本身；params 是陣列時展開。沒有對應的鍵就退回 reason.text（舊流程遺留的句子），否則空字串。
+// 與 calc.js 的 reasonText(reason, t) 分工不同：那個讀 t.reasons 且有別名，這個的字典名稱空間由呼叫端決定。
 export function renderReason(reason, dict) {
   if (!reason) return '';
-  if (typeof reason === 'string') return reason; // 旧流程遗留的整句：原样返回，不假设任何前缀
+  if (typeof reason === 'string') return reason; // 舊流程遺留的整句：原樣返回，不假設任何字首
   const v = reason.code ? dict?.[reason.code] : undefined;
   if (typeof v === 'function') {
     const args = reason.params;
@@ -89,8 +89,8 @@ export function renderReason(reason, dict) {
   return typeof reason.text === 'string' ? reason.text : '';
 }
 
-// 校验来自网络的不可信 JSON：任何一项不合格即整份拒绝，不转型、不挑拣。
-// 失败时回传 { ok: false, code, params? }，code 是 t.holidayData 的键名；由调用方按当时的字典翻成文字。
+// 校驗來自網路的不可信 JSON：任何一項不合格即整份拒絕，不轉型、不挑揀。
+// 失敗時回傳 { ok: false, code, params? }，code 是 t.holidayData 的鍵名；由呼叫方按當時的字典翻成文字。
 export function validateHolidayYear(json, year) {
   const bad = (code, params) => (params === undefined ? { ok: false, code } : { ok: false, code, params });
   if (!isPlainObject(json)) return bad('notObject');
@@ -124,7 +124,7 @@ export function validateHolidayYear(json, year) {
   return { ok: true, table: { off, makeup }, papers: [...papers] };
 }
 
-// 内置年份优先；online 只补充内置没有的年份。
+// 內建年份優先；online 只補充內建沒有的年份。
 export function mergeTables(builtin, online) {
   const out = {};
   for (const y of Object.keys(online ?? {})) out[y] = online[y];
@@ -135,16 +135,16 @@ export function mergeTables(builtin, online) {
 export async function fetchHolidayYear(year, opts = {}) {
   const sources = Array.isArray(opts.sources) ? opts.sources : [...DEFAULT_HOLIDAY_SOURCES];
   const fetchImpl = opts.fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
-  const timeoutMs = opts.timeoutMs ?? 5000; // 每个来源 5 秒（R37）：三个来源最坏约 15 秒 / 年
+  const timeoutMs = opts.timeoutMs ?? 5000; // 每個來源 5 秒（R37）：三個來源最壞約 15 秒 / 年
   const NO_SOURCE = { code: 'noSource' };
   if (sources.length === 0 || !fetchImpl) return { ok: false, kind: 'network', reason: NO_SOURCE };
 
-  // 失败种类（多个来源时取最有信息量的）：invalid（拿到了但不合格）> unpublished（来源暂未发布）> network（连不上 / HTTP 错误）
+  // 失敗種類（多個來源時取最有資訊量的）：invalid（拿到了但不合格）> unpublished（來源暫未釋出）> network（連不上 / HTTP 錯誤）
   const RANK = { network: 0, unpublished: 1, invalid: 2 };
   let kind = 'network';
   let last = NO_SOURCE;
   let lastOfKind = NO_SOURCE;
-  let formatOfKind = false; // 选中的失败原因是否来自 validateHolidayYear（格式 / 内容不合格；R47：界面据此提供「查看格式示例」）
+  let formatOfKind = false; // 選中的失敗原因是否來自 validateHolidayYear（格式 / 內容不合格；R47：介面據此提供「檢視格式示例」）
   const note = (k, reason, format = false) => {
     last = reason;
     if (RANK[k] >= RANK[kind]) { kind = k; lastOfKind = reason; formatOfKind = format; }
@@ -154,7 +154,7 @@ export async function fetchHolidayYear(year, opts = {}) {
     const ctrl = new AbortController();
     let timedOut = false;
     let timer;
-    // 墙钟兜底（R32）：不依赖 AbortSignal——即使 fetchImpl 不理会 signal，也会在 timeoutMs 后结束为「连接超时」
+    // 牆鍾兜底（R32）：不依賴 AbortSignal——即使 fetchImpl 不理會 signal，也會在 timeoutMs 後結束為「連線超時」
     const deadline = new Promise((_, reject) => {
       timer = setTimeout(() => { timedOut = true; ctrl.abort(); reject(new Error('timeout')); }, timeoutMs);
     });
@@ -166,7 +166,7 @@ export async function fetchHolidayYear(year, opts = {}) {
       if (Number.isFinite(len) && len > MAX_BODY) return { res, tooLarge: true };
       return { res, text: await res.text() };
     })();
-    attempt.catch(() => {}); // 兜底先到时，迟到的失败不成为未处理的 rejection
+    attempt.catch(() => {}); // 兜底先到時，遲到的失敗不成為未處理的 rejection
     try {
       const { res, text, notHttps, tooLarge } = await Promise.race([attempt, deadline]);
       if (!res || !res.ok) {
@@ -190,7 +190,7 @@ export async function fetchHolidayYear(year, opts = {}) {
       }
       const v = validateHolidayYear(json, year);
       if (v.ok) return { ok: true, table: v.table, papers: v.papers, source: url };
-      // validateHolidayYear 只给 code/params：这里原样转交（绝不要读 v.reason，它已不存在）
+      // validateHolidayYear 只給 code/params：這裡原樣轉交（絕不要讀 v.reason，它已不存在）
       const why = v.params === undefined ? { code: v.code } : { code: v.code, params: v.params };
       if (isUnpublishedYear(json, year)) note('unpublished', why);
       else note('invalid', why, true);
@@ -200,8 +200,8 @@ export async function fetchHolidayYear(year, opts = {}) {
       clearTimeout(timer);
     }
   }
-  // reason 是「最有信息量的那一个来源」的失败本身（不是已经拼好的句子）：
-  // 显示端自己决定要不要套上「所有数据源都获取失败：」之类的外框，换语言时整句一起重译。
+  // reason 是「最有資訊量的那一個來源」的失敗本身（不是已經拼好的句子）：
+  // 顯示端自己決定要不要套上「所有資料來源都獲取失敗：」之類的外框，換語言時整句一起重譯。
   return { ok: false, kind, reason: kind === 'network' ? last : lastOfKind, format: kind === 'invalid' && formatOfKind };
 }
 

@@ -1,13 +1,13 @@
-// 月历日期小菜单（spec §12.1）：role=menu + menuitemradio；方向键 / Home / End 移动，
-// Enter / Space 套用（按钮原生行为），Esc / Tab 关闭并把焦点还给日期格，点菜单外关闭。
-// 全页只有一个菜单节点；只在打开期间挂 document / window 监听，关闭即移除。
+// 月曆日期小選單（spec §12.1）：role=menu + menuitemradio；方向鍵 / Home / End 移動，
+// Enter / Space 套用（按鈕原生行為），Esc / Tab 關閉並把焦點還給日期格，點選單外關閉。
+// 全頁只有一個選單節點；只在開啟期間掛 document / window 監聽，關閉即移除。
 import { h, setText } from './dom.js';
 import { icon } from './icons.js';
 
 const OPTION_ICON = { default: 'reset', work: 'makeup', rest: 'rest', paidLeave: 'paid', unpaidLeave: 'unpaid' };
 const GAP = 4;
 
-// refocus(btn)：把焦点还给日期格（调用方用来区分程序聚焦，避免 Esc 后立刻弹出提示）。
+// refocus(btn)：把焦點還給日期格（呼叫方用來區分程式聚焦，避免 Esc 後立刻彈出提示）。
 export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn.focus() }) {
   const win = doc.defaultView;
   const header = h(doc, 'p', { class: 'day-menu-header', id: 'day-menu-header' });
@@ -34,7 +34,7 @@ export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn
       h(doc, 'span', { class: `day-menu-note${it.checked ? ' is-current' : ''}`, text: it.note }))));
   }
 
-  // 优先放在格子右侧、顶端对齐；放不下就翻到左侧，再不行就贴边；上下同样夹在月历与视窗之内。
+  // 優先放在格子右側、頂端對齊；放不下就翻到左側，再不行就貼邊；上下同樣夾在月曆與視窗之內。
   function place() {
     const c = container.getBoundingClientRect();
     const a = anchor.getBoundingClientRect();
@@ -100,7 +100,7 @@ export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn
     (all.find((b) => b.getAttribute('aria-checked') === 'true') ?? all[0])?.focus();
   }
 
-  // 月历重绘后：挂到新的格子上并更新内容，保留焦点所在的选项。
+  // 月曆重繪後：掛到新的格子上並更新內容，保留焦點所在的選項。
   function refresh(btn, model) {
     const all = items();
     const had = all.indexOf(doc.activeElement);

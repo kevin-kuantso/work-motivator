@@ -10,7 +10,7 @@ import {
   dayOptions, applyOption, previewDailyWage, menuModel, dayTooltipModel, tooltipText,
 } from '../src/ui/day-options.js';
 
-// 历史 CN fixture：月薪 6800、11:30 开始午休；provider 显式写出（与 dayInfo 的 CN 默认是同一个对象）
+// 歷史 CN fixture：月薪 6800、11:30 開始午休；provider 顯式寫出（與 dayInfo 的 CN 預設是同一個物件）
 const cfg = { ...DEFAULTS, salary: 6800, lunchOn: true, lunchStart: '11:30', holidayProvider: CN_HOLIDAY_PROVIDER };
 const at = (m, d, y = 2026) => new Date(y, m - 1, d);
 const plain = (date, c = cfg, tables = HOLIDAYS_CN) => dayInfo(date, c, {}, tables);
@@ -38,7 +38,7 @@ test('dayOptions: a marked day keeps the options of its DEFAULT type, current on
   assert.deepEqual(ids(dayOptions(plain(at(11, 3)), 'rest')), ['default', 'rest', 'paidLeave', 'unpaidLeave']);
 });
 
-const NO_2027 = { 2026: HOLIDAYS_CN[2026] }; // 2027 已内置；无表回退用显式注入的表集合覆盖
+const NO_2027 = { 2026: HOLIDAYS_CN[2026] }; // 2027 已內建；無表回退用顯式注入的表集合覆蓋
 
 test('dayOptions: 2027 without a table falls back to the plain weekend rule', () => {
   const tables = NO_2027;
@@ -154,7 +154,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
     lunar: '农历九月廿六',
     title: '11月4日 周三', status: '工作日', source: '来源：按默认规则', pay: '当日计薪 ¥323.81', hint: '点击修改',
     sourceLabel: '按默认规则', payShort: '计薪 ¥323.81', titleShort: '11月4日 周三', statusShort: '工作日',
-    // 结构化字段：让界面用地区字典重排时不必解析翻译后的空白/分隔符
+    // 結構化欄位：讓介面用地區字典重排時不必解析翻譯後的空白/分隔符
     titleDate: '11月4日', titleWeekday: '周三', titleSep: ' ',
     payLabel: '计薪', payAmount: '¥323.81', paySep: ' ', payZero: false,
   });
@@ -162,7 +162,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   const sat = tip(at(11, 7));
   assert.equal(sat.status, '休息日');
   assert.equal(sat.pay, '当日计薪 ¥0.00');
-  // 结构化字段在其余日期也成立（不只 11-04 的 deepEqual）
+  // 結構化欄位在其餘日期也成立（不只 11-04 的 deepEqual）
   assert.deepEqual(
     [sat.titleDate, sat.titleWeekday, sat.titleSep, sat.payLabel, sat.payAmount, sat.paySep, sat.payZero],
     ['11月7日', '周六', ' ', '计薪', '¥0.00', ' ', true],
@@ -192,13 +192,13 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(rest.status, '休息日');
   assert.equal(rest.pay, '当日计薪 ¥0.00');
   assert.equal(tip(at(11, 4), { '2026-11-05': 'rest' }).pay, '当日计薪 ¥340.00', 'other days see the new denominator');
-  // 联网表：source 'online'
+  // 聯網表：source 'online'
   const online = { 2027: { off: { '2027-01-01': '元旦' }, makeup: { '2027-01-09': '元旦' }, source: 'online' } };
   assert.equal(tip(at(1, 1, 2027), {}, online).source, '来源：联网更新', 'C minor: same claim as the pill (联网取得的数据), no 「官方通知」');
-  // R30：导入的文件只写「导入文件」，不声称官方来源
+  // R30：匯入的檔案只寫「匯入檔案」，不聲稱官方來源
   const file = { 2027: { ...online[2027], source: 'file' } };
   assert.equal(tip(at(1, 1, 2027), {}, file).source, '来源：导入文件');
-  // 盖在格子上的短写（Task 14）：来源只写类别，计薪写「计薪 ¥x」
+  // 蓋在格子上的短寫（Task 14）：來源只寫類別，計薪寫「計薪 ¥x」
   assert.equal(tip(at(1, 1, 2027), {}, file).sourceLabel, '导入文件');
   assert.equal(hol.sourceLabel, '内置·官方通知');
   assert.equal(mk.payShort, '计薪 ¥377.78');
@@ -215,7 +215,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   assert.equal(tip(at(1, 2, 2027), {}, NO_2027).source, '来源：按周末规则', 'no table, Saturday → weekend rule');
   assert.equal(tip(at(11, 7), {}, HOLIDAYS_CN, { ...cfg, weekends: true }).source, '来源：按默认规则', 'weekend counted as workday');
   assert.equal(tip(at(1, 4, 2027), {}, NO_2027).status, '工作日');
-  // 内置 2027 表：来源写内置·官方通知，春节 span / 调休上班都来自表
+  // 內建 2027 表：來源寫內建·官方通知，春節 span / 調休上班都來自表
   const builtin = tip(at(2, 9, 2027));
   assert.equal(builtin.status, '法定假日（春节）');
   assert.equal(builtin.source, '来源：内置·官方通知');
@@ -229,7 +229,7 @@ test('tooltipText joins the same lines used by the visual tooltip', () => {
   assert.equal(tooltipText(m, CN), '11月7日 周六，农历九月廿九，休息日，来源：按周末规则，当日计薪 ¥0.00，点击修改');
 });
 
-// R50（fix round 1 · C2）：盖在格子上的提示用不带括号的短状态，「今天」放在状态行里而不是日期行
+// R50（fix round 1 · C2）：蓋在格子上的提示用不帶括號的短狀態，「今天」放在狀態行裡而不是日期行
 test('R50: tooltip short status (法定假日·劳动节 / 调休上班·劳动节), 今天 in the status line, no （今天） on the date line', () => {
   const tip = (date, marks = {}, tables = HOLIDAYS_CN, now = at(11, 3)) => dayTooltipModel(date, cfg, marks, tables, now, CN);
   assert.equal(tip(at(5, 1)).statusShort, '法定假日·劳动节');

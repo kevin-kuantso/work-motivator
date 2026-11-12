@@ -1,7 +1,7 @@
 import { validateHolidayYear, validateCustomUrl } from './holiday-data.js';
 
 export const HOLIDAYS_STORAGE_KEY = 'work-motivator-v1-holidays';
-// 导入的假期表文件在记录里的 source 标记（联网获取的记录的是实际网址）
+// 匯入的假期表文件在記錄裡的 source 標記（聯網獲取的記錄的是實際網址）
 export const FILE_SOURCE = 'file';
 
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -19,11 +19,11 @@ function readRecord(storage) {
   try {
     const rec = JSON.parse(raw);
     if (isPlainObject(rec) && rec.version === 1) return { record: rec, storageOk: true };
-  } catch { /* 视为空记录 */ }
+  } catch { /* 視為空記錄 */ }
   return { record: null, storageOk: true };
 }
 
-// 把已存的表还原成 holiday-cn 的形状，再走与联网下载完全相同的校验。
+// 把已存的表還原成 holiday-cn 的形狀，再走與聯網下載完全相同的校驗。
 function toHolidayJson(year, entry) {
   if (!isPlainObject(entry) || !isPlainObject(entry.table)) return null;
   const { off, makeup } = entry.table;
@@ -47,10 +47,10 @@ export function loadOnlineTables(storage) {
       if (!json) continue;
       const v = validateHolidayYear(json, year);
       if (!v.ok) continue;
-      // source 只接受导入文件标记 'file' 或以 https:// 开头的下载网址（区分大小写）；其他值丢弃该年，绝不默认为联网
+      // source 只接受匯入檔案標記 'file' 或以 https:// 開頭的下載網址（區分大小寫）；其他值丟棄該年，絕不預設為聯網
       if (!isKnownSource(entry.source)) continue;
       if (typeof entry.fetchedAt !== 'number' || !Number.isFinite(entry.fetchedAt)) continue;
-      // R30：导入的文件记为 'file'（不声称来源），其余（记录的是下载网址）为 'online'
+      // R30：匯入的檔案記為 'file'（不聲稱來源），其餘（記錄的是下載網址）為 'online'
       tables[year] = { off: v.table.off, makeup: v.table.makeup, source: entry.source === FILE_SOURCE ? 'file' : 'online' };
       meta[year] = { source: entry.source, papers: v.papers, fetchedAt: entry.fetchedAt };
     }
@@ -66,7 +66,7 @@ function update(storage, mutate) {
       years: record && isPlainObject(record.years) ? { ...record.years } : {},
       lastCheck: record && typeof record.lastCheck === 'number' ? record.lastCheck : null,
     };
-    // 新增字段（自定义网址）在其他写入时保留；读取时另行校验
+    // 新增欄位（自定義網址）在其他寫入時保留；讀取時另行校驗
     if (record && typeof record.customUrl === 'string') next.customUrl = record.customUrl;
     mutate(next);
     storage.setItem(HOLIDAYS_STORAGE_KEY, JSON.stringify(next));
@@ -97,7 +97,7 @@ export function saveLastCheck(storage, ms) {
   return update(storage, (next) => { next.lastCheck = ms; });
 }
 
-// 「自定义网址」存在假期数据记录里（不进设置备份文件）；读取时重新校验，不合格视为未设置。
+// 「自定義網址」存在假期資料記錄裡（不進設定備份檔案）；讀取時重新校驗，不合格視為未設定。
 export function loadCustomUrl(storage) {
   const { record } = readRecord(storage);
   const v = record && record.customUrl;

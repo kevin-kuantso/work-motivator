@@ -1,6 +1,6 @@
-// 月历（spec §13.3）：工具列（切月、回到今天；PgUp / PgDn 只写在切月按钮的悬停提示里）、
-// 摘要行（应出勤天数、日薪、情境胶囊、缺表标签、重置本月标记）、固定列出全部 7 种的单行图例（R36）、弹性行高的格子；
-// 点日期弹出小菜单（修改即存），悬停 / 聚焦提示直接盖在该格上（R35、Task 18）。
+// 月曆（spec §13.3）：工具列（切月、回到今天；PgUp / PgDn 只寫在切月按鈕的懸停提示裡）、
+// 摘要行（應出勤天數、日薪、情境膠囊、缺表標籤、重置本月標記）、固定列出全部 7 種的單行圖例（R36）、彈性行高的格子；
+// 點日期彈出小選單（修改即存），懸停 / 聚焦提示直接蓋在該格上（R35、Task 18）。
 import { h, show, setText } from './dom.js';
 import { icon } from './icons.js';
 import { monthGrid } from './calendar-model.js';
@@ -13,23 +13,23 @@ import { monthContext, missingTableTag } from './holiday-context.js';
 
 const TAG_ICON = { holiday: 'holiday', makeup: 'makeup', paid: 'paid', unpaid: 'unpaid', rest: 'rest' };
 const MARK_KIND = { paidLeave: 'paid', unpaidLeave: 'unpaid', work: 'makeup', rest: 'rest' };
-// 图例：永远列出全部类型（R36），顺序固定；「工作日」是普通格子，不列入
+// 圖例：永遠列出全部型別（R36），順序固定；「工作日」是普通格子，不列入
 const LEGEND_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid'];
 const HOVER_MS = 400;
 
-// getTables：当前使用的假期表（app.js 持有，替换后调用 render 即可）。
-// setProfile(t)：切换地区时原地换字典（不重挂载：不重建 DOM、不丢焦点与月份），静态文字、图例与模型一起刷新。
+// getTables：當前使用的假期表（app.js 持有，替換後呼叫 render 即可）。
+// setProfile(t)：切換地區時原地換字典（不重掛載：不重建 DOM、不丟焦點與月份），靜態文字、圖例與模型一起重新整理。
 export function createCalendar(doc, initialT, { getState, getTables, getToday, onMarks, onUndo }) {
   let t = initialT;
   let c = t.calendar;
   const today0 = getToday();
   let view = { y: today0.getFullYear(), m: today0.getMonth() };
   let lastTodayKey = null;
-  let focusKey = null; // 下一次重绘后要聚焦的日期（套用菜单、PgUp / PgDn）
-  let rovingKey = null; // 月历的 Tab 停靠点：跟着实际焦点走
-  let quiet = false; // 程序聚焦（Esc 关菜单、重绘后还原焦点）时不弹提示
+  let focusKey = null; // 下一次重繪後要聚焦的日期（套用選單、PgUp / PgDn）
+  let rovingKey = null; // 月曆的 Tab 停靠點：跟著實際焦點走
+  let quiet = false; // 程式聚焦（Esc 關選單、重繪後還原焦點）時不彈提示
 
-  // 法定假日格只放旗子图示 + 节日名（Task 18：不再有「假」字；无节日名时只剩旗子，格子的无障碍名称仍写明「法定假日」）
+  // 法定假日格只放旗子圖示 + 節日名（Task 18：不再有「假」字；無節日名時只剩旗子，格子的無障礙名稱仍寫明「法定假日」）
   const tag = (kind) =>
     TAG_ICON[kind] ? h(doc, 'span', { class: 'day-tag' }, icon(doc, TAG_ICON[kind]), c.tags[kind] ?? null) : null;
 
@@ -50,7 +50,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
   const hint = h(doc, 'span', { class: 'legend-hint', text: c.legendHint });
   const toolbar = h(doc, 'div', { class: 'cal-toolbar' }, prevBtn, title, nextBtn, todayBtn, hint);
 
-  // 图例色块只放图示（文字标签已说明类型），省宽度以保持单行
+  // 圖例色塊只放圖示（文字標籤已說明型別），省寬度以保持單行
   const legendItem = (kind, label) =>
     h(doc, 'span', { class: 'legend-item', 'data-kind': kind },
       h(doc, 'span', { class: `legend-swatch kind-${kind}` }, TAG_ICON[kind] ? icon(doc, TAG_ICON[kind]) : null), label);
@@ -100,7 +100,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     const [y, m, d] = key.split('-').map(Number);
     const next = applyOption(marks, new Date(y, m - 1, d), id);
     const mark = next[key];
-    if (mark === marks[key]) return; // 选了当前项：不改动、不弹提示
+    if (mark === marks[key]) return; // 選了當前項：不改動、不彈提示
     focusKey = key;
     const md = `${m}/${d}`;
     onMarks(next, (strings) => mark === undefined ? strings.calendar.cleared(md) : strings.calendar.marked(md, strings.calendar.kinds[MARK_KIND[mark]]), marks);
@@ -116,7 +116,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     menu.open(btn, cell.key, menuModel(cell.date, cfg, marks, getTables(), t));
   }
 
-  // 键盘聚焦才立即显示；鼠标点击后的程序聚焦不弹提示（悬停另有 0.4 秒延迟）
+  // 鍵盤聚焦才立即顯示；滑鼠點選後的程式聚焦不彈提示（懸停另有 0.4 秒延遲）
   const keyboardFocus = (btn) => {
     try {
       return btn.matches(':focus-visible');
@@ -139,7 +139,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     if (e.key === 'PageUp' || e.key === 'PageDown') {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       e.preventDefault();
-      // APG 日期选择器：切到上 / 下个月，焦点停在同号日期，没有就落到月底
+      // APG 日期選擇器：切到上 / 下個月，焦點停在同號日期，沒有就落到月底
       const first = new Date(view.y, view.m + (e.key === 'PageUp' ? -1 : 1), 1);
       const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
       const target = new Date(first.getFullYear(), first.getMonth(), Math.min(cell.day, last));
@@ -158,7 +158,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
 
   const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  // 图例只随地区变（不随月份变）：切换地区时整体重建（文字全部来自字典）
+  // 圖例只隨地區變（不隨月份變）：切換地區時整體重建（文字全部來自字典）
   function buildLegend() {
     legendItems.replaceChildren(
       ...LEGEND_KINDS.map((k) => legendItem(k, c.kinds[k])),
@@ -176,12 +176,12 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     if (note.title !== m.title) note.title = m.title;
   }
 
-  // 优先完整提示；空间不够时改短提示，再放不下才隐藏。切月、resize 与字体就绪都重算。
+  // 優先完整提示；空間不夠時改短提示，再放不下才隱藏。切月、resize 與字型就緒都重算。
   function fitHint() {
     hint.hidden = false;
     setText(hint, c.legendHint);
     const bar = toolbar.getBoundingClientRect();
-    if (!bar.width) return; // 隐藏的分页（display:none）里无从量测
+    if (!bar.width) return; // 隱藏的分頁（display:none）裡無從量測
     const last = todayBtn.getBoundingClientRect();
     const fits = () => {
       const r = hint.getBoundingClientRect();
@@ -197,7 +197,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     const { cfg, marks } = getState();
     const today = getToday();
     const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
-    // 跨日：原本停在「今天」所在月份时，跟着今天走
+    // 跨日：原本停在「今天」所在月份時，跟著今天走
     if (lastTodayKey !== null && lastTodayKey !== todayKey) {
       const [py, pm] = lastTodayKey.split('-').map(Number);
       if (py === view.y && pm === view.m) view = { y: today.getFullYear(), m: today.getMonth() };
@@ -218,7 +218,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     todayBtn.classList.toggle('is-away', !isThisMonth);
     const wage = monthWage(view.y, view.m, cfg, marks, tables);
     setText(summaryText, c.summary(wage.workdays, `${t.currency}${money(wage.dailyWage, 2, t)}`));
-    // R41：缺表标签只在当年与之后的年份显示，措辞按该年实际标出的日子
+    // R41：缺表標籤只在當年與之後的年份顯示，措辭按該年實際標出的日子
     const missing = missingTableTag(view.y, today, tables, t, cfg.holidayProvider);
     show(yearTag, Boolean(missing));
     setText(yearTag, missing ? missing.text : '');
@@ -276,7 +276,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     const menuHadFocus = menu.hasFocus();
     grid.replaceChildren(head, ...rows);
     if (toFocus) focusQuietly(toFocus);
-    // 菜单打开时重绘（跨日、其他分页改了设置）：日期仍在画面上就原地更新，否则关闭且不丢焦点
+    // 選單開啟時重繪（跨日、其他分頁改了設定）：日期仍在畫面上就原地更新，否則關閉且不丟焦點
     if (menu.isOpen()) {
       const key = menu.key();
       const anchor = grid.querySelector(`button[data-key="${key}"]`);
@@ -292,8 +292,8 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     centerTodayInk();
   }
 
-  // 切换地区：字典换掉后原地重刷静态文字、图例与整月模型（焦点 / 月份 / 菜单开合都由 render 自己保留）。
-  // 不重建任何节点，也不重新挂载（mountApp 没有 dispose，重挂会重复 listener 与 ticker）。
+  // 切換地區：字典換掉後原地重刷靜態文字、圖例與整月模型（焦點 / 月份 / 選單開合都由 render 自己保留）。
+  // 不重建任何節點，也不重新掛載（mountApp 沒有 dispose，重掛會重複 listener 與 ticker）。
   function setProfile(nextT) {
     if (nextT === t) return;
     t = nextT;
@@ -307,16 +307,16 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     setText(undo, c.undoMark);
     setText(legendTitle, c.legend);
     buildLegend();
-    render(); // 内含 fitHint()：换了字典后提示文字变长／变短都重新量测
+    render(); // 內含 fitHint()：換了字典後提示文字變長／變短都重新量測
   }
 
-  // 切换分页时收起菜单与提示（两者都浮在月历上）
+  // 切換分頁時收起選單與提示（兩者都浮在月曆上）
   function hideOverlays() {
     tooltip.hide();
     menu.close(false);
   }
 
-  // 把当天数字的实际墨迹中心对齐圆心；保留等宽数字，字体变化时重新量。
+  // 把當天數字的實際墨跡中心對齊圓心；保留等寬數字，字型變化時重新量。
   function centerTodayInk() {
     const num = grid.querySelector('.day.is-today .day-num');
     const ink = num?.querySelector('.day-num-ink');
@@ -328,7 +328,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     if (!ctx) return;
     ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     ctx.fontKerning = cs.fontKerning;
-    // Canvas 不继承等宽数字，依 DOM 中各数字的实际宽度测量。
+    // Canvas 不繼承等寬數字，依 DOM 中各數字的實際寬度測量。
     const node = ink.firstChild;
     const range = doc.createRange();
     let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
@@ -348,13 +348,13 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     if (left <= right && top <= bottom) ink.style.transform = `translate(${(circle.left + circle.right - left - right) / 2}px, ${(circle.top + circle.bottom - top - bottom) / 2}px)`;
   }
 
-  // 提示的「放得下吗」随视窗宽度与字体度量变化：挂一次监听，量测同步执行（不靠 rAF，测试里的假时钟不会吞掉）
+  // 提示的「放得下嗎」隨視窗寬度與字型度量變化：掛一次監聽，量測同步執行（不靠 rAF，測試裡的假時鐘不會吞掉）
   try {
     doc.defaultView?.addEventListener?.('resize', () => { fitHint(); centerTodayInk(); });
     doc.fonts?.ready?.then?.(() => { fitHint(); centerTodayInk(); }, () => {});
     doc.fonts?.addEventListener?.('loadingdone', () => { fitHint(); centerTodayInk(); });
   } catch {
-    // 没有 FontFaceSet：只靠 resize 与 render
+    // 沒有 FontFaceSet：只靠 resize 與 render
   }
 
   return { el, render, setProfile, hideOverlays, setUndoAvailable: (available) => undo.setAttribute('aria-disabled', String(!available)), refreshLayout: () => { fitHint(); centerTodayInk(); } };

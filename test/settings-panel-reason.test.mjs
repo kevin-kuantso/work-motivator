@@ -1,6 +1,6 @@
-// 回归：设置面板的月薪输入框必须说清「怎么输入才对」（settings.salaryError），
-// 而不是通用规则句（reasons.salary）。两者都是字典文案，选谁只由字段 + 语义 code 决定，
-// 所以切地区 / 切语言后同一份语义状态仍能重译；导入报告等别的入口继续用 reasons.salary。
+// 迴歸：設定面板的月薪輸入框必須說清「怎麼輸入才對」（settings.salaryError），
+// 而不是通用規則句（reasons.salary）。兩者都是字典文案，選誰只由欄位 + 語義 code 決定，
+// 所以切地區 / 切語言後同一份語義狀態仍能重譯；匯入報告等別的入口繼續用 reasons.salary。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fieldReasonText } from '../src/ui/settings-panel.js';
@@ -9,14 +9,14 @@ import { STRINGS as TW } from '../src/strings.zh-TW.js';
 import { importReport } from '../src/ui/import-model.js';
 import { DEFAULTS, importState } from '../src/settings.js';
 
-// validateSchedule 对任何无效月薪都回传同一个语义原因：{ code: 'salary' }（见 calc.js）
+// validateSchedule 對任何無效月薪都回傳同一個語義原因：{ code: 'salary' }（見 calc.js）
 const salaryReason = { code: 'salary' };
 
 test('salary field shows the input-format copy; the semantic state itself stays language-neutral', () => {
-  // 同一份原因对象，换字典就换说法：这正是 setProfile / retranslate 依赖的性质
+  // 同一份原因物件，換字典就換說法：這正是 setProfile / retranslate 依賴的性質
   assert.equal(fieldReasonText('salary', salaryReason, CN, CN.settings), CN.settings.salaryError);
   assert.equal(fieldReasonText('salary', salaryReason, TW, TW.settings), TW.settings.salaryError);
-  // 两本字典的具体说法都不是通用规则句，且各自给出当地示例金额
+  // 兩本字典的具體說法都不是通用規則句，且各自給出當地示例金額
   assert.notEqual(CN.settings.salaryError, CN.reasons.salary);
   assert.notEqual(TW.settings.salaryError, TW.reasons.salary);
   assert.match(CN.settings.salaryError, /6800/);
@@ -25,12 +25,12 @@ test('salary field shows the input-format copy; the semantic state itself stays 
 
 test('other fields keep their reasons.* wording (the salary override must not leak)', () => {
   assert.equal(fieldReasonText('end', { code: 'endAfterStart' }, CN, CN.settings), CN.reasons.endAfterStart);
-  // 带参数的 code 仍走 labels 查表
+  // 帶引數的 code 仍走 labels 查表
   assert.equal(
     fieldReasonText('start', { code: 'timeFormat', params: { field: 'start' } }, CN, CN.settings),
     CN.reasons.timeFormat(CN.reasons.labels.start),
   );
-  // 同一个对象按两个字段分别取词：措辞由「去处」决定，不由 code 决定
+  // 同一個物件按兩個欄位分別取詞：措辭由「去處」決定，不由 code 決定
   assert.equal(fieldReasonText('salary', { code: 'timeFormat', params: { field: 'start' } }, CN, CN.settings),
     CN.reasons.timeFormat(CN.reasons.labels.start));
 });
