@@ -298,7 +298,6 @@ function fitHero(r, cfg, redraw) {
   if (!avail) return;
   const sig = `${el.textContent.replace(/[0-9]/g, '0')}|${avail}|${cfg.fontScale ?? 'm'}`;
   if (r.heroFitSig === sig) return;
-  r.heroFitSig = sig;
   const set = (v) => {
     r.heroFit = v;
     if (v === null) el.style.removeProperty('--hero-fit');
@@ -309,15 +308,19 @@ function fitHero(r, cfg, redraw) {
   set(null);
   redraw();
   const need = el.scrollWidth;
-  if (need <= avail + 0.5) return;
-  set(shrink(avail / need));
-  redraw();
-  const after = el.scrollWidth;
-  if (after > avail + 0.5) {
-    // 数字格按新字号重新取整后仍差一点：按实测量的比例再收一次（只影响字形宽度，一次就够）
-    set(shrink((r.heroFit * avail) / after));
+  if (need > avail + 0.5) {
+    set(shrink(avail / need));
     redraw();
+    const after = el.scrollWidth;
+    if (after > avail + 0.5) {
+      // 数字格按新字号重新取整后仍差一点：按实测量的比例再收一次（只影响字形宽度，一次就够）
+      set(shrink((r.heroFit * avail) / after));
+      redraw();
+    }
   }
+  // 只有实际量到放得下才记住签名；仍溢出（字体或数字格宽度可能尚未稳定）就清掉，让下一次 tick 重量，
+  // 否则错误的缩放会被签名锁住，直到文字位数或视窗变化才重算
+  r.heroFitSig = el.scrollWidth <= avail + 0.5 ? sig : null;
 }
 
 export function renderCard(root, snap, cfg, t) {
