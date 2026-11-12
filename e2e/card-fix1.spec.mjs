@@ -122,9 +122,36 @@ test('V2: 已下班 — 「✓ 今天工作满 7小时」 in the head row (right
   });
 });
 
-test('V4 / V5 / V6: lunch fill #B45309 (≥ 3:1 vs track and ≥ 4.5 vs white); 14px dark label above the amount; 国庆 once; 法定假日 badge', async () => {
+// V4：午休的进度填色要能从轨道里分辨出来（≥ 3:1），也要在轨道上读得清（≥ 4.5:1 对白）。
+// 颜色本身随主题走（变量 --state-lunch-fill），所以断言拿当前主题解析出的变量值比对，不写死某一轮的色号。
+const rgb = (s) => (/^rgba?\(([^)]+)\)$/.exec(s.trim())?.[1] ?? '').split(/[,\s/]+/).filter(Boolean).slice(0, 3).map(Number);
+const contrast = (a, b) => {
+  const lum = (c) => {
+    const [r, g, bl] = c.map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+test('V4 / V5 / V6: lunch fill is the theme token (≥ 3:1 vs track and ≥ 4.5:1 vs white); 14px dark label above the amount; 国庆 once; 法定假日 badge', async () => {
   await withState('lunch', async (page) => {
-    assert.equal(await page.locator('#status-card .bar-fill').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(180, 83, 9)');
+    const r = await page.evaluate(() => {
+      const bar = document.querySelector('#status-card .bar');
+      const probe = document.createElement('span');
+      probe.style.background = 'var(--state-lunch-fill)';
+      bar.appendChild(probe);
+      const token = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { fill: getComputedStyle(bar.querySelector('.bar-fill')).backgroundColor, track: getComputedStyle(bar).backgroundColor, token };
+    });
+    assert.equal(r.fill, r.token, 'fill uses --state-lunch-fill');
+    const f = rgb(r.fill);
+    assert.ok(contrast(f, rgb(r.track)) >= 3, `fill vs track ≥ 3:1 (${r.fill} vs ${r.track})`);
+    assert.ok(contrast(f, [255, 255, 255]) >= 4.5, `fill vs white ≥ 4.5:1 (${r.fill})`);
   });
   await withState('working', async (page) => {
     const l = await page.locator('#status-card .card-label').evaluate((e) => { const s = getComputedStyle(e); return { size: s.fontSize, color: s.color, weight: s.fontWeight }; });

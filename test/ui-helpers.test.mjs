@@ -11,7 +11,7 @@ import { importReport } from '../src/ui/import-model.js';
 import { snapshot } from '../src/calc.js';
 import { DEFAULTS, importState } from '../src/settings.js';
 
-const cfg = { ...DEFAULTS };
+const cfg = { ...DEFAULTS, salary: 6800, lunchOn: true, lunchStart: '11:30' };
 const at = (m, d, h = 0, mi = 0, s = 0, y = 2026) => new Date(y, m - 1, d, h, mi, s);
 
 test('money / hero formatting uses zh-CN grouping and fixed decimals', () => {
@@ -53,7 +53,7 @@ test('card model at 2026-11-03 14:12 matches spec §11.13 sample (not ÷21.75)',
   assert.equal(m.progressText, '已工作 4小时12分 / 共 7小时');
   assert.equal(m.progressPct, 60);
   assert.equal(m.payday, null, 'payday hidden when empty');
-  assert.equal(m.cheer, null);
+  assert.deepEqual(m.cheers, [], 'no cheer lines when every entry is blank');
   assert.equal(cardModel({ ...snapshot(at(11, 3, 14, 12), cfg, {}), now: at(11, 3, 14, 12) }, cfg, t).yearNote, null);
 });
 
@@ -101,12 +101,20 @@ test('card model per status', () => {
   const makeup = cardModel(snapshot(at(9, 20, 10), cfg, {}), cfg, t);
   assert.equal(makeup.badge, '上班中');
   assert.equal(makeup.tag, '调休上班');
-  const payCfg = { ...cfg, payday: 5, cheer: '加油' };
+  const payCfg = { ...cfg, payday: 5, cheers: ['加油'] };
   const pay = cardModel(snapshot(at(11, 3, 10), payCfg, {}), payCfg, t);
   assert.equal(pay.payday, '距发薪日 2 天');
-  assert.equal(pay.cheer, '加油');
+  assert.deepEqual(pay.cheers, ['加油']);
   const payToday = { ...cfg, payday: 3 };
   assert.equal(cardModel(snapshot(at(11, 3, 10), payToday, {}), payToday, t).payday, '今天发薪');
+});
+
+test('cheer lines drop blank entries and keep the authored order (rotation source)', () => {
+  const lines = (cheers) => cardModel(snapshot(at(11, 3, 10), { ...cfg, cheers }, {}), { ...cfg, cheers }, t).cheers;
+  assert.deepEqual(lines(['第一句', '', '   ', '第二句']), ['第一句', '第二句']);
+  assert.deepEqual(lines(['  只有一句  ']), ['  只有一句  '], 'text is shown verbatim; only the blank test trims');
+  assert.deepEqual(lines([]), []);
+  assert.deepEqual(lines([1, null, '真实']), ['真实'], 'non-strings are ignored, not coerced');
 });
 
 test('calendar cell aria label says Enter opens the menu', () => {
@@ -145,26 +153,55 @@ test('month grid starts on Monday and flags missing holiday tables', () => {
 test('import report counts applied items and lists dropped + unknown with current values', () => {
   const obj = { version: 1, salary: -5, start: '9am', cheer: '加油', foo: 1, lunchOn: true,
     marks: { '2026-11-05': 'paidLeave', '2026-02-30': 'work' } };
-  const current = { cfg: { ...cfg }, marks: { '2026-02-28': 'work' } };
+  const { salary, ...shared } = cfg;
+  const current = { region: 'CN', cfg: shared, salaries: { TW: 40000, CN: salary }, marksByRegion: { TW: {}, CN: { '2026-02-28': 'work' } } };
   const res = importState(JSON.stringify(obj), current);
-  const r = importReport(obj, res, t);
+  const r = importReport(res, t);
   assert.equal(r.applied, 3, 'cheer, lunchOn, one mark');
   assert.equal(r.title, '已导入 3 项，4 项未导入');
   const byLabel = Object.fromEntries(r.rows.map((x) => [x.label, x]));
-  assert.equal(byLabel['月薪'].value, '保留当前值 6800');
+  assert.equal(byLabel['月薪 · 中国大陆'].value, '保留当前值 6800');
   assert.equal(byLabel['上班时间'].value, '保留当前值 08:30');
-  assert.equal(byLabel['月历标记 2026-02-30'].value, '保留当前值 未标记');
+  assert.equal(byLabel['月历标记 2026-02-30 · 中国大陆'].value, '保留当前值 未标记');
+  assert.equal(byLabel.foo.reason, '无法识别的字段，已忽略');
+  // 报告里的原因由语义 code 按当前字典翻出来：文案与迁移前逐字一致
+  assert.equal(byLabel['月薪 · 中国大陆'].reason, '月薪必须是大于 0 的数字');
+  assert.equal(byLabel['上班时间'].reason, '上班时间格式不正确，应为 24 小时制的「时:分」，例如 08:30');
+  assert.equal(byLabel['月历标记 2026-02-30 · 中国大陆'].reason, '不是真实存在的日期');
   assert.equal(byLabel.foo.reason, '无法识别的字段，已忽略');
   const bad = importState('{"marks":[]}', current);
-  assert.equal(importReport({ marks: [] }, bad, t).rows[0].label, '月历标记');
+  assert.equal(importReport(bad, t).rows[0].label, '月历标记 · 中国大陆');
+  assert.equal(importReport(bad, t).rows[0].reason, '月历标记的格式不正确');
+});
+
+test('import report reasons are re-rendered from the dictionary it is given, not baked at import time', () => {
+  const { salary, ...shared } = cfg;
+  const current = { region: 'CN', cfg: shared, salaries: { TW: 40000, CN: salary }, marksByRegion: { TW: {}, CN: {} } };
+  const res = importState(JSON.stringify({ version: 1, salary: -5, start: '9am' }), current);
+  // 同一份结果、换一本字典：文字跟着字典走（新增地区只要注册字典就能复用这套校验）
+  const other = {
+    ...t,
+    reasons: {
+      ...t.reasons,
+      salary: 'SALARY-TEXT',
+      timeFormat: (label) => `TIME(${label})`,
+      labels: { ...t.reasons.labels, start: 'START-LABEL' },
+    },
+  };
+  const rows = Object.fromEntries(importReport(res, other).rows.map((x) => [x.label, x.reason]));
+  assert.equal(rows['月薪 · 中国大陆'], 'SALARY-TEXT');
+  assert.equal(rows['上班时间'], 'TIME(START-LABEL)');
+  // 缺键时留空，不回退到简体或旧译文
+  const bare = { ...t, reasons: {} };
+  assert.equal(importReport(res, bare).rows[0].reason, '');
 });
 
 test('import report counts and labels the lunar setting accurately', () => {
   const current = { cfg: { ...cfg }, marks: {} };
   const good = { version: 2, showLunar: false };
-  assert.equal(importReport(good, importState(JSON.stringify(good), current), t).applied, 1);
+  assert.equal(importReport(importState(JSON.stringify(good), current), t).applied, 1);
   const bad = { showLunar: 'false' };
-  const report = importReport(bad, importState(JSON.stringify(bad), current), t);
+  const report = importReport(importState(JSON.stringify(bad), current), t);
   assert.equal(report.applied, 0);
   assert.equal(report.rows[0].label, '显示农历');
 });
@@ -176,8 +213,9 @@ function walk(dir) {
     e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
 }
 
-test('no CJK literals anywhere in src/ outside strings.zh-CN.js (comments excluded)', () => {
-  const files = walk(SRC).filter((f) => /\.(js|css)$/.test(f) && !f.endsWith('strings.zh-CN.js'));
+test('no CJK literals in implementation outside dictionaries and official regional data', () => {
+  const dataFiles = new Set(['strings.zh-CN.js', 'strings.zh-TW.js', 'holidays-cn.js', 'holiday-data-tw.js', 'holidays-tw.js']);
+  const files = walk(SRC).filter((f) => /\.(js|css)$/.test(f) && !dataFiles.has(f.split('/').at(-1)));
   assert.ok(files.length >= 15, 'scanned all source files');
   for (const f of files) {
     assert.doesNotMatch(stripComments(readFileSync(f, 'utf8')), /[一-鿿]/, `CJK literal in ${f}`);

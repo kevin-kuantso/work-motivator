@@ -16,6 +16,12 @@ export function monthPercent(monthTotal, salary) {
   return Math.min(100, Math.max(0, Math.round((monthTotal / salary) * 100)));
 }
 
+// 多句鼓励语：只保留非空白的字符串，顺序不变；空白句不占位、不参与轮播（数组本身由设置校验保证至少一项）。
+export function cheerLines(cfg) {
+  const list = Array.isArray(cfg?.cheers) ? cfg.cheers : [];
+  return list.filter((s) => typeof s === 'string' && s.trim() !== '');
+}
+
 export function cardModel(snap, cfg, t) {
   const c = t.card;
   const s = snap.status;
@@ -48,7 +54,7 @@ export function cardModel(snap, cfg, t) {
   let rate = c.monthProgressValue(monthPercent(snap.monthTotal, cfg.salary));
   if (s === 'working') {
     rateLabel = c.rate;
-    rate = `${t.currency}${money(snap.ratePerSec, 4)}${c.rateUnit}`;
+    rate = `${t.currency}${money(snap.ratePerSec, 4, t)}${c.rateUnit}`;
   } else if (s === 'lunch' && lunchEnd) {
     rateLabel = c.lunchEnds;
     rate = lunchEnd;
@@ -62,13 +68,16 @@ export function cardModel(snap, cfg, t) {
     : c.worked(c.spanHM(worked.h, worked.m), c.spanH(total.h, total.m));
 
   const pct = snap.totalSec > 0 ? Math.min(100, Math.max(0, (snap.workedSec / snap.totalSec) * 100)) : 0;
-  const cheer = typeof cfg.cheer === 'string' && cfg.cheer.trim() !== '' ? cfg.cheer : null;
+  const cheers = cheerLines(cfg);
   let payday = null;
   if (snap.paydayInDays === 0) payday = c.payToday;
   else if (Number.isInteger(snap.paydayInDays)) payday = c.payIn(snap.paydayInDays);
 
   const fixedTwo = s === 'afterWork' || s === 'paidLeave' || s === 'beforeWork';
-  const yearTag = snap.tableMissing && snap.now instanceof Date ? missingTableTag(snap.now.getFullYear(), snap.now, {}, t) : null;
+  // 缺表措辞按活动地区的 provider（cfg.holidayProvider）：台湾缺表只说「仅依周末与手动标记试算」
+  const yearTag = snap.tableMissing && snap.now instanceof Date
+    ? missingTableTag(snap.now.getFullYear(), snap.now, cfg.holidayProvider?.tables ?? {}, t, cfg.holidayProvider)
+    : null;
   return {
     status: s,
     tone: holiday ? 'holiday' : TONE[s],
@@ -81,8 +90,8 @@ export function cardModel(snap, cfg, t) {
     // 已下班 / 带薪假：金额定格，末两位恢复正常对比（design-spec §6.4）
     settled: s === 'afterWork' || s === 'paidLeave',
     // 金额只显示 2 位的状态：定格的（已下班 / 带薪假）与未上班的 0.00；上班中 / 午休照旧 4 位（末两位降对比）
-    hero: fixedTwo ? { head: money(snap.earned, 2), tail: '' } : heroParts(snap.earned),
-    amountSrText: `${t.currency} ${money(snap.earned, fixedTwo ? 2 : 4)}`,
+    hero: fixedTwo ? { head: money(snap.earned, 2, t), tail: '' } : heroParts(snap.earned, t),
+    amountSrText: `${t.currency} ${money(snap.earned, fixedTwo ? 2 : 4, t)}`,
     secondary,
     showProgress: timed && snap.totalSec > 0,
     progressPct: Math.round(pct),
@@ -95,14 +104,14 @@ export function cardModel(snap, cfg, t) {
     showHourly: s !== 'restDay' && s !== 'unpaidLeave',
     rateLabel,
     rate,
-    month: `${t.currency}${money(snap.monthTotal)}`,
-    hourly: `${t.currency}${money(snap.hourlyWage)}`,
-    daily: `${t.currency}${money(snap.dailyWage)}`,
+    month: `${t.currency}${money(snap.monthTotal, 2, t)}`,
+    hourly: `${t.currency}${money(snap.hourlyWage, 2, t)}`,
+    daily: `${t.currency}${money(snap.dailyWage, 2, t)}`,
     payday,
     // 没有假期表的年份（R15 / R41）：卡片上要看得出来；措辞按该年实际标出的日子（状态卡永远是当年）
     yearNote: yearTag?.text ?? null,
     yearTitle: yearTag?.title ?? '',
-    cheer,
+    cheers,
     srSummary: c.srSummary(t.status[s], Math.floor(Number.isFinite(snap.earned) ? snap.earned : 0)),
   };
 }

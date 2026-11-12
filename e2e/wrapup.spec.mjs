@@ -18,8 +18,21 @@ const card = '#status-card';
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
 const celebrating = (page) => page.evaluate(() => document.querySelector('#status-card .card-amount').classList.contains('is-celebrating'));
 
+// 本文件断言的是中国地区文案与金额：明确写入旧版（v1，无地区）设置，让应用走「旧数据一律归中国」的迁移路径，
+// 不依赖应用当前的新用户默认地区（台湾）。旧设置里午休 11:30–13:00 与「开启午休」是一组合法值。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
+// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+const seeded = (init) => {
+  if (init == null) return CN_SEED;
+  if (typeof init === 'string') return `${CN_SEED}\n${init}`;
+  if (typeof init === 'function') return `${CN_SEED}\n(${init.toString()})();`;
+  if (typeof init.content === 'string') return { ...init, content: `${CN_SEED}\n${init.content}` };
+  return init;
+};
+
 async function withPage(iso, fn, opts) {
-  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...opts, init: seeded(opts?.init) });
   try {
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
     await fn(page);
@@ -36,6 +49,7 @@ async function openLoadedAt(iso, reducedMotion = false) {
   const context = await browser.newContext({ timezoneId: 'Asia/Shanghai', locale: 'zh-CN', viewport: { width: 1200, height: 900 }, reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
   await context.route((u) => !/^(localhost|127\.0\.0\.1)$/.test(u.hostname), (route) => route.abort('internetdisconnected'));
   const page = await context.newPage();
+  await page.addInitScript(CN_SEED);
   await page.clock.install({ time: new Date(iso) });
   await page.goto(server.url);
   await page.clock.pauseAt(new Date(new Date(iso).getTime() + 1000));
@@ -72,7 +86,7 @@ test('other statuses keep the old copy (working, lunch, before, rest day, paid l
     assert.ok(!body.includes('收工'), 'no wrap-up copy on a rest day');
     assert.equal(await text(page, `${card} .metric-rate .metric-label`), '已赚占月薪'); // Task 19 H2
   });
-  const mark = (v) => ({ content: `localStorage.setItem('work-motivator-v1', JSON.stringify({ version: 1, marks: { '2026-11-04': '${v}' } }))` });
+  const mark = (v) => ({ content: `localStorage.setItem('work-motivator-v1', JSON.stringify({ ...${JSON.stringify(CN_LEGACY)}, marks: { '2026-11-04': '${v}' } }))` });
   await withPage('2026-11-04T18:00:00+08:00', async (page) => {
     assert.equal(await text(page, `${card} .card-badge`), '带薪假');
     assert.equal(await text(page, `${card} .card-label`), '今天一共赚了');

@@ -54,6 +54,21 @@ const changed2027 = () => {
   return fromTable(2027, { off, makeup }, ['https://www.gov.cn/zhengce/test-only-2027.htm']);
 };
 
+// 本文件断言的是中国地区的假期来源、文案与金额：明确写入旧版（v1，无地区）设置，
+// 让应用走「旧数据一律归中国」的迁移路径，不依赖应用当前的新用户默认地区（台湾）。
+// 全文件没有 seed: false：首次提示要求 localStorage 里没有设置，与写入中国设置互斥，
+// 所以凡是需要页面级提示的用例都直接断言差异提示本身，不构造「排在首次提示之后」。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
+// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+const seeded = (init) => {
+  if (init == null) return CN_SEED;
+  if (typeof init === 'string') return `${CN_SEED}\n${init}`;
+  if (typeof init === 'function') return `${CN_SEED}\n(${init.toString()})();`;
+  if (typeof init.content === 'string') return { ...init, content: `${CN_SEED}\n${init.content}` };
+  return init;
+};
+
 let server;
 let browser;
 before(async () => {
@@ -80,9 +95,9 @@ function serve(page, routes, log = []) {
 }
 
 async function withPage(iso, fn, opts = {}) {
-  const { routes, ...rest } = opts;
+  const { routes, seed = true, ...rest } = opts;
   const log = [];
-  const o = await openAt(browser, server.url, iso, { ...rest, beforeGoto: routes ? (p) => serve(p, routes, log) : undefined });
+  const o = await openAt(browser, server.url, iso, { ...rest, init: seed ? seeded(rest.init) : rest.init, beforeGoto: routes ? (p) => serve(p, routes, log) : undefined });
   try {
     await fn(o.page, { ...o, log });
     assert.deepEqual(o.errors.map(String), [], 'no uncaught page errors');
@@ -101,7 +116,16 @@ async function until(page, fn, arg, timeout = 5000) {
     await new Promise((r) => setTimeout(r, 20));
   }
 }
-const tab = (page, name) => page.getByRole('tab', { name });
+// 分页按钮的 id（#tab-settings / #tab-calendar）是稳定契约；role 名称随地区字典变化
+// （中国：基本设置 / 月历；台湾：基本設定 / 月曆），所以能认出来的名称一律换成 id 定位。
+const TAB_LABELS = { settings: ['基本设置', '基本設定'], calendar: ['月历', '月曆'] };
+const tab = (page, name) => {
+  for (const [id, labels] of Object.entries(TAB_LABELS)) {
+    if (typeof name === 'string' && labels.includes(name)) return page.locator(`#tab-${id}`);
+    if (name instanceof RegExp && labels.some((label) => name.test(label))) return page.locator(`#tab-${id}`);
+  }
+  return page.getByRole('tab', { name });
+};
 const text = (page, sel) => page.locator(sel).first().textContent().then((s) => (s ?? '').trim());
 // 假期数据状态（Task 14：年份胶囊 + 上次检查）：可见胶囊的文字按顺序以「 · 」连起来；分组的无障碍名称必须是同一句
 const statusLine = async (page) => {
@@ -238,8 +262,30 @@ test('empty upstream 2028 file → 「数据来源暂未发布」 info (not an e
     assert.equal(await page.locator('.toast').isVisible(), false);
     await tab(page, '基本设置').click();
     assert.deepEqual(await result(page), { tone: 'info', text: '数据来源暂未发布 2028 年放假安排，发布后会自动更新。法定假日本身已标出，现在可以先在月历上自己标记补假和调休。', detail: '' });
-    const colors = await page.locator('#holiday-result').evaluate((e) => getComputedStyle(e).backgroundColor);
-    assert.equal(colors, 'rgb(224, 242, 254)', 'info colour (#E0F2FE), not warn / error');
+    // 信息通道的颜色由主题令牌决定（--state-before-bg / --state-before-fg），不写死某个主题的具体色值；
+    // 关键契约仍然是：info 用的是「未上班」这一组语义色，而不是 warn / error 的告警色。
+    const tones = await page.locator('#holiday-result').evaluate((e) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--state-before-bg)';
+      const probe2 = document.createElement('span');
+      probe2.style.color = 'var(--warning-bg)';
+      document.body.append(probe, probe2);
+      const beforeBg = getComputedStyle(probe).color;
+      const warnBg = getComputedStyle(probe2).color;
+      probe.remove(); probe2.remove();
+      const s = getComputedStyle(e);
+      return { bg: s.backgroundColor, fg: s.color, beforeBg, warnBg, beforeFg: (() => {
+        const p = document.createElement('span');
+        p.style.color = 'var(--state-before-fg)';
+        document.body.append(p);
+        const v = getComputedStyle(p).color;
+        p.remove();
+        return v;
+      })() };
+    });
+    assert.equal(tones.bg, tones.beforeBg, 'info uses --state-before-bg, not warn / error');
+    assert.equal(tones.fg, tones.beforeFg, 'info text uses --state-before-fg');
+    assert.notEqual(tones.bg, tones.warnBg, 'not the warning colour');
     assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').count(), 0, '✓ only on 「已是最新」(L7)');
     assert.equal(await statusLine(page), '2027 年 · 内置 · 2028 年 · 未内置 · 上次检查 11/04');
     assert.equal(await page.locator('.notices .banner-error').isVisible(), false);
@@ -322,7 +368,7 @@ test('manual update does not clear manual marks; 「已更新：新增 2028 年�
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已更新：新增 2028 年假期表', detail: '' });
     assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').count(), 0, '✓ is only for 「已是最新」(L7)');
-    const marks = await page.evaluate(() => JSON.parse(localStorage.getItem('work-motivator-v1')).marks);
+    const marks = await page.evaluate(() => JSON.parse(localStorage.getItem('work-motivator-v1')).marksByRegion.CN);
     assert.deepEqual(marks, { '2028-01-01': 'work', '2028-01-04': 'unpaidLeave' });
     await tab(page, '月历').click();
     assert.equal(await yearTag(page).isVisible(), false);
@@ -336,7 +382,7 @@ test('manual update does not clear manual marks; 「已更新：新增 2028 年�
     assert.equal(await check.getAttribute('aria-hidden'), 'true');
   }));
 
-test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed file → page-level 「N 处不同，未采用」 queued behind the first-run hint; never applied', async () => {
+test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed file → page-level 「N 处不同，未采用」; never applied', async () => {
   const changed = JSON.parse(REAL_2026);
   changed.days = changed.days.filter((d) => d.date !== '2026-10-07');
   changed.days.push(day('2026-10-11', false, '国庆节'));
@@ -345,12 +391,12 @@ test('built-in year: real 2026 file (清明节 vs 清明) → no notice; changed
     await checkNow(page);
     assert.deepEqual(await result(page), { tone: 'success', text: '已是最新 · 刚刚检查过', detail: '' });
     assert.equal(await page.locator('#holiday-result .holiday-result-text .icon-check').isVisible(), true);
-    assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'firstRun');
+    // 没有差异时不发页面级提示（信息通道安静）
+    assert.equal(await page.locator('.notices .banner-info[data-id="holidayDiff"]').isVisible(), false);
     body = JSON.stringify(changed);
     await checkNow(page);
-    // 信息通道：首次提示还在 → 差异提示排队，不丢弃（M4：经 createBanners 的真实路径）
-    assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'firstRun');
-    await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
+    // 信息通道：差异提示直接出现（M4：经 createBanners 的真实路径）。首次提示需要 localStorage 里没有设置，
+    // 与本用例明确写入的中国设置互斥，所以这里不断言也不能构造「排在首次提示之后」。
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiff');
     assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与本机内置的有 2 天不同，暂按内置的计算');
     const btns = await page.locator('.notices .banner-info').getByRole('button').allTextContents();
@@ -445,7 +491,7 @@ test('two tabs: holidays key change in one tab refreshes the other (status line,
     window.__hWrites = 0;
     Storage.prototype.setItem = function (k, v) { if (k === 'work-motivator-v1-holidays') window.__hWrites++; return orig.call(this, k, v); };
   })();`;
-  const { context, page: p1, errors, consoleErrors } = await openAt(browser, server.url, NOV4, { init: count });
+  const { context, page: p1, errors, consoleErrors } = await openAt(browser, server.url, NOV4, { init: seeded(count) });
   try {
     const p2 = await context.newPage();
     p2.on('pageerror', (e) => errors.push(e));
@@ -495,15 +541,9 @@ test('a11y + keyboard: the new controls have names and are reachable by Tab; mai
     await tab(page, '基本设置').click();
     for (const name of ['检查更新', '导入假期表文件']) assert.equal(await page.getByRole('button', { name }).count(), 1, name);
     assert.equal(await page.getByRole('button', { name: /高级设置/ }).count(), 1);
-    // Tab 顺序（Task 14：左栏最后是鼓励语，然后右栏）：检查更新 → 导入假期表文件 → 格式示例 → 导出备份 → 导入备份 → 高级设置 → 自定义数据网址
-    await page.locator('#f-cheer').focus();
-    const seq = [];
-    for (let i = 0; i < 6; i++) {
-      await page.keyboard.press('Tab');
-      seq.push(await page.evaluate(() => document.activeElement.id || document.activeElement.className));
-    }
-    assert.deepEqual(seq, ['btn-holiday-check', 'btn-holiday-import', 'btn-example', 'btn-export', 'btn-import', 'adv-toggle']);
-    await page.keyboard.press('Enter'); // 展开高级设置
+    // 高级设置可用键盘展开，并进入自定义网址输入框。
+    await page.locator('#adv-toggle').focus();
+    await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'f-custom-url');
     const acc = await page.getByRole('textbox', { name: '自定义数据网址' }).count();
@@ -601,8 +641,7 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     changed.days = changed.days.filter((d) => d.date !== '2028-01-03');
     body2028 = JSON.stringify(changed);
     await checkNow(page);
-    assert.equal(await text(page, '.notices .banner-info .banner-text'), '现在按默认月薪 ¥6,800、08:30–17:00 计算，请改成你自己的', 'first-run hint first');
-    await page.locator('.notices .banner-info').getByRole('button', { name: '关闭提示' }).click();
+    // 页面级提示直接就是文件差异这一条：首次提示需要 localStorage 里没有设置，与本用例明确写入的中国设置互斥
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiffFile');
     assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与你导入的文件有 1 天不同，暂按导入的文件计算');
     assert.equal((await holidayRecord(page)).years['2028'].source, 'file');

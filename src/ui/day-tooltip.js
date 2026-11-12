@@ -5,12 +5,18 @@
 // 窄到格子不显示农历时，提示仍保留农历。金额与 aria-describedby 中的完整文字始终保留。
 import { h } from './dom.js';
 
-const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-no-wd', 'is-lean', 'is-no-lunar'];
+const ALL = ['is-tight', 'is-compact', 'is-inline', 'is-mini', 'is-no-wd', 'is-lean', 'is-no-lunar', 'is-no-pay-label', 'is-currency-fit', 'is-no-status-name'];
 const TIERS = [
   [], ['is-tight'], ['is-compact'], ['is-compact', 'is-tight'],
   ['is-inline'], ['is-inline', 'is-tight'], ['is-inline', 'is-compact'], ['is-inline', 'is-compact', 'is-tight'],
   ['is-no-lunar'], ['is-no-lunar', 'is-tight'], ['is-no-lunar', 'is-compact'], ['is-no-lunar', 'is-compact', 'is-tight'],
   ['is-no-lunar', 'is-inline'], ['is-no-lunar', 'is-inline', 'is-tight'], ['is-no-lunar', 'is-inline', 'is-compact'], ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight'],
+  ['is-no-lunar', 'is-compact', 'is-no-pay-label'], ['is-no-lunar', 'is-compact', 'is-tight', 'is-no-pay-label'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-no-pay-label'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-no-pay-label', 'is-currency-fit'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-no-pay-label', 'is-mini'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-no-pay-label', 'is-currency-fit', 'is-no-status-name'],
+  ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-no-pay-label', 'is-mini', 'is-no-status-name'],
   ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-mini'],
   ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd'],
   ['is-no-lunar', 'is-inline', 'is-compact', 'is-tight', 'is-mini', 'is-no-wd', 'is-lean'],
@@ -21,7 +27,7 @@ const kindOf = (btn) => ([...btn.classList].find((c) => c.startsWith('kind-')) ?
 export function createDayTooltip(doc) {
   // 文字拆成不可再拆的「单位」：sep 给了就按它拆（日期 / 周X 之间的空格，拆开后补回空格）；没给就在每个「·」之后断开。
   // 标了 wd 的单位（「周X」）在倒数第二档 is-no-wd 里整个隐藏：先于「拿掉状态行」的最后手段，屏幕阅读器仍读得到（格子的 aria-describedby）
-  const units = (text, sep, weekday) => (sep ? text.split(sep) : text.split(/(?<=·)/)).flatMap((u, i) => [i && sep ? sep : null, h(doc, 'span', { class: weekday && i === 1 ? 'u u-wd' : 'u', text: u })]);
+  const units = (text, sep, weekday) => (sep ? text.split(sep) : text.replace(/\s+/g, ' ').split(/(?<=·)/)).flatMap((u, i) => [i && sep ? sep : null, h(doc, 'span', { class: weekday && i === 1 ? 'u u-wd' : i ? 'u u-detail' : 'u', text: u })]);
 
   const win = doc.defaultView;
   const el = h(doc, 'div', { class: 'day-tooltip', 'aria-hidden': 'true', hidden: true });
@@ -46,17 +52,26 @@ export function createDayTooltip(doc) {
     cancel();
     const cell = btn.parentElement;
     if (!btn.isConnected || !cell) return;
-    const [payLabel, ...payRest] = m.payShort.split(' ');
-    const amount = payRest.join(' ');
+    // 结构化字段（日期 / 星期 / 计薪说明 / 金额）来自 dayTooltipModel：排版只用这些，不解析翻译后的空白或分隔符（Task 14）。
+    // 只有拿不到结构化字段的旧模型（不该出现）才退回按空白拆 payShort
+    const legacy = m.payLabel === undefined && m.payAmount === undefined;
+    const [legacyLabel, ...legacyRest] = legacy ? m.payShort.split(' ') : [''];
+    const titleDate = m.titleDate ?? m.titleShort;
+    const payLabel = legacy ? legacyLabel : m.payLabel;
+    const payAmount = legacy ? legacyRest.join(' ') : m.payAmount;
     el.replaceChildren(
       // 「11月18日」「周三」各是不可拆的单位：窄格子换行时只在单位之间换（round 3）
-      h(doc, 'span', { class: 'tip-title' }, units(m.titleShort, ' ', true)),
+      h(doc, 'span', { class: 'tip-title' },
+        h(doc, 'span', { class: 'u', text: titleDate }),
+        ...(m.titleWeekday ? [m.titleSep ?? ' ', h(doc, 'span', { class: 'u u-wd', text: m.titleWeekday })] : [])),
       ...(m.lunar ? [h(doc, 'span', { class: 'tip-lunar', text: m.lunar })] : []),
       // 状态与来源只在「·」处换行（「法定假日·」「劳动节」各是整体），名字中间不折行
       h(doc, 'span', { class: 'tip-status' }, units(m.statusShort)),
       h(doc, 'span', { class: 'tip-source' }, units(m.sourceLabel)),
-      h(doc, 'span', { class: `tip-pay${/^\D*0\.00$/.test(amount) ? ' is-zero' : ''}` },
-        h(doc, 'span', { class: 'pay-label', text: payLabel }), ' ', h(doc, 'span', { class: 'pay-amt', text: amount })));
+      h(doc, 'span', { class: `tip-pay${m.payZero ? ' is-zero' : ''}` },
+        h(doc, 'span', { class: 'pay-label', text: payLabel }),
+        m.paySep ?? ' ',
+        h(doc, 'span', { class: 'pay-amt', text: payAmount || m.payShort })));
     el.dataset.kind = kindOf(btn);
     el.classList.toggle('is-today', btn.classList.contains('is-today'));
     if (el.parentElement !== cell) cell.append(el);

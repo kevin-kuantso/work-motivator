@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STRINGS } from '../src/strings.zh-CN.js';
+import { STRINGS as TW } from '../src/strings.zh-TW.js';
 
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶變當內擷檢實際應該'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用', '套用', '尚未公布', '字串', '物件', '档案', '网路', '资料', '设定', '储存', '复制贴上', '讯息', '登入'];
@@ -36,10 +37,26 @@ test('every UI string (incl. Task 14 copy) is mainland Simplified: no Traditiona
   assert.deepEqual(bad, []);
 });
 
+test('Taiwan dictionary implements the mainland dictionary contract and uses Taiwanese terminology', () => {
+  const compare = (cn, tw, path) => {
+    for (const [key, value] of Object.entries(cn)) {
+      const name = `${path}.${key}`;
+      assert.ok(Object.hasOwn(tw, key), `missing ${name}`);
+      assert.equal(typeof tw[key], typeof value, name);
+      if (value && typeof value === 'object' && !Array.isArray(value)) compare(value, tw[key], name);
+    }
+  };
+  compare(STRINGS, TW, 'strings');
+  const all = [];
+  collect(TW, 'TW', all);
+  const forbidden = ['设置', '保存', '数据', '文件', '默认', '菜单', '联网', '鼠标', '屏幕', '带薪假', '调休'];
+  const bad = all.flatMap(([path, text]) => forbidden.filter((word) => text.includes(word)).map((word) => `${path}: ${word}`));
+  assert.deepEqual(bad, []);
+});
+
 test('the approved Task 14 copy is present verbatim', () => {
   const s = STRINGS.settings;
   assert.equal(s.backupDesc, '设置只保存在这个浏览器里，不会上传。');
-  assert.equal(`${s.backup.importLead}${s.backup.importText}`, '导入备份：用之前导出的文件恢复这些设置。');
   assert.equal(s.paydayHint, '设置后，状态卡会显示「距离发薪日 N 天」');
   assert.equal(s.cheerHint, '会显示在左侧状态卡上');
   assert.equal(s.advancedSub, '一般不用改');

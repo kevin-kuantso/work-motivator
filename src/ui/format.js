@@ -1,22 +1,32 @@
 // 纯函数：数字 / 时间 / 日期格式化（不碰 DOM，可在 node 测试）。
 import { lunarDate } from '../lunar.js';
 
+const FALLBACK_LOCALE = 'zh-CN';
 const fmtCache = new Map();
-function nf(digits) {
-  if (!fmtCache.has(digits)) {
-    fmtCache.set(digits, new Intl.NumberFormat('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }));
+
+// 取 locale：直接给 locale 字符串，或给 profile / strings（两者都带 locale）。缺省沿用 zh-CN，既有调用不改行为。
+export function localeOf(x) {
+  if (typeof x === 'string' && x !== '') return x;
+  const loc = x && typeof x === 'object' ? x.locale : null;
+  return typeof loc === 'string' && loc !== '' ? loc : FALLBACK_LOCALE;
+}
+
+function nf(digits, locale) {
+  const key = `${locale}|${digits}`;
+  if (!fmtCache.has(key)) {
+    fmtCache.set(key, new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }));
   }
-  return fmtCache.get(digits);
+  return fmtCache.get(key);
 }
 
 const safe = (v) => (Number.isFinite(v) ? v : 0);
 
-// 金额文字（不含货币符号），zh-CN 千分位。
-export const money = (v, digits = 2) => nf(digits).format(safe(v));
+// 金额文字（不含货币符号），千分位按 locale 决定。
+export const money = (v, digits = 2, locale) => nf(digits, localeOf(locale)).format(safe(v));
 
 // 主金额：4 位小数，拆出末两位以便降对比。
-export function heroParts(v) {
-  const s = money(v, 4);
+export function heroParts(v, locale) {
+  const s = money(v, 4, locale);
   return { head: s.slice(0, -2), tail: s.slice(-2) };
 }
 

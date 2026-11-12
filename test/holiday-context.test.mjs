@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { monthContext, monthHolidays, missingTableTag, noTableKind } from '../src/ui/holiday-context.js';
 import { HOLIDAYS_CN } from '../src/holidays-cn.js';
+import { CN_HOLIDAY_PROVIDER } from '../src/holiday-provider-cn.js';
 import { STRINGS as t } from '../src/strings.zh-CN.js';
 
 const NOW = new Date(2026, 10, 4, 10); // 注入的「今天」：2026-11-04
-const ctx = (y, m, tables = HOLIDAYS_CN, today = NOW) => monthContext(y, m - 1, tables, today, t);
+const ctx = (y, m, tables = HOLIDAYS_CN, today = NOW) => monthContext(y, m - 1, tables, today, t, CN_HOLIDAY_PROVIDER);
 const online2027 = { off: { '2027-01-01': '元旦', '2027-01-02': '元旦', '2027-01-03': '元旦' }, makeup: {}, source: 'online' };
 
 test('built-in year, month without holidays: ✓ 「本月没有法定假日」, basis only in title (M10)', () => {
@@ -115,31 +116,31 @@ test('collisions and grouping: 2028-10-03 (国庆 + 中秋) once as 国庆; same
 });
 
 test('monthHolidays ignores manual marks and the weekends switch (pure table / statutory data)', () => {
-  const h = monthHolidays(2026, 9, HOLIDAYS_CN);
+  const h = monthHolidays(2026, 9, HOLIDAYS_CN, CN_HOLIDAY_PROVIDER);
   assert.deepEqual(h.off.map((x) => x.day), [1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(h.makeup, [{ name: '国庆', day: 10 }]);
 });
 
 test('R41 (amended round 3) missing-table tag: every no-table year, past or future; wording follows what is actually marked', () => {
-  assert.equal(missingTableTag(2026, NOW, HOLIDAYS_CN, t), null, 'has a table');
-  assert.equal(missingTableTag(2027, NOW, HOLIDAYS_CN, t), null, '2027 is built in since the 2026-11 notice');
-  assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t).text, '2025 年只标了元旦、劳动节、国庆', 'past year: visible qualifier too (round 3)');
-  assert.deepEqual(missingTableTag(2028, NOW, HOLIDAYS_CN, t), {
+  assert.equal(missingTableTag(2026, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER), null, 'has a table');
+  assert.equal(missingTableTag(2027, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER), null, '2027 is built in since the 2026-11 notice');
+  assert.equal(missingTableTag(2025, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).text, '2025 年只标了元旦、劳动节、国庆', 'past year: visible qualifier too (round 3)');
+  assert.deepEqual(missingTableTag(2028, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER), {
     kind: 'lunar', text: '2028 年只标了法定假日，补假和调休未标出',
     title: '2028 年假期表未内置：已按《放假办法》标出法定假日本身；补假、调休和延长的假日未标出',
   });
-  assert.equal(missingTableTag(2027, NOW, { ...HOLIDAYS_CN, 2027: online2027 }, t), null, 'online table');
-  assert.equal(missingTableTag(2028, NOW, { ...HOLIDAYS_CN, 2028: online2027 }, t), null, 'online table for 2028');
-  const f = missingTableTag(2036, NOW, HOLIDAYS_CN, t);
+  assert.equal(missingTableTag(2027, NOW, { ...HOLIDAYS_CN, 2027: online2027 }, t, CN_HOLIDAY_PROVIDER), null, 'online table');
+  assert.equal(missingTableTag(2028, NOW, { ...HOLIDAYS_CN, 2028: online2027 }, t, CN_HOLIDAY_PROVIDER), null, 'online table for 2028');
+  const f = missingTableTag(2036, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER);
   assert.equal(f.kind, 'fixed');
   assert.equal(f.text, '2036 年只标了元旦、劳动节、国庆'); // 名字取自 STATUTORY_FIXED（F1：固定日期年份不说「标了法定假日」）
   assert.match(f.title, /元旦、劳动节、国庆/);
   assert.ok([...f.text].filter((c) => /\p{Script=Han}/u.test(c)).length <= 14, '≤ 14 CJK characters');
-  assert.equal(missingTableTag(2035, new Date(2035, 5, 1), HOLIDAYS_CN, t).kind, 'lunar');
-  assert.equal(missingTableTag(2028, new Date(2029, 0, 1), HOLIDAYS_CN, t).kind, 'lunar', 'a past lunar year keeps its tag');
-  assert.equal(missingTableTag(2025, new Date(2025, 5, 1), HOLIDAYS_CN, t).kind, 'fixed', '2025 current (clock in 2025): fixed days only');
-  assert.equal(missingTableTag(2024, new Date(2024, 5, 1), HOLIDAYS_CN, t).text, '2024 年未标法定假日');
-  assert.deepEqual([2024, 2025, 2026, 2027, 2028, 2035, 2036].map(noTableKind), ['none', 'fixed', 'fixed', 'fixed', 'lunar', 'lunar', 'fixed']);
+  assert.equal(missingTableTag(2035, new Date(2035, 5, 1), HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).kind, 'lunar');
+  assert.equal(missingTableTag(2028, new Date(2029, 0, 1), HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).kind, 'lunar', 'a past lunar year keeps its tag');
+  assert.equal(missingTableTag(2025, new Date(2025, 5, 1), HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).kind, 'fixed', '2025 current (clock in 2025): fixed days only');
+  assert.equal(missingTableTag(2024, new Date(2024, 5, 1), HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).text, '2024 年未标法定假日');
+  assert.deepEqual([2024, 2025, 2026, 2027, 2028, 2035, 2036].map((y) => noTableKind(y, CN_HOLIDAY_PROVIDER)), ['none', 'fixed', 'fixed', 'fixed', 'lunar', 'lunar', 'fixed']);
 });
 
 // R49（fix round 1 · C1）：说 app 知道什么（未内置 / 未标出），不说世界的状态（未公布 / 待公布）；fixed 与 lunar 年份措辞分开；
@@ -155,7 +156,7 @@ test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and t
     [2025, 2, new Date(2025, 1, 3), '本月没有已标出的法定假日', 'fixed'],
   ]) {
     const c = ctx(y, m, HOLIDAYS_CN, today);
-    const tag = missingTableTag(y, today, HOLIDAYS_CN, t);
+    const tag = missingTableTag(y, today, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER);
     assert.equal(c.text, text, `${y}-${m}`);
     assert.equal(tag?.kind ?? null, tagKind, `${y}-${m} tag`);
     assert.match(c.title, /只标出固定日期的法定假日；其余假日和补假、调休未标出$/, `${y}-${m} title`);
@@ -173,6 +174,6 @@ test('R49: 2025-01 / 2025-10 / 2036-01 / 2036-05 / 2036-07 — pill, title and t
   assert.match(ctx(2028, 1).title, /标出法定假日本身；补假、调休和延长的假日未标出$/);
   // 内置的 2027 不进这套措辞：依据国务院通知
   assert.match(ctx(2027, 2).title, /依据 2027 年国务院放假通知$/);
-  assert.equal(missingTableTag(2027, NOW, HOLIDAYS_CN, t), null);
-  assert.doesNotMatch(missingTableTag(2028, NOW, HOLIDAYS_CN, t).title + missingTableTag(2036, NOW, HOLIDAYS_CN, t).title + missingTableTag(2024, new Date(2024, 0, 1), HOLIDAYS_CN, t).title, /未公布|待公布/);
+  assert.equal(missingTableTag(2027, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER), null);
+  assert.doesNotMatch(missingTableTag(2028, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).title + missingTableTag(2036, NOW, HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).title + missingTableTag(2024, new Date(2024, 0, 1), HOLIDAYS_CN, t, CN_HOLIDAY_PROVIDER).title, /未公布|待公布/);
 });

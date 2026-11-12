@@ -1,171 +1,564 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULTS, loadState, saveState, exportState, importState } from '../src/settings.js';
+import {
+  STORAGE_KEY, STATE_VERSION, REGIONS, DEFAULT_REGION, DEFAULTS, SALARY_DEFAULTS,
+  defaultsFor, defaultState, loadState, saveState, exportState, importState,
+} from '../src/settings.js';
 
+const KEY = 'work-motivator-v1';
 const fakeStorage = (init = {}) => {
   const m = new Map(Object.entries(init));
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, String(v)), _m: m };
+  const writes = [];
+  return {
+    getItem: (k) => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => { writes.push(k); m.set(k, String(v)); },
+    _m: m,
+    _writes: writes,
+  };
 };
-const cur = () => ({ cfg: { ...DEFAULTS }, marks: {} });
+// 规范状态：cfg 不含 salary，月薪按地区放在 salaries，标记按地区放在 marksByRegion。
+const canonical = (over = {}) => ({
+  region: 'CN',
+  cfg: { ...DEFAULTS },
+  salaries: { TW: 40000, CN: 6800 },
+  marksByRegion: { TW: {}, CN: {} },
+  ...over,
+});
+const tw = () => defaultState();
+const legacyRaw = (obj) => JSON.stringify(obj);
 
-test('DEFAULTS pinned', () => {
-  assert.deepEqual(DEFAULTS, {
-    salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30',
-    lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true,
-  });
+test('version 4 契约：键名不变、地区列表、共享设置不含月薪', () => {
+  assert.equal(STORAGE_KEY, KEY);
+  assert.equal(STATE_VERSION, 4);
+  assert.deepEqual([...REGIONS], ['TW', 'CN']);
+  assert.equal(DEFAULT_REGION, 'TW');
+  assert.equal(Object.hasOwn(DEFAULTS, 'salary'), false, '共享设置不存月薪');
+  assert.deepEqual(Object.keys(DEFAULTS).sort(), [
+    'cheers', 'end', 'fontScale', 'lunchEnd', 'lunchOn', 'lunchStart', 'payday',
+    'showCardCheer', 'showCardDate', 'showCardMetrics', 'showCardPayday', 'showCardProgress',
+    'showLunar', 'start', 'theme', 'weekends',
+  ]);
+  // 画面设置默认中号 + 全部显示：与旧版画面一致，旧存档缺这些键时看得到的卡片不变。
+  assert.equal(DEFAULTS.fontScale, 'm');
+  for (const f of ['showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer']) {
+    assert.equal(DEFAULTS[f], true, `${f} defaults to visible`);
+  }
+  // 默认午休关闭（不预先把某个休息时段当成所有人的作息），但保留 12:00–13:00 的预填值。
+  assert.equal(DEFAULTS.lunchOn, false);
+  assert.equal(DEFAULTS.lunchStart, '12:00');
+  assert.equal(DEFAULTS.lunchEnd, '13:00');
+  assert.deepEqual({ ...SALARY_DEFAULTS }, { TW: 40000, CN: 5000 });
+  assert.deepEqual(defaultsFor('TW'), { ...DEFAULTS, salary: 40000 });
+  assert.deepEqual(defaultsFor('CN'), { ...DEFAULTS, salary: 5000 });
+  assert.deepEqual(defaultsFor('TW').salary, 40000, '示例月薪整数，无小数');
 });
 
-test('save -> load round trip', () => {
+test('没有储存 + 读取成功 = 新用户：TW、40000、午休关闭', () => {
   const st = fakeStorage();
-  const state = { cfg: { ...DEFAULTS, salary: 9000, cheer: '加油', payday: 10 }, marks: { '2026-05-04': 'rest' } };
+  const r = loadState(st);
+  assert.deepEqual(r, {
+    state: {
+      region: 'TW',
+      cfg: { ...DEFAULTS },
+      salaries: { TW: 40000, CN: 5000 },
+      marksByRegion: { TW: {}, CN: {} },
+    },
+    storageOk: true,
+    dropped: [],
+    corrupt: false,
+  });
+  assert.equal(r.state.cfg.salary, undefined, '活动月薪只在边界组装，不在 cfg 里重复');
+  assert.deepEqual(st._writes, [], '读取不写回');
+});
+
+test('new users get rainbow while existing themes and missing legacy theme are preserved', () => {
+  assert.equal(loadState(fakeStorage()).state.cfg.theme, 'rainbow');
+  for (const theme of ['green', 'blue', 'rainbow']) {
+    assert.equal(loadState(fakeStorage({ [KEY]: JSON.stringify({ version: 3, theme }) })).state.cfg.theme, theme);
+  }
+  assert.equal(loadState(fakeStorage({ [KEY]: JSON.stringify({ version: 1, salary: 6800 }) })).state.cfg.theme, 'green');
+});
+
+test('save -> load round trip（同一把键，v4 结构）', () => {
+  const st = fakeStorage();
+  const state = canonical({
+    region: 'TW',
+    cfg: { ...DEFAULTS, cheers: ['加油', '繼續努力'], payday: 10, weekends: true },
+    salaries: { TW: 12345.5, CN: 6800 },
+    marksByRegion: { TW: { '2026-05-04': 'rest' }, CN: { '2026-05-05': 'work' } },
+  });
   assert.deepEqual(saveState(st, state), { ok: true });
-  assert.ok(st._m.has('work-motivator-v1'));
+  assert.deepEqual(st._writes, [KEY]);
   assert.deepEqual(loadState(st), { state, storageOk: true, dropped: [], corrupt: false });
+  assert.equal(state.cfg.salary, undefined);
 });
 
-test('load: empty / garbage storage -> defaults, storageOk true', () => {
-  assert.deepEqual(loadState(fakeStorage()), { state: cur(), storageOk: true, dropped: [], corrupt: false });
-  assert.deepEqual(loadState(fakeStorage({ 'work-motivator-v1': 'not json' })), { state: cur(), storageOk: true, dropped: [], corrupt: true });
-  assert.equal(loadState(fakeStorage({ 'work-motivator-v1': '[1,2]' })).corrupt, true, 'not an object');
-  assert.equal(loadState(fakeStorage({ 'work-motivator-v1': 'null' })).corrupt, true);
+test('旧 v2 储存载入为 CN：月薪与标记归 CN，TW 独立取默认', () => {
+  const raw = legacyRaw({
+    version: 2, salary: 6800, start: '09:00', end: '18:00', lunchOn: true,
+    lunchStart: '11:30', lunchEnd: '13:00', cheer: '冲', marks: { '2026-05-04': 'rest' },
+  });
+  const st = fakeStorage({ [KEY]: raw });
+  const r = loadState(st);
+  assert.equal(r.corrupt, false);
+  assert.equal(r.storageOk, true);
+  assert.deepEqual(r.dropped, []);
+  assert.equal(r.state.region, 'CN');
+  assert.equal(r.state.salaries.CN, 6800);
+  assert.equal(r.state.salaries.TW, 40000, 'TW 用示例默认值初始化');
+  assert.deepEqual(r.state.marksByRegion.CN, { '2026-05-04': 'rest' });
+  assert.deepEqual(r.state.marksByRegion.TW, {});
+  assert.deepEqual(r.state.cfg, {
+    ...DEFAULTS, theme: 'green', start: '09:00', end: '18:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', cheers: ['冲'],
+  }, '旧午休设置原样保留，不被新默认值改写');
+  assert.equal(st._m.get(KEY), raw, '只读不迁移：原始内容不变');
+  assert.deepEqual(st._writes, []);
 });
 
-test('load: invalid fields in storage dropped via same rules', () => {
-  const raw = JSON.stringify({ version: 1, salary: 'abc', start: '25:99', cheer: 'hi', marks: { '2026-02-30': 'work', '2026-05-04': 'rest' } });
-  const { state, storageOk, dropped, corrupt } = loadState(fakeStorage({ 'work-motivator-v1': raw }));
-  assert.equal(storageOk, true);
-  assert.equal(corrupt, false);
-  assert.deepEqual(dropped.map((d) => d.field).sort(), ['marks.2026-02-30', 'salary', 'start']);
-  assert.ok(dropped.every((d) => typeof d.reason === 'string' && d.reason.length > 0));
-  assert.equal(state.cfg.salary, 6800);
-  assert.equal(state.cfg.start, '08:30');
-  assert.equal(state.cfg.cheer, 'hi');
-  assert.deepEqual(state.marks, { '2026-05-04': 'rest' });
+test('旧 v1 / 无版本储存同样载入为 CN', () => {
+  for (const raw of ['{"version":1,"salary":9000}', '{"salary":9000,"marks":{"2026-05-04":"work"}}']) {
+    const r = loadState(fakeStorage({ [KEY]: raw }));
+    assert.equal(r.state.region, 'CN', raw);
+    assert.equal(r.state.salaries.CN, 9000);
+    assert.equal(r.state.cfg.start, '08:30');
+    assert.equal(r.corrupt, false);
+  }
 });
 
-test('load: one bad field is reported in dropped, every other field still loads', () => {
-  const raw = JSON.stringify({ version: 1, salary: 9000, start: '09:00', end: '18:00', payday: 99, cheer: '冲' });
-  const r = loadState(fakeStorage({ 'work-motivator-v1': raw }));
+test('load: 储存回传非字串（实作异常）-> 不算新用户，按损坏处理且不写回', () => {
+  for (const raw of [undefined, 0, false, {}]) {
+    const st = { getItem: () => raw, setItem() { throw new Error('should not write'); } };
+    const r = loadState(st);
+    assert.equal(r.storageOk, false, String(raw));
+    assert.equal(r.corrupt, true, String(raw));
+    assert.equal(r.state.region, 'CN');
+    assert.equal(r.state.salaries.CN, 5000);
+  }
+});
+
+test('load: 损坏内容 -> corrupt + CN 保守回退，不覆写原始数据', () => {
+  for (const raw of ['not json', '[1,2]', 'null', '3', '']) {
+    const st = fakeStorage({ [KEY]: raw });
+    const r = loadState(st);
+    assert.equal(r.corrupt, true, raw);
+    assert.equal(r.storageOk, true);
+    assert.equal(r.state.region, 'CN');
+    assert.equal(r.state.salaries.CN, 5000, '损坏时按 CN 示例默认，不猜用户资料');
+    assert.deepEqual(r.state.marksByRegion, { TW: {}, CN: {} });
+    assert.equal(st._m.get(KEY), raw);
+    assert.deepEqual(st._writes, []);
+  }
+});
+
+test('load: 无法识别的未来版本整份拒绝（保守回退，不当旧版读）', () => {
+  for (const raw of ['{"version":5,"salary":9000}', '{"version":"3","salary":9000}', '{"version":null}', '{"version":1.5}']) {
+    const st = fakeStorage({ [KEY]: raw });
+    const r = loadState(st);
+    assert.equal(r.corrupt, true, raw);
+    assert.equal(r.state.region, 'CN');
+    assert.equal(r.state.salaries.CN, 5000, raw);
+    assert.equal(r.state.cfg.start, '08:30');
+    assert.equal(st._m.get(KEY), raw);
+    assert.deepEqual(st._writes, []);
+  }
+});
+
+test('load: 未知 region / 非法子项逐栏丢弃，不污染其他地区', () => {
+  const raw = legacyRaw({
+    version: 3,
+    region: 'XX',
+    salaries: { TW: 'abc', CN: 9000, XX: 1 },
+    marksByRegion: { TW: { '2026-02-30': 'work', '2026-05-04': 'rest' }, CN: [1], XX: {} },
+    start: '25:99',
+  });
+  const r = loadState(fakeStorage({ [KEY]: raw }));
+  assert.equal(r.corrupt, false);
+  assert.equal(r.state.region, 'CN', '无效 region 保留保守回退');
+  assert.equal(r.state.salaries.TW, 40000);
+  assert.equal(r.state.salaries.CN, 9000);
+  assert.deepEqual(r.state.marksByRegion.TW, { '2026-05-04': 'rest' });
+  assert.deepEqual(r.state.marksByRegion.CN, {});
+  assert.deepEqual(r.dropped.map((d) => d.field).sort(), [
+    'marksByRegion.CN', 'marksByRegion.TW.2026-02-30', 'marksByRegion.XX', 'region', 'salaries.TW', 'salaries.XX', 'start',
+  ]);
+  assert.ok(r.dropped.every((d) => typeof d.reason.code === 'string' && d.reason.code.length > 0));
+});
+
+test('load: 单栏位坏掉时其他栏位照常读出', () => {
+  const raw = legacyRaw({ version: 2, salary: 9000, start: '09:00', end: '18:00', payday: 99, cheer: '冲' });
+  const r = loadState(fakeStorage({ [KEY]: raw }));
   assert.deepEqual(r.dropped.map((d) => d.field), ['payday']);
   assert.equal(r.corrupt, false);
-  assert.deepEqual(r.state.cfg, { ...DEFAULTS, salary: 9000, start: '09:00', end: '18:00', cheer: '冲' });
+  assert.equal(r.state.salaries.CN, 9000);
+  assert.deepEqual(r.state.cfg, { ...DEFAULTS, theme: 'green', start: '09:00', end: '18:00', cheers: ['冲'] });
 });
 
-test('getItem throws -> storageOk false + DEFAULTS', () => {
-  const st = { getItem() { throw new Error('denied'); }, setItem() {} };
-  assert.deepEqual(loadState(st), { state: cur(), storageOk: false, dropped: [], corrupt: false });
+test('getItem 抛错 -> storageOk false + CN 保守回退（不算新用户），不写回', () => {
+  const st = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('should not write'); } };
+  const r = loadState(st);
+  assert.deepEqual(r, {
+    state: canonical({ cfg: { ...DEFAULTS }, salaries: { TW: 40000, CN: 5000 } }),
+    storageOk: false,
+    dropped: [],
+    corrupt: false,
+  });
+  assert.equal(r.state.region, 'CN');
 });
 
-test('setItem throws -> {ok:false}', () => {
+test('setItem 抛错 -> {ok:false}', () => {
   const st = { getItem: () => null, setItem() { throw new Error('quota'); } };
-  assert.deepEqual(saveState(st, cur()), { ok: false });
+  assert.deepEqual(saveState(st, tw()), { ok: false });
+  assert.deepEqual(saveState(st, canonical()), { ok: false });
 });
 
-test('exportState contains version 2, cfg fields, marks', () => {
-  const o = JSON.parse(exportState({ cfg: { ...DEFAULTS }, marks: { '2026-05-04': 'work' } }));
-  assert.equal(o.version, 2);
-  assert.equal(o.salary, 6800);
-  assert.deepEqual(o.marks, { '2026-05-04': 'work' });
+test('exportState: v4 结构，两地月薪与标记都在，没有活动月薪/标记的副本', () => {
+  const o = JSON.parse(exportState(canonical({
+    region: 'TW',
+    salaries: { TW: 8888.8888, CN: 6800 },
+    marksByRegion: { TW: { '2026-05-04': 'work' }, CN: { '2026-05-05': 'rest' } },
+  })));
+  assert.equal(o.version, STATE_VERSION);
+  assert.equal(o.region, 'TW');
+  assert.equal(o.salary, undefined, '不再有顶层 salary');
+  assert.equal(o.marks, undefined, '不再有顶层 marks');
+  assert.deepEqual(o.salaries, { TW: 8888.8888, CN: 6800 }, '不四舍五入使用者输入');
+  assert.deepEqual(o.marksByRegion, { TW: { '2026-05-04': 'work' }, CN: { '2026-05-05': 'rest' } });
+  for (const k of Object.keys(DEFAULTS)) assert.ok(k in o, `共享设置 ${k} 在备份里`);
+  // 已经按旧形状拼错（cfg 里带 salary）也不会把活动月薪写进备份
+  const stray = JSON.parse(exportState({ ...canonical(), cfg: { ...DEFAULTS, salary: 12 } }));
+  assert.equal(stray.salary, undefined);
+  assert.equal(stray.salaries.TW, 40000);
 });
 
-test('export -> import round trip', () => {
-  const state = { cfg: { ...DEFAULTS, salary: 12345.5, weekends: true, payday: 31 }, marks: { '2026-05-04': 'paidLeave' } };
-  const r = importState(exportState(state), cur());
-  assert.deepEqual(r, { state, dropped: [], unknown: [] });
+test('exportState: 不合法的月薪改写成该地区示例默认，产物一定读得回来', () => {
+  for (const bad of [Number.NaN, Infinity, 0, -1, '7000', null, undefined]) {
+    const o = JSON.parse(exportState({
+      ...canonical(),
+      salaries: { TW: bad, CN: 6800 },
+    }));
+    assert.equal(o.salaries.TW, SALARY_DEFAULTS.TW, String(bad));
+    assert.equal(o.salaries.CN, 6800);
+    const back = loadState(fakeStorage({ [KEY]: exportState({ ...canonical(), salaries: { TW: bad, CN: 6800 } }) }));
+    assert.equal(back.corrupt, false);
+    assert.equal(back.dropped.length, 0);
+    assert.equal(back.state.salaries.TW, SALARY_DEFAULTS.TW);
+  }
 });
 
-test('lunar preference survives backups and older backups keep the current setting', () => {
-  const current = { cfg: { ...DEFAULTS, showLunar: false }, marks: {} };
-  const backup = JSON.parse(exportState(current));
-  assert.equal(backup.version, 2);
-  assert.equal(backup.showLunar, false);
-  assert.equal(importState(JSON.stringify(backup), cur()).state.cfg.showLunar, false);
-  assert.equal(importState('{"version":1,"salary":9000}', current).state.cfg.showLunar, false);
-  const invalid = importState('{"showLunar":"false"}', current);
-  assert.equal(invalid.state.cfg.showLunar, false);
-  assert.equal(invalid.dropped[0].field, 'showLunar');
-  const old = loadState(fakeStorage({ 'work-motivator-v1': '{"version":1,"salary":9000}' }));
-  assert.equal(old.state.cfg.showLunar, true);
+test('exportState: 坏掉的共享设置与标记写回默认/剔除，产物零丢弃地读得回来', () => {
+  const messy = {
+    ...canonical(),
+    cfg: { ...DEFAULTS, theme: 'purple', payday: 40, lunchOn: 'yes', cheers: ['x'.repeat(41)], start: '25:00' },
+    marksByRegion: {
+      TW: { '2026-02-30': 'work', '2026-05-04': 'sick', '2026-05-05': 'rest' },
+      CN: 'not-an-object',
+    },
+  };
+  const raw = exportState(messy);
+  const o = JSON.parse(raw);
+  assert.equal(o.theme, DEFAULTS.theme);
+  assert.equal(o.payday, DEFAULTS.payday);
+  assert.equal(o.lunchOn, DEFAULTS.lunchOn);
+  assert.deepEqual(o.cheers, DEFAULTS.cheers);
+  assert.equal(o.start, DEFAULTS.start);
+  assert.deepEqual(o.marksByRegion, { TW: { '2026-05-05': 'rest' }, CN: {} });
+  const back = loadState(fakeStorage({ [KEY]: raw }));
+  assert.equal(back.corrupt, false);
+  assert.deepEqual(back.dropped, []);
+  assert.deepEqual(back.state.marksByRegion, { TW: { '2026-05-05': 'rest' }, CN: {} });
 });
 
-test('import: non-JSON / array / null / scalar -> error', () => {
-  for (const t of ['not json', '[]', 'null', '3', '"x"', 'true']) {
-    const r = importState(t, cur());
-    assert.equal(typeof r.error, 'string', t);
+test('exportState: 时段与午休合起来不成立时逐级让步，产物零丢弃地读得回来', () => {
+  // 午休落在上下班时间之外：先关午休，上下班时间不动。
+  const lunchOutside = {
+    ...canonical(),
+    cfg: { ...DEFAULTS, lunchOn: true, lunchStart: '20:00', lunchEnd: '21:00' },
+  };
+  const a = JSON.parse(exportState(lunchOutside));
+  assert.equal(a.start, DEFAULTS.start);
+  assert.equal(a.end, DEFAULTS.end);
+  assert.equal(a.lunchOn, false);
+  assert.equal(loadState(fakeStorage({ [KEY]: exportState(lunchOutside) })).dropped.length, 0);
+
+  // 午休顺序倒挂但开关本来就是关的：时段仍然原样保留。
+  const offReversed = {
+    ...canonical(),
+    cfg: { ...DEFAULTS, lunchOn: false, lunchStart: '13:00', lunchEnd: '12:00' },
+  };
+  const b = JSON.parse(exportState(offReversed));
+  assert.equal(b.lunchOn, false);
+  assert.equal(b.lunchStart, '13:00');
+  assert.equal(b.lunchEnd, '12:00');
+  assert.deepEqual(loadState(fakeStorage({ [KEY]: exportState(offReversed) })).dropped, []);
+
+  // 上下班时间本身倒挂：整组时段退回默认。
+  const badShift = { ...canonical(), cfg: { ...DEFAULTS, start: '18:00', end: '09:00' } };
+  const c = JSON.parse(exportState(badShift));
+  assert.equal(c.start, DEFAULTS.start);
+  assert.equal(c.end, DEFAULTS.end);
+  assert.deepEqual(loadState(fakeStorage({ [KEY]: exportState(badShift) })).dropped, []);
+});
+
+test('load: 两套键按版本分流，过时键回报未知而不套用', () => {
+  // v3 里出现顶层 salary / marks：属于过时键，不并入任何地区。
+  const v3 = loadState(fakeStorage({ [KEY]: legacyRaw({ version: 3, salary: 9000, marks: { '2026-05-04': 'rest' } }) }));
+  assert.equal(v3.corrupt, false);
+  assert.deepEqual(v3.dropped, []);
+  assert.deepEqual(v3.state.salaries, { TW: 40000, CN: 5000 });
+  assert.deepEqual(v3.state.marksByRegion, { TW: {}, CN: {} });
+  // 旧版里出现地区键：没有地区概念，不能当成 CN 或 TW 的资料。
+  const old = loadState(fakeStorage({ [KEY]: legacyRaw({ version: 2, salaries: { CN: 9000 }, marksByRegion: { CN: { '2026-05-04': 'rest' } } }) }));
+  assert.equal(old.corrupt, false);
+  assert.deepEqual(old.dropped, []);
+  assert.deepEqual(old.state.salaries, { TW: 40000, CN: 5000 });
+  assert.deepEqual(old.state.marksByRegion, { TW: {}, CN: {} });
+  assert.equal(old.state.region, 'CN', '旧版无地区信息，仍按 CN 保守回退');
+});
+
+test('export -> import round trip：两地资料原样回来', () => {
+  const state = canonical({
+    region: 'TW',
+    cfg: { ...DEFAULTS, weekends: true, payday: 31, showLunar: false, theme: 'blue' },
+    salaries: { TW: 12345.5, CN: 6800 },
+    marksByRegion: { TW: { '2026-05-04': 'paidLeave' }, CN: { '2026-05-05': 'unpaidLeave' } },
+  });
+  const r = importState(exportState(state), tw());
+  assert.deepEqual(r.state, state);
+  assert.deepEqual(r.dropped, []);
+  assert.deepEqual(r.unknown, []);
+  assert.equal(r.applied.length, 1 + 2 + 1 + 1 + Object.keys(DEFAULTS).length, 'region + 两地月薪 + 两笔标记 + 共享设置');
+});
+
+test('import v3：只给部分地区时其余保留现值', () => {
+  const current = canonical({ region: 'CN', salaries: { TW: 40000, CN: 6800 } });
+  const r = importState('{"version":3,"salaries":{"CN":7500},"marksByRegion":{"TW":{"2026-05-04":"rest"}}}', current);
+  assert.equal(r.state.salaries.CN, 7500);
+  assert.equal(r.state.salaries.TW, 40000);
+  assert.deepEqual(r.state.marksByRegion.TW, { '2026-05-04': 'rest' });
+  assert.deepEqual(r.state.marksByRegion.CN, {});
+  assert.equal(r.state.region, 'CN', '备份没写 region 就不切地区');
+  assert.deepEqual(r.applied.sort(), ['marksByRegion.TW.2026-05-04', 'salaries.CN']);
+});
+
+test('import v3：region 有效即切换，两地资料各自保留', () => {
+  const current = canonical({ region: 'CN', salaries: { TW: 40000, CN: 6800 } });
+  const r = importState('{"version":3,"region":"TW","salaries":{"TW":52000}}', current);
+  assert.equal(r.state.region, 'TW');
+  assert.equal(r.state.salaries.TW, 52000);
+  assert.equal(r.state.salaries.CN, 6800);
+  assert.deepEqual(r.applied.sort(), ['region', 'salaries.TW']);
+  const bad = importState('{"version":3,"region":"JP"}', current);
+  assert.equal(bad.state.region, 'CN');
+  assert.deepEqual(bad.dropped.map((d) => d.field), ['region']);
+});
+
+test('旧备份在 TW 汇入：salary / marks 一律写进 CN，当前地区不变', () => {
+  const current = canonical({ region: 'TW', salaries: { TW: 40000, CN: 5000 } });
+  const r = importState('{"version":2,"salary":6800,"marks":{"2026-05-04":"rest"},"cheer":"冲"}', current);
+  assert.equal(r.state.region, 'TW', '旧备份不切换地区');
+  assert.equal(r.state.salaries.CN, 6800);
+  assert.equal(r.state.salaries.TW, 40000);
+  assert.deepEqual(r.state.marksByRegion.CN, { '2026-05-04': 'rest' });
+  assert.deepEqual(r.state.marksByRegion.TW, {});
+  assert.deepEqual(r.state.cfg.cheers, ['冲']);
+  assert.deepEqual(r.applied.sort(), ['cheers', 'marksByRegion.CN.2026-05-04', 'salaries.CN']);
+});
+
+test('import v3 里混入旧 salary / marks 属过时键：回报未知，不并入任何地区', () => {
+  const current = canonical({ region: 'CN' });
+  const r = importState('{"version":3,"salary":7000,"marks":{"2026-05-05":"work"}}', current);
+  assert.deepEqual(r.unknown.sort(), ['marks', 'salary']);
+  assert.deepEqual(r.dropped, []);
+  assert.deepEqual(r.applied, []);
+  assert.equal(r.state.salaries.CN, current.salaries.CN);
+  assert.deepEqual(r.state.marksByRegion, current.marksByRegion);
+  assert.equal(r.state.cfg.salary, undefined);
+});
+
+test('import: 非法地区子项互相隔离，只丢该栏并报告原因', () => {
+  const current = canonical();
+  const raw = JSON.stringify({
+    version: 3,
+    salaries: { TW: 'abc', CN: 8000, XX: 1 },
+    marksByRegion: { TW: [1], CN: { '2026-02-30': 'work', 'x': 'work', '2026-05-05': 'bogus', '2026-05-06': 'unpaidLeave' } },
+  });
+  const r = importState(raw, current);
+  assert.equal(r.state.salaries.TW, 40000);
+  assert.equal(r.state.salaries.CN, 8000);
+  assert.deepEqual(r.state.marksByRegion.TW, {});
+  assert.deepEqual(r.state.marksByRegion.CN, { '2026-05-06': 'unpaidLeave' });
+  assert.deepEqual(r.dropped.map((d) => d.field).sort(), [
+    'marksByRegion.CN.2026-02-30', 'marksByRegion.CN.2026-05-05', 'marksByRegion.CN.x',
+    'marksByRegion.TW', 'salaries.TW', 'salaries.XX',
+  ]);
+  assert.deepEqual(r.applied, ['salaries.CN', 'marksByRegion.CN.2026-05-06']);
+});
+
+test('import: 容器不是物件时只丢容器的该地区，保留现值', () => {
+  const current = canonical({ marksByRegion: { TW: { '2026-05-04': 'rest' }, CN: {} } });
+  const r = importState('{"version":3,"salaries":[],"marksByRegion":[1]}', current);
+  assert.deepEqual(r.state.salaries, current.salaries);
+  assert.deepEqual(r.state.marksByRegion, current.marksByRegion);
+  assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['marksByRegion', 'salaries']);
+  const legacy = importState('{"marks":[1]}', current);
+  assert.deepEqual(legacy.dropped.map((d) => d.field), ['marksByRegion.CN']);
+  assert.deepEqual(legacy.state.marksByRegion, current.marksByRegion);
+});
+
+test('import: 无法识别的未来版本整份拒绝', () => {
+  for (const raw of ['{"version":5,"salary":9000}', '{"version":"3","region":"TW"}', '{"version":null}']) {
+    const r = importState(raw, tw());
+    assert.equal(typeof r.error.code, 'string', raw);
+    assert.equal(r.error.code, 'futureVersion', raw);
+    assert.equal(r.state, undefined, raw);
+    assert.equal(r.dropped, undefined, raw);
+  }
+});
+
+test('import: 非 JSON / 阵列 / null / 纯量 -> error（稳定 code，不带译文）', () => {
+  const cases = [['not json', 'notJson'], ['[]', 'notObject'], ['null', 'notObject'], ['3', 'notObject'], ['"x"', 'notObject'], ['true', 'notObject']];
+  for (const [text, code] of cases) {
+    const r = importState(text, tw());
+    assert.equal(r.error.code, code, text);
+    assert.equal(typeof r.error.reason, 'undefined', `${text}: 不得回传已翻译的字串`);
     assert.equal(r.state, undefined);
   }
 });
 
-test('import: salary "abc" dropped, old value kept', () => {
-  const c = { cfg: { ...DEFAULTS, salary: 7000 }, marks: {} };
-  const r = importState('{"salary":"abc"}', c);
-  assert.equal(r.state.cfg.salary, 7000);
-  assert.equal(r.dropped.length, 1);
-  assert.equal(r.dropped[0].field, 'salary');
-  assert.equal(typeof r.dropped[0].reason, 'string');
+test('import: 非法的两地月薪逐栏丢弃，旧值保留', () => {
+  const current = canonical({ salaries: { TW: 41000, CN: 7000 } });
+  const r = importState('{"version":3,"salaries":{"TW":"abc","CN":0}}', current);
+  assert.deepEqual(r.state.salaries, { TW: 41000, CN: 7000 });
+  assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['salaries.CN', 'salaries.TW']);
+  assert.deepEqual(r.applied, []);
 });
 
-test('import: unknown field reported, not applied', () => {
-  const r = importState('{"foo":1,"salary":7000}', cur());
+test('import: 未知栏位回报，不套用', () => {
+  const r = importState('{"version":3,"foo":1,"salaries":{"CN":7000}}', tw());
   assert.deepEqual(r.unknown, ['foo']);
   assert.equal(r.state.cfg.foo, undefined);
-  assert.equal(r.state.cfg.salary, 7000);
+  assert.equal(r.state.salaries.CN, 7000);
+  // 旧版备份里的地区键同属无法识别的过时键：不套用、不污染其他地区。
+  const legacy = importState('{"salaries":{"TW":1},"marksByRegion":{"TW":{}}}', tw());
+  assert.deepEqual(legacy.unknown.sort(), ['marksByRegion', 'salaries']);
+  assert.deepEqual(legacy.state, tw());
 });
 
-test('import: start "25:99" dropped', () => {
-  const r = importState('{"start":"25:99"}', cur());
-  assert.equal(r.state.cfg.start, '08:30');
-  assert.equal(r.dropped[0].field, 'start');
+test('import: 严格校验，绝不转型（含两地结构与开关）', () => {
+  const bad = {
+    version: 3,
+    start: '8:30', end: 1700, lunchOn: 'true', weekends: 1, payday: 0, cheer: 5,
+    region: 1, salaries: { TW: '7000' }, marksByRegion: { CN: 'x' },
+  };
+  const r = importState(JSON.stringify(bad), tw());
+  assert.deepEqual(r.state, tw());
+  assert.deepEqual(r.dropped.map((d) => d.field).sort(), [
+    'cheer', 'end', 'lunchOn', 'marksByRegion.CN', 'payday', 'region', 'salaries.TW', 'start', 'weekends',
+  ]);
+  assert.equal(importState('{"payday":32}', tw()).dropped[0].field, 'payday');
+  assert.equal(importState('{"payday":1.5}', tw()).dropped[0].field, 'payday');
+  assert.equal(importState('{"payday":null}', canonical({ cfg: { ...DEFAULTS, payday: 5 } })).state.cfg.payday, null);
+  assert.equal(importState('{"payday":31}', tw()).state.cfg.payday, 31);
+  assert.deepEqual(importState('{"cheer":"<script>x</script>"}', tw()).state.cfg.cheers, ['<script>x</script>']);
 });
 
-test('import: field rules are strict (no coercion)', () => {
-  const bad = { salary: '7000', lunchOn: 'true', weekends: 1, payday: 0, start: '8:30', end: 1700, cheer: 5 };
-  const r = importState(JSON.stringify(bad), cur());
-  assert.deepEqual(r.state, cur());
-  assert.deepEqual(r.dropped.map((d) => d.field).sort(), Object.keys(bad).sort());
-  assert.equal(importState('{"payday":32}', cur()).dropped[0].field, 'payday');
-  assert.equal(importState('{"payday":1.5}', cur()).dropped[0].field, 'payday');
-  assert.equal(importState('{"salary":0}', cur()).dropped[0].field, 'salary');
-  assert.equal(importState('{"salary":-1}', cur()).dropped[0].field, 'salary');
-  assert.equal(importState('{"payday":null}', { cfg: { ...DEFAULTS, payday: 5 }, marks: {} }).state.cfg.payday, null);
-  assert.equal(importState('{"payday":31}', cur()).state.cfg.payday, 31);
-});
-
-test('import: one bad marks key drops only that entry', () => {
-  const t = JSON.stringify({ marks: { '2026-05-04': 'rest', '2026-02-30': 'work', 'x': 'work', '2026-05-05': 'bogus', '2026-05-06': 'unpaidLeave' } });
-  const r = importState(t, cur());
-  assert.deepEqual(r.state.marks, { '2026-05-04': 'rest', '2026-05-06': 'unpaidLeave' });
-  assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['marks.2026-02-30', 'marks.2026-05-05', 'marks.x']);
-});
-
-test('import: marks not an object -> field dropped, marks kept', () => {
-  const c = { cfg: { ...DEFAULTS }, marks: { '2026-05-04': 'rest' } };
-  const r = importState('{"marks":[1]}', c);
-  assert.deepEqual(r.state.marks, c.marks);
-  assert.equal(r.dropped[0].field, 'marks');
-});
-
-test('import: cheer > 40 chars dropped, exactly 40 kept, HTML kept verbatim', () => {
-  const r = importState(JSON.stringify({ cheer: 'x'.repeat(41) }), cur());
-  assert.equal(r.state.cfg.cheer, '');
+test('import: 鼓励语长度上限', () => {
+  const r = importState(JSON.stringify({ cheer: 'x'.repeat(41) }), tw());
+  assert.deepEqual(r.state.cfg.cheers, ['']);
   assert.equal(r.dropped[0].field, 'cheer');
-  assert.equal(importState(JSON.stringify({ cheer: 'x'.repeat(40) }), cur()).state.cfg.cheer.length, 40);
-  assert.equal(importState('{"cheer":"<script>x</script>"}', cur()).state.cfg.cheer, '<script>x</script>');
+  assert.equal(importState(JSON.stringify({ cheer: 'x'.repeat(40) }), tw()).state.cfg.cheers[0].length, 40);
 });
 
-test('import (R7): jointly invalid times dropped together, reported with reason', () => {
-  const r = importState('{"start":"18:00","end":"19:00"}', cur()); // lunch 11:30-13:00 now outside
+test('multi-cheer migration, validation and backup preserve all entries', () => {
+  const legacy = loadState(fakeStorage({ [KEY]: JSON.stringify({ version: 3, region: 'TW', cheer: '原句' }) }));
+  assert.deepEqual(legacy.state.cfg.cheers, ['原句']);
+  const current = defaultState();
+  const r = importState(JSON.stringify({ version: 4, cheers: ['第一句', '', '第二句'] }), current);
+  assert.deepEqual(r.state.cfg.cheers, ['第一句', '', '第二句']);
+  assert.deepEqual(importState(exportState(r.state), current).state.cfg.cheers, ['第一句', '', '第二句']);
+  for (const invalid of [[], [4], ['ok', 'x'.repeat(41)]]) {
+    const bad = importState(JSON.stringify({ version: 4, cheers: invalid }), r.state);
+    assert.deepEqual(bad.state.cfg.cheers, r.state.cfg.cheers);
+    assert.equal(bad.dropped[0].field, 'cheers');
+  }
+});
+
+test('import: 农历与主题各自保留现值，非法值只丢该栏', () => {
+  const current = canonical({ cfg: { ...DEFAULTS, showLunar: false, theme: 'blue' } });
+  assert.equal(importState(exportState(current), tw()).state.cfg.showLunar, false);
+  assert.equal(importState(exportState(current), tw()).state.cfg.theme, 'blue');
+  assert.equal(importState('{"version":1,"salary":9000}', current).state.cfg.showLunar, false);
+  const invalid = importState('{"showLunar":"false","theme":"other"}', current);
+  assert.equal(invalid.state.cfg.showLunar, false);
+  assert.equal(invalid.state.cfg.theme, 'blue');
+  assert.deepEqual(invalid.dropped.map((d) => d.field).sort(), ['showLunar', 'theme']);
+});
+
+test('curated themes survive storage and backup round trips', () => {
+  for (const theme of ['teal', 'rose', 'slate', 'rainbow']) {
+    const state = canonical({ cfg: { ...DEFAULTS, theme } });
+    const storage = fakeStorage();
+    assert.equal(saveState(storage, state).ok, true);
+    assert.equal(loadState(storage).state.cfg.theme, theme);
+    const backup = exportState(state);
+    assert.equal(importState(backup, tw()).state.cfg.theme, theme);
+  }
+});
+
+
+test('import (R7): 时间合起来不成立时一并丢弃，用旧午休 fixture', () => {
+  const current = canonical({
+    cfg: { ...DEFAULTS, lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00' },
+  });
+  const r = importState('{"start":"18:00","end":"19:00"}', current); // 旧午休 11:30–13:00 落在这段时间之外
   assert.equal(r.state.cfg.start, '08:30');
   assert.equal(r.state.cfg.end, '17:00');
   assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['end', 'start']);
-  assert.ok(r.dropped.every((d) => typeof d.reason === 'string' && d.reason.length > 0));
-  const r2 = importState('{"start":"17:00","end":"09:00"}', cur());
-  assert.deepEqual(r2.state.cfg, DEFAULTS);
+  assert.ok(r.dropped.every((d) => typeof d.reason.code === 'string' && d.reason.code.length > 0));
+  assert.deepEqual(r.applied, []);
+  const r2 = importState('{"start":"17:00","end":"09:00"}', current);
+  assert.deepEqual(r2.state, current);
   assert.equal(r2.dropped.length, 2);
 });
 
-test('import does not mutate current', () => {
-  const c = cur();
+test('import (R7): 时段与午休合起来不成立时回退时段，只留合法的开关', () => {
+  const current = canonical({ cfg: { ...DEFAULTS, start: '08:30', end: '17:00', lunchOn: false, lunchStart: '12:00', lunchEnd: '13:00' } });
+  const r = importState('{"start":"14:00","end":"18:00","lunchOn":true,"lunchStart":"08:00","lunchEnd":"09:00"}', current);
+  assert.deepEqual(r.state.cfg, { ...current.cfg, lunchOn: true });
+  assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['end', 'lunchEnd', 'lunchStart', 'start']);
+  assert.deepEqual(r.applied, ['lunchOn'], '开关本身合法，保留并计入已导入');
+});
+
+test('import (R7): 时段与时区内的午休一起合法时全部套用', () => {
+  const current = canonical({ cfg: { ...DEFAULTS, lunchOn: false } });
+  const r = importState('{"start":"09:00","end":"18:00","lunchOn":true,"lunchStart":"12:00","lunchEnd":"13:00"}', current);
+  assert.equal(r.state.cfg.start, '09:00');
+  assert.equal(r.state.cfg.end, '18:00');
+  assert.equal(r.state.cfg.lunchOn, true);
+  assert.deepEqual(r.dropped, []);
+  assert.deepEqual(r.applied.sort(), ['end', 'lunchEnd', 'lunchOn', 'lunchStart', 'start']);
+});
+
+test('import 不修改 current（含两地结构）', () => {
+  const c = canonical({
+    region: 'TW',
+    cfg: { ...DEFAULTS, cheers: ['冲'] },
+    salaries: { TW: 9000, CN: 6800 },
+    marksByRegion: { TW: { '2026-05-04': 'rest' }, CN: {} },
+  });
+  const snapshot = JSON.parse(JSON.stringify(c));
+  importState('{"version":3,"region":"CN","salaries":{"TW":1,"CN":2},"marksByRegion":{"CN":{"2026-05-05":"work"}},"cheer":"改"}', c);
+  assert.deepEqual(c, snapshot);
   importState('{"salary":1,"marks":{"2026-05-04":"rest"}}', c);
-  assert.deepEqual(c, cur());
+  assert.deepEqual(c, snapshot);
+});
+
+test('储存失败 / 内容损坏都不覆写原始内容', () => {
+  const raw = legacyRaw({ version: 2, salary: 6800, marks: { '2026-05-04': 'rest' } });
+  const st = fakeStorage({ [KEY]: raw });
+  st.setItem = () => { throw new Error('quota'); };
+  loadState(st);
+  assert.equal(st._m.get(KEY), raw);
+  const denied = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
+  assert.equal(loadState(denied).storageOk, false);
 });

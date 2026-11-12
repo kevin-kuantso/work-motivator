@@ -9,6 +9,19 @@ import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harnes
 const T1412 = '2026-11-03T14:12:00+08:00';
 const T1830 = '2026-11-03T18:30:00+08:00';
 
+// 本文件断言的是中国地区文案与金额：明确写入旧版（v1，无地区）设置，让应用走「旧数据一律归中国」的迁移路径，
+// 不依赖应用当前的新用户默认地区（台湾）。旧设置里午休 11:30–13:00 与「开启午休」是一组合法值。
+const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
+const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
+// 与既有的 init 组在一起：字符串相加、函数转成字符串、{ content } 加前缀、null / undefined 只留种子、{ path } 原样。
+const seeded = (init) => {
+  if (init == null) return CN_SEED;
+  if (typeof init === 'string') return `${CN_SEED}\n${init}`;
+  if (typeof init === 'function') return `${CN_SEED}\n(${init.toString()})();`;
+  if (typeof init.content === 'string') return { ...init, content: `${CN_SEED}\n${init.content}` };
+  return init;
+};
+
 const stub = (opts = {}) => ({ content: `(${pipStub})(${JSON.stringify(opts)})` });
 const unsupported = {
   content: 'delete Window.prototype.documentPictureInPicture; delete window.documentPictureInPicture;',
@@ -26,7 +39,7 @@ after(async () => {
 });
 
 async function withPage(iso, fn, opts) {
-  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
+  const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, { ...opts, init: seeded(opts?.init) });
   try {
     // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
     assert.deepEqual(autoUrls, expectedAutoUrls(iso), 'auto-check requests on load');
@@ -44,13 +57,32 @@ const txt = (loc) => loc.first().textContent().then((s) => (s ?? '').trim());
 const floatBtn = (page) => page.locator('#btn-float');
 const placeholder = (page) => page.getByRole('button', { name: '已悬浮 · 点此收回' });
 
+test('lunch card follows theme changes while floating', () =>
+  withPage('2026-11-03T12:15:00+08:00', async (page) => {
+    await floatBtn(page).click();
+    await pip(page).locator('#status-card').waitFor();
+    assert.equal(await txt(pip(page).locator('.badge-text')), '午休中');
+    await page.getByRole('tab', { name: '基本设置' }).click();
+    const colors = [];
+    for (const theme of ['green', 'blue', 'orange', 'teal', 'rose', 'slate', 'rainbow']) {
+      await page.locator('#f-theme').selectOption(theme);
+      colors.push(await pip(page).locator('#status-card').evaluate((card) => {
+        card.ownerDocument.getAnimations().filter((a) => a instanceof card.ownerDocument.defaultView.CSSTransition).forEach((a) => a.finish());
+        return ['.card-badge', '.card-band', '.bar-fill'].map((s) => getComputedStyle(card.querySelector(s)).backgroundColor);
+      }));
+    }
+    for (let i = 0; i < 3; i++) assert.equal(new Set(colors.map((c) => c[i])).size, 7, `floating component ${i} follows theme`);
+  }, { init: stub(), reducedMotion: true }));
+
 test('float moves the card into the PiP document (sm) and the X / pagehide brings it back', () =>
   withPage(T1412, async (page) => {
     assert.equal(await floatBtn(page).isEnabled(), true);
     assert.equal(await placeholder(page).isVisible(), false);
     await floatBtn(page).click();
     await pip(page).locator('#status-card').waitFor();
-    assert.deepEqual(await page.evaluate(() => window.__pip.calls), [{ width: 340, height: 280 }]);
+    const [size] = await page.evaluate(() => window.__pip.calls);
+    assert.equal(size.width, 340);
+    assert.ok(size.height >= 280);
     assert.equal(await page.locator('#status-card').count(), 0, 'card left the main document');
 
     const c = pip(page).locator('#status-card');
@@ -63,8 +95,8 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     assert.equal(await txt(c.locator('.card-progress-text')), '已工作 4小时12分 / 共 7小时');
     assert.equal(await c.locator('[role=progressbar]').isVisible(), true);
     assert.equal(await c.locator('.card-gear').isVisible(), true, 'gear shows in the small window');
-    assert.equal(await c.locator('.metric-hourly').isVisible(), false, '时薪 only on the main page');
-    assert.equal(await c.locator('.metric-daily').isVisible(), false, '今日满勤可得 only on the main page');
+    assert.equal(await c.locator('.metric-hourly').isVisible(), true, '时薪也显示在小窗');
+    assert.equal(await c.locator('.metric-daily').isVisible(), true, '今日满勤可得也显示在小窗');
     // 样式与语言复制进 PiP 文档
     assert.equal(await pip(page).locator('html').getAttribute('lang'), 'zh-CN');
     assert.equal(await pip(page).locator('body').evaluate((b) => getComputedStyle(b).margin), '0px');
@@ -252,7 +284,6 @@ async function floatFits(page) {
   await pip(page).locator('#status-card').waitFor();
   const [req] = await page.evaluate(() => window.__pip.calls);
   assert.equal(req.width, 340, 'width fixed');
-  assert.ok(req.height >= 280, `height >= 280 (got ${req.height})`);
   // about:blank 文档是 quirks 模式：卷动元素是 body，不是 html，故用 scrollingElement
   const m = await pip(page).locator('html').evaluate((el) => {
     const se = el.ownerDocument.scrollingElement;
@@ -268,12 +299,12 @@ async function setCheerAndPayday(page) {
   await page.getByLabel('发薪日').selectOption({ label: '每月 5 号' });
 }
 
-test('PiP height: default requests 280 and fits', () =>
+test('PiP fits all salary metrics without scrolling', () =>
   withPage(T1412, async (page) => {
-    const { req } = await floatFits(page);
-    assert.equal(req.height, 280);
+    await floatFits(page);
+    assert.equal(await pip(page).locator('.metric-hourly').isVisible(), true);
+    assert.equal(await pip(page).locator('.metric-daily').isVisible(), true);
   }, { init: stub() }));
-
 test('PiP height grows with cheer + payday (working) and fits', () =>
   withPage(T1412, async (page) => {
     await setCheerAndPayday(page);

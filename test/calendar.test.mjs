@@ -3,11 +3,32 @@ import assert from 'node:assert/strict';
 import { dayInfo, workdaysInMonth, nextWorkdayInDays } from '../src/calendar.js';
 import { HOLIDAYS_CN, STATUTORY_FIXED, STATUTORY_FIXED_FROM_YEAR } from '../src/holidays-cn.js';
 import { STATUTORY_LUNAR, statutoryLunarName } from '../src/statutory-dates.js';
+import { PROFILES } from '../src/profiles.js';
+import { monthWage, snapshot } from '../src/calc.js';
 
 const cfg = { weekends: false };
 const d = (y, m, day) => new Date(y, m - 1, day);
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (y, m, day) => `${y}-${pad(m)}-${pad(day)}`;
+
+test('Taiwan missing-year weekend and manual override update monthly wages without CN fallback', () => {
+  const profile = PROFILES.TW.holidayProvider;
+  const tw = { weekends: false, salary: 40000, start: '09:00', end: '18:00', lunchOn: false, holidayProvider: profile };
+  const date = d(2028, 10, 1); // Sunday; also a CN statutory holiday.
+  const ordinary = dayInfo(date, tw, {}, profile.tables);
+  assert.deepEqual([ordinary.tableMissing, ordinary.base, ordinary.reason, ordinary.holidayName], [true, 'rest', 'weekend', null]);
+  assert.equal(dayInfo(date, cfg, {}, {}).holidayName, '国庆');
+  const marks = { '2028-10-01': 'work' };
+  const manual = dayInfo(date, tw, marks, profile.tables);
+  assert.deepEqual([manual.base, manual.reason, manual.source], ['work', 'override', 'manual']);
+  assert.deepEqual(monthWage(2028, 9, tw, {}, profile.tables), { workdays: 22, dailyWage: 40000 / 22 });
+  assert.deepEqual(monthWage(2028, 9, tw, marks, profile.tables), { workdays: 23, dailyWage: 40000 / 23 });
+  const now = new Date(2028, 9, 1, 10);
+  assert.equal(snapshot(now, tw, {}, profile.tables).status, 'restDay');
+  const changed = snapshot(now, tw, marks, profile.tables);
+  assert.equal(changed.status, 'working');
+  assert.equal(changed.dailyWage, 40000 / 23);
+});
 
 // ---- P9：2027 年国办通知发布后内置整年日期表（2026-11 发布；保留无表年份的回退当兜底） ----
 // https://www.gov.cn/zhengce/content/202611/content_7085101.htm

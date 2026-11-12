@@ -5,14 +5,20 @@ import { join } from 'node:path';
 import { startServer, launch, openAt, root, expectedAutoUrls } from './harness.mjs';
 
 const T1412 = '2026-11-03T14:12:00+08:00';
-// 常见繁体字（简体中不存在的字形）+ 台湾用语；成品中一个都不得出现。
+// 常见繁体字（简体中不存在的字形）+ 台湾用语；只用来检查「中国大陆界面」，不对整包成品扫描
+// （成品同时内置繁中字典，繁中字样是预期内容）。
 const TRAD = [...'設開時賺鐘勵週與請計錢進導電連線標題資儲歷這個們為麼來還說後點選擇關閉復讀寫據節農區塊網頁顯匯則數單項錯誤會發現狀態間預覽灣準備載檔記號啟離階動處無帶'];
 const TW_TERMS = ['预设', '进阶', '有薪假', '使用者', '尚未公布', '请改成你的月薪', '字串', '物件', 'JSON 文字', '选单', '滑鼠', '萤幕', '点选', '自订', '未套用'];
-// dist 中即使有 \\uXXXX 转义也要还原后再扫描
-const decode = (s) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, x) => String.fromCharCode(parseInt(x, 16)));
 const VOID_NUMBERS = ['312.64', '44.66', '187.5862', '500.23', '6,565.52', '5,627.59', '21.75', '0.0124'];
-// H1：首次提示的数字来自真实默认设置（月薪 6800、08:30–17:00）
-const FIRST_RUN = '现在按默认月薪 ¥6,800、08:30–17:00 计算，请改成你自己的';
+
+// 新版默认值是台湾（NT$40,000、午休关闭）。中国大陆回归要靠一份「旧版用户」存档：
+// 无 region、version < 3 的设置按规格并入 CN，旧默认月薪 6800、午休 11:30–13:00，
+// 这样既有的 ¥ 金额、CN 文案与假期表断言全部照旧成立。
+const CN_SEED = { version: 2, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true };
+const SEED_CN = `if (!localStorage.getItem('work-motivator-v1')) localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_SEED))});`;
+
+// H1：首次提示的数字来自真实默认设置（台湾默认：月薪 40000、08:30–17:00）
+const FRESH_HINT = '目前按預設月薪 NT$40,000、08:30–17:00 計算，請改成你自己的';
 
 let server;
 let browser;
@@ -48,7 +54,14 @@ function assertNoTraditional(s, where) {
   assert.deepEqual(terms, [], `non-mainland terms in ${where}: ${terms.join('、')}`);
 }
 
-async function withPage(iso, fn, opts) {
+// 全部既有用例都是中国大陆回归：默认先写入旧版（CN）存档；`{ fresh: true }` 保留真正的全新用户。
+function withPage(iso, fn, opts = {}) {
+  const { fresh, ...rest } = opts;
+  const init = fresh ? rest.init : [SEED_CN, typeof rest.init === 'function' ? `(${String(rest.init)})()` : rest.init].filter(Boolean).join('\n');
+  return openPage(iso, fn, { ...rest, init });
+}
+
+async function openPage(iso, fn, opts) {
   const { context, page, errors, external, consoleErrors, autoUrls } = await openAt(browser, server.url, iso, opts);
   try {
     // R19：开页只会请求「自动检查」该请求的网址（11 月前为 0 个）；一律被 harness 中止（离线）
@@ -62,27 +75,116 @@ async function withPage(iso, fn, opts) {
   }
 }
 
-// 设置在「基本设置」分页里：先切过去（spec §13.1）
-const openSettings = (page) => page.getByRole('tab', { name: '基本设置' }).click();
+// 设置在设置分页里：先切过去（spec §13.1）。分页名随地区字典变化（简体「基本设置」/ 繁体「基本設定」），
+// 所以按当前页面语言选名字，而不是把某一个地区的文案写死。
+const openSettings = (page) => page.getByRole('tab', { name: /^(基本设置|基本設定)$/ }).click();
 const errorBar = '.notices .banner-error';
 const infoBar = '.notices .banner-info';
 const todayCell = (page, label) => page.locator(`.cal-grid button[aria-label^="${label} "]`);
 
+test('themes coordinate the working badge, card band and progress while keeping calendar states legible', () =>
+  withPage(T1412, async (page) => {
+    await openSettings(page);
+    const seen = [];
+    for (const theme of ['green', 'blue', 'orange', 'teal', 'rose', 'slate', 'rainbow']) {
+      await page.locator('#f-theme').selectOption(theme);
+      await page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSTransition).forEach((a) => a.finish()));
+      const result = await page.evaluate(() => {
+        const style = (s) => getComputedStyle(document.querySelector(s));
+        const root = getComputedStyle(document.documentElement);
+        const rgb = (value) => value.startsWith('#')
+          ? [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16))
+          : value.match(/\d+/g).slice(0, 3).map(Number);
+        const luminance = (value) => {
+          const [r, g, b] = rgb(value).map((n) => n / 255).map((n) => n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4);
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        const ratio = (a, b) => {
+          const x = luminance(a), y = luminance(b);
+          return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+        };
+        const token = (name) => root.getPropertyValue(name).trim();
+        const pairs = ['working', 'before', 'after', 'holiday', 'lunch', 'rest', 'paid', 'unpaid', 'makeup']
+          .map((name) => [token(`--state-${name}-fg`), token(`--state-${name}-bg`)]);
+        pairs.push([token('--warning-fg'), token('--warning-bg')],
+          [token('--warning-fg'), token('--color-surface')],
+          [token('--state-unpaid-fg'), token('--state-unpaid-stripe')],
+          [token('--cal-weekend-num'), token('--cal-weekend-bg')],
+          [token('--cal-holiday-num'), token('--cal-holiday-bg')],
+          [token('--state-holiday-fg'), token('--cal-holiday-bg')],
+          [token('--color-text-900'), token('--cal-holiday-bg')]);
+        return { badge: style('.card-badge').backgroundColor, band: style('.card-band').backgroundColor,
+          warning: style('.warn-note').backgroundColor,
+          fill: style('.bar-fill').backgroundColor, minimum: Math.min(...pairs.map(([a, b]) => ratio(a, b))),
+          fillContrast: ratio(token('--state-working-fg'), token('--color-border-subtle')),
+          lunchFillContrast: ratio(token('--state-lunch-fill'), token('--color-border-subtle')) };
+      });
+      assert.ok(result.minimum >= 4.5, `${theme} status text contrast: ${result.minimum}`);
+      assert.ok(result.fillContrast >= 3 && result.lunchFillContrast >= 3, `${theme} progress fill contrast`);
+      seen.push(result);
+    }
+    for (const role of ['badge', 'band', 'fill', 'warning']) assert.equal(new Set(seen.map((x) => x[role])).size, 7, `${role} changes for each theme`);
+  }, { reducedMotion: true }));
+
+test('lunch badge, card band and progress follow all themes', () =>
+  withPage('2026-11-03T12:15:00+08:00', async (page) => {
+    await openSettings(page);
+    assert.equal(await text(page, '.card-badge .badge-text'), '午休中');
+    const colors = [];
+    for (const theme of ['green', 'blue', 'orange', 'teal', 'rose', 'slate', 'rainbow']) {
+      await page.locator('#f-theme').selectOption(theme);
+      await page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSTransition).forEach((a) => a.finish()));
+      colors.push(await page.evaluate(() => Object.fromEntries(
+        ['.card-badge', '.card-band', '.bar-fill'].map((s) => [s, getComputedStyle(document.querySelector(s)).backgroundColor])
+      )));
+    }
+    for (const selector of ['.card-badge', '.card-band', '.bar-fill']) {
+      assert.equal(new Set(colors.map((c) => c[selector])).size, 7, `${selector} must have a distinct color in every theme`);
+    }
+  }, { reducedMotion: true }));
+test('calendar legend remains fully visible on narrow screens in every theme', () =>
+  withPage(T1412, async (page) => {
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const theme of ['green', 'blue', 'orange', 'teal', 'rose', 'slate', 'rainbow']) {
+        await openSettings(page);
+        await page.locator('#f-theme').selectOption(theme);
+        await page.getByRole('tab', { name: '月历' }).click();
+        const result = await page.evaluate(() => {
+          const legend = document.querySelector('.cal-legend');
+          const bounds = legend.getBoundingClientRect();
+          return {
+            clipped: [...legend.querySelectorAll('.legend-title, .legend-item')].filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.left < bounds.left - 0.5 || r.right > bounds.right + 0.5 || r.top < bounds.top - 0.5 || r.bottom > bounds.bottom + 0.5;
+            }).map((el) => el.textContent.trim()),
+            horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
+          };
+        });
+        assert.deepEqual(result.clipped, [], `${theme} at ${width}px: legend items fit`);
+        assert.equal(result.horizontalOverflow, false, `${theme} at ${width}px: no horizontal overflow`);
+      }
+    }
+  }));
+
+
 test('fresh storage shows numbers derived from defaults, no setup card, no payday row', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await page.title(), '上班鼓励器');
-    assert.equal(await text(page, `${card} .card-date`), '2026/11/03 周二');
+    // 全新用户：台湾默认（NT$40,000、午休关闭 → 8.5 小时）
+    assert.equal(await page.title(), '上班鼓勵器');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-TW');
+    assert.equal(await text(page, `${card} .card-date`), '2026/11/03 週二');
     assert.equal(await text(page, `${card} .card-badge`), '上班中');
-    assert.equal(await text(page, `${card} .card-label`), '今天已经赚了');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
-    assert.equal(await text(page, `${card} .metric-rate .metric-value`), '¥0.0128/秒');
-    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '当前赚钱速度');
-    assert.equal(await text(page, `${card} .metric-month .metric-value`), '¥518.10');
-    assert.equal(await text(page, `${card} .metric-hourly .metric-value`), '¥46.26');
-    assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥323.81');
-    assert.equal(await text(page, `${card} .card-progress-text`), '已工作 4小时12分 / 共 7小时');
-    assert.equal(await text(page, `${card} .card-countdown`), '距下班 2小时48分0秒');
-    assert.equal(await page.locator(`${card} [role=progressbar]`).getAttribute('aria-valuenow'), '60');
+    assert.equal(await text(page, `${card} .card-label`), '今天已經賺了');
+    assert.equal(await text(page, `${card} .card-amount`), 'NT$ 1,277.3109');
+    assert.equal(await text(page, `${card} .metric-rate .metric-value`), 'NT$0.0622/秒');
+    assert.equal(await text(page, `${card} .metric-rate .metric-label`), '目前賺錢速度');
+    assert.equal(await text(page, `${card} .metric-month .metric-value`), 'NT$3,182.07');
+    assert.equal(await text(page, `${card} .metric-hourly .metric-value`), 'NT$224.09');
+    assert.equal(await text(page, `${card} .metric-daily .metric-value`), 'NT$1,904.76');
+    assert.equal(await text(page, `${card} .card-progress-text`), '已工作 5小時42分 / 共 8小時30分');
+    assert.equal(await text(page, `${card} .card-countdown`), '距下班 2小時48分0秒');
+    assert.equal(await page.locator(`${card} [role=progressbar]`).getAttribute('aria-valuenow'), '67');
     assert.equal(await visible(page, `${card} .card-payday`), false, 'payday row hidden when payday empty');
     assert.equal(await visible(page, `${card} .card-cheer`), false, 'cheer row hidden when empty');
     assert.equal(await visible(page, `${card} .card-year`), false, 'no year note in 2026');
@@ -91,14 +193,14 @@ test('fresh storage shows numbers derived from defaults, no setup card, no payda
     for (const n of VOID_NUMBERS) assert.ok(!all.includes(n), `void ÷21.75 number ${n} must not appear`);
     assert.ok(!all.includes('发薪日：每月 5 号'));
     // 首次提示：说清现在用的默认值（H1），可关闭、关闭后记住
-    const hint = page.getByText(FIRST_RUN);
+    const hint = page.getByText(FRESH_HINT);
     assert.equal(await hint.isVisible(), true);
     assert.equal(await page.locator(infoBar).getByRole('button', { name: '去修改' }).isVisible(), true);
-    await page.getByRole('button', { name: '关闭提示' }).click();
+    await page.getByRole('button', { name: '關閉提示' }).click();
     assert.equal(await hint.isVisible(), false);
     await page.reload();
-    assert.equal(await page.getByText(FIRST_RUN).isVisible(), false, 'dismissal remembered');
-  }));
+    assert.equal(await page.getByText(FRESH_HINT).isVisible(), false, 'dismissal remembered');
+  }, { fresh: true }));
 
 test('ticks at 100ms and recomputes on visibilitychange', () =>
   withPage(T1412, async (page) => {
@@ -236,7 +338,7 @@ test('calendar: day menu marks today as paid then unpaid leave; weekend → make
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
     // 撤销
     await choose('11月7日', /改为上班/);
-    await page.getByRole('button', { name: '撤销' }).click();
+    await page.getByRole('button', { name: '撤销', exact: true }).click();
     assert.match(await todayCell(page, '11月7日').getAttribute('aria-label'), /周末/);
   }));
 
@@ -312,6 +414,9 @@ test('lunch, before-work and after-work states', async () => {
 
 test('import with bad fields lists dropped items with reasons and unknown fields', () =>
   withPage(T1412, async (page) => {
+    await page.locator('.cal-grid button[aria-label^="11月2日 "]').click();
+    await page.getByRole('menuitemradio', { name: /^带薪假/ }).click();
+    assert.equal(await page.locator('.cal-undo').getAttribute('aria-disabled'), 'false');
     const file = JSON.stringify({
       version: 1, salary: -5, start: '9am', cheer: '加油', foo: 1,
       marks: { '2026-11-05': 'paidLeave', '2026-02-30': 'work' },
@@ -319,16 +424,17 @@ test('import with bad fields lists dropped items with reasons and unknown fields
     await page.locator('input[type=file]:not(#holiday-file)').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(file) });
     const report = page.locator('.import-report');
     await report.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.cal-undo').getAttribute('aria-disabled'), 'true', 'import invalidates undo');
     assert.equal(await page.getByRole('tab', { name: '基本设置' }).getAttribute('aria-selected'), 'true', 'report shown in 基本设置 › 数据与备份');
     assert.equal(await page.locator('.section-backup .import-report').count(), 1);
     assert.equal(await text(page, '.import-report h3'), '已导入 2 项，4 项未导入');
     assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'H3', 'focus on the report title');
     const rows = await page.locator('.import-report tbody tr').allTextContents();
     const joined = rows.join('\n');
-    assert.match(joined, /月薪.*月薪必须是大于 0 的数字.*保留当前值 6800/);
+    assert.match(joined, /月薪 · 中国大陆.*月薪必须是大于 0 的数字.*保留当前值 6800/);
     assert.match(joined, /上班时间.*上班时间格式不正确.*保留当前值 08:30/);
     assert.doesNotMatch(joined, /paidLeave|unpaidLeave|true 或 false|null/, 'no raw keys / enum values');
-    assert.match(joined, /月历标记 2026-02-30.*不是真实存在的日期/);
+    assert.match(joined, /月历标记 2026-02-30 · 中国大陆.*不是真实存在的日期/);
     assert.match(joined, /foo.*无法识别的字段，已忽略/);
     assert.equal(rows.length, 4);
     assert.equal(await text(page, `${card} .card-cheer`), '加油');
@@ -377,9 +483,13 @@ test('export downloads a backup that round-trips', () =>
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.section-backup').getByRole('button', { name: '导出备份' }).click()]);
     assert.match(dl.suggestedFilename(), /^work-motivator-backup-2026-11-03\.json$/);
     const body = JSON.parse(readFileSync(await dl.path(), 'utf8'));
-    assert.equal(body.salary, 7100);
-    assert.equal(body.version, 2);
+    assert.equal(body.version, 4, 'backup format version 4 carries both regions and encouragements');
+    assert.equal(body.region, 'CN');
+    assert.equal(body.salaries.CN, 7100);
+    assert.equal(body.salaries.TW, 40000, 'untouched region keeps its own salary');
+    assert.deepEqual(body.marksByRegion, { TW: {}, CN: {} });
     assert.equal(body.showLunar, true);
+    assert.equal(body.salary, undefined, 'no contradictory active-region copy');
     assert.match(await text(page, '.toast-text'), /已导出/);
   }));
 
@@ -410,28 +520,32 @@ test('storage failure shows the warning bar and the app keeps working', () =>
 test('storage unreadable at load: warning bar from the start, defaults still tick', () =>
   withPage(T1412, async (page) => {
     assert.equal(await text(page, `${errorBar} .banner-text`), '无法保存设置，关闭页面后会丢失。请先导出备份');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
-  }, { init: () => { Storage.prototype.getItem = () => { throw new DOMException('denied', 'SecurityError'); }; } }));
+    // 读不到存档 = 保守回退（CN、月薪 5000、午休关闭），不是全新用户
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 159.6639');
+    assert.equal(await page.locator(`${infoBar}[data-id=firstRun]`).count(), 0, 'not treated as first run');
+  }, { fresh: true, init: () => { Storage.prototype.getItem = () => { throw new DOMException('denied', 'SecurityError'); }; } }));
 
-const seed = (raw) => ({ init: `if (!sessionStorage.getItem('seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(raw)}); sessionStorage.setItem('seeded', '1'); }` });
+// 直接写入原始存档（可用来写入坏内容）：默认 init 里已经有 CN 种子，这里覆盖它。
+const seed = (raw) => `if (!sessionStorage.getItem('seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(raw)}); sessionStorage.setItem('seeded', '1'); }`;
 
 test('corrupt saved settings: visible dismissible notice, not a silent first run', () =>
   withPage(T1412, async (page) => {
     assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置无法读取，现在使用的是默认值。如有备份，可用「导入备份」恢复。');
     assert.equal(await page.locator(errorBar).getByRole('button', { name: '导入备份' }).isVisible(), true, 'the bar offers the button its text refers to');
-    assert.equal(await page.getByText(FIRST_RUN).isVisible(), false, 'not treated as first run');
-    assert.equal(await text(page, `${card} .card-amount`), '¥ 194.2857');
+    assert.equal(await page.locator(`${infoBar}[data-id=firstRun]`).count(), 0, 'not treated as first run');
+    // 坏存档 → 保守回退（CN、月薪 5000、午休关闭），不会冒用台湾默认
+    assert.equal(await text(page, `${card} .card-amount`), '¥ 159.6639');
     assertNoTraditional(await bodyText(page), 'corrupt-load notice');
     await page.locator(errorBar).getByRole('button', { name: '关闭提示' }).click();
     assert.equal(await visible(page, errorBar), false);
-  }, seed('{oops')));
+  }, { init: seed('{oops') }));
 
 test('partly invalid saved settings: notice lists field labels, other fields still loaded', () =>
   withPage(T1412, async (page) => {
-    assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：发薪日、月历标记 2026-02-30');
+    assert.equal(await text(page, `${errorBar} .banner-text`), '已保存的设置中有部分项目无法使用，以下项目已改用默认值：发薪日、月历标记 2026-02-30 · 中国大陆');
     assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥428.57', 'valid salary 9000 still loaded');
-    assert.equal(await page.getByText(FIRST_RUN).isVisible(), false);
-  }, seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } }))));
+    assert.equal(await page.locator(`${infoBar}[data-id=firstRun]`).count(), 0);
+  }, { init: seed(JSON.stringify({ version: 1, salary: 9000, payday: 99, marks: { '2026-02-30': 'work' } })) }));
 
 test('two tabs: a change in one tab reaches the other without reload and is never reverted', async () => {
   // 只记录设置键的写入次数（测试用 init script，不是成品钩子）
@@ -443,11 +557,13 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
       return orig.call(this, k, v);
     };
   };
-  const { context, page: p1, errors } = await openAt(browser, server.url, T1412, { init: count });
+  const init = [SEED_CN, `(${String(count)})()`].join('\n');
+  const { context, page: p1, errors } = await openAt(browser, server.url, T1412, { init });
   try {
     const p2 = await context.newPage();
     p2.setDefaultTimeout(5000);
     p2.on('pageerror', (e) => errors.push(e));
+    await p2.addInitScript(init);
     await p2.goto(server.url);
     await openSettings(p2);
     await openSettings(p1);
@@ -460,18 +576,28 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
     // 第 1 页再改鼓励语：不得把第 2 页的月薪改回 6800
     await p1.getByLabel('鼓励语').fill('加油');
     const saved = JSON.parse(await p1.evaluate(() => localStorage.getItem('work-motivator-v1')));
-    assert.equal(saved.salary, 9000);
-    assert.equal(saved.cheer, '加油');
+    assert.equal(saved.region, 'CN');
+    assert.equal(saved.salaries.CN, 9000);
+    assert.deepEqual(saved.cheers, ['加油']);
     await until(p2, `${card} .card-cheer`, '加油');
     assert.equal(await text(p2, `${card} .metric-daily .metric-value`), '¥428.57', 'tab 2 salary not reverted');
+    await p1.getByRole('tab', { name: '月历' }).click();
+    await p1.locator('.cal-grid button[aria-label^="11月2日 "]').click();
+    await p1.getByRole('menuitemradio', { name: /^带薪假/ }).click();
+    assert.equal(await p1.locator('.cal-undo').getAttribute('aria-disabled'), 'false');
+    await p2.waitForFunction(() => JSON.parse(localStorage.getItem('work-motivator-v1')).marksByRegion.CN['2026-11-02'] === 'paidLeave');
     // 月历标记同样同步
     await p2.getByRole('tab', { name: '月历' }).click();
     await p2.locator('.cal-grid button[aria-label^="11月3日 "]').click();
     await p2.getByRole('menuitemradio', { name: /^带薪假/ }).click();
     await until(p1, `${card} .card-badge .badge-text`, '带薪假');
-    // 其他分页清空储存（key === null）：回到默认值
+    assert.equal(await p1.locator('.cal-undo').getAttribute('aria-disabled'), 'true', 'remote mark change invalidates local undo');
+    await p1.locator('.cal-undo').evaluate((button) => button.click());
+    assert.match(await p1.locator('.cal-grid button[aria-label^="11月3日 "]').getAttribute('aria-label'), /带薪假/);
+    // 其他分页清空储存（key === null）：回到新安装默认值（台湾、NT$40,000）
     await p2.evaluate(() => localStorage.clear());
-    await until(p1, `${card} .metric-daily .metric-value`, '¥323.81');
+    await until(p1, `${card} .metric-daily .metric-value`, 'NT$1,904.76');
+    assert.equal(await p1.getByLabel('月薪').inputValue(), '40000');
     assert.deepEqual(errors.map(String), []);
   } finally {
     await context.close();
@@ -480,21 +606,22 @@ test('two tabs: a change in one tab reaches the other without reload and is neve
 
 test('first successful save shows one-time backup nudge and requests persistence (failure tolerated)', () =>
   withPage(T1412, async (page) => {
+    // 全新用户（台湾默认）：首次提示 → 保存后换成备份提醒
     assert.equal(await visible(page, infoBar), true, 'first-run hint');
     await openSettings(page);
     await page.getByLabel('月薪').fill('7000');
-    assert.match(await text(page, infoBar), /建议导出/);
+    assert.match(await text(page, infoBar), /建議匯出/);
     assert.equal(await page.locator(infoBar).getAttribute('data-id'), 'backupNudge', 'first-run hint gave way to the nudge');
-    assert.equal(await page.locator(infoBar).getByRole('button', { name: '导出备份' }).isVisible(), true);
+    assert.equal(await page.locator(infoBar).getByRole('button', { name: '匯出備份' }).isVisible(), true);
     assert.equal(await page.evaluate(() => window.__persistCalls), 1);
-    assert.equal(await text(page, `${card} .metric-daily .metric-value`), '¥333.33');
+    assert.equal(await text(page, `${card} .metric-daily .metric-value`), 'NT$333.33');
     await page.locator(infoBar).getByRole('button', { name: '知道了' }).click();
     assert.equal(await visible(page, infoBar), false);
     await page.reload();
     await openSettings(page);
     await page.getByLabel('月薪').fill('7100');
     assert.equal(await visible(page, infoBar), false, 'nudge is one-time');
-  }, { init: () => {
+  }, { fresh: true, init: () => {
     window.__persistCalls = 0;
     Object.defineProperty(navigator.storage, 'persist', { value: () => { window.__persistCalls++; return Promise.reject(new Error('nope')); } });
   } }));
@@ -509,17 +636,20 @@ test('crossing 00:00 switches the date', () =>
     assert.doesNotMatch(await todayCell(page, '11月3日').getAttribute('aria-label'), /今天/);
   }));
 
-test('no Traditional characters in visible text or in the shipped file', () =>
+// 成品同时内置繁中字典，所以「整包不得出现繁体」不再成立；这里守的是中国大陆界面本身，
+// 并确认成品没把繁中字典丢掉（切换地区要用）。
+test('CN UI has no Traditional characters; the shipped file bundles both regional dictionaries', () =>
   withPage(T1412, async (page) => {
-    assertNoTraditional(await bodyText(page), 'default page');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-CN');
+    assertNoTraditional(await bodyText(page), 'default page (CN)');
     await openSettings(page);
-    assertNoTraditional(await bodyText(page), '基本设置');
+    assertNoTraditional(await bodyText(page), '基本设置 (CN)');
     await page.getByRole('button', { name: /高级设置/ }).click();
-    assertNoTraditional(await bodyText(page), 'advanced settings open');
+    assertNoTraditional(await bodyText(page), 'advanced settings open (CN)');
     const html = readFileSync(join(root, 'dist/work-motivator.html'), 'utf8');
-    assert.ok(html.includes('现在按默认月薪'), 'dist keeps raw UTF-8 Chinese (charset utf8)');
-    assertNoTraditional(decode(html), 'dist/work-motivator.html (decoded)');
-  }));
+    assert.ok(html.includes('现在按默认月薪'), 'dist keeps raw UTF-8 Simplified Chinese (charset utf8)');
+    assert.ok(html.includes('今天已經賺了'), 'dist also carries the Traditional Chinese dictionary');
+  }, { fresh: false }));
 
 // Task 14 fix round 1 · D1：运行中切换减少动态（reduce → 关 → reduce），时钟在 change 事件送到之前就走：
 // 每次观察都恰好一个计时器（100 ms 的 setInterval 或对齐整秒的 setTimeout），金额更新没有超过 1 秒的空档

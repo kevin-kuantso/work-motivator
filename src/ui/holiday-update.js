@@ -3,7 +3,7 @@
 // 规则：内置年份永不被覆盖；联网 / 导入的数据都走 validateHolidayYear；自动检查失败时静默，手动检查才显示原因；
 // 同一时间只显示一个结果；自动与手动检查排队依次执行，不并发。
 import {
-  fetchHolidayYear, mergeTables, validateHolidayYear, yearsToAutoCheck, sourcesWith, validateCustomUrl, buildSourceUrl,
+  fetchHolidayYear, mergeTables, validateHolidayYear, yearsToAutoCheck, sourcesWith, validateCustomUrl, buildSourceUrl, renderReason,
 } from '../holiday-data.js';
 import {
   loadOnlineTables, saveOnlineYear, loadLastCheck, saveLastCheck, loadCustomUrl, saveCustomUrl, FILE_SOURCE,
@@ -88,8 +88,7 @@ export function pickResult(results) {
 export function resultView(res, t) {
   if (!res) return null;
   const U = t.holidayUpdate;
-  const prefix = t.holidayData.allFailed('');
-  const reason = res.reason?.startsWith(prefix) ? res.reason.slice(prefix.length) : res.reason;
+  const reason = renderReason(res.reason, t.holidayData);
   const detail = reason ? U.detail(reason) : null;
   switch (res.outcome) {
     case 'added': return { tone: 'success', text: U.added(res.years), detail: null };
@@ -118,8 +117,9 @@ export function customUrlSummary(url, t) {
 // ctx: { storage, clock, fetchImpl?, getTables, onTables, notify(msg, kind:'info'|'success', against?:'builtin'|'file'), onStatus(status) }
 // status: { checking, line, status:{chips,lastCheck}, result:{tone,text,detail}|null, customUrl, customSummary }
 export function startHolidayUpdate(ctx) {
-  const t = STRINGS;
-  const U = t.holidayUpdate;
+  const current = () => ctx.isCurrent?.() !== false;
+  const getT = () => ctx.getStrings?.() ?? STRINGS;
+  const U = new Proxy({}, { get: (_, key) => getT().holidayUpdate[key] });
   const { storage, clock, getTables, onTables, notify, onStatus } = ctx;
   let result = null;
   // 结果区一次只显示一个，最新的用户操作优先（R32）：每次手动检查 / 导入把 seq 加一；
@@ -129,12 +129,14 @@ export function startHolidayUpdate(ctx) {
   let chain = Promise.resolve();
 
   function emit() {
+    if (!current()) return;
+    const t = getT();
     const url = loadCustomUrl(storage);
     onStatus({
       checking: pending > 0,
       line: statusLine(clock(), getTables(), loadLastCheck(storage), t),
       status: statusModel(clock(), getTables(), loadLastCheck(storage), t),
-      result,
+      result: typeof result === 'function' ? result(t) : result,
       customUrl: url,
       customSummary: customUrlSummary(url, t),
     });
@@ -144,6 +146,7 @@ export function startHolidayUpdate(ctx) {
 
   // 从储存重新读取联网 / 导入的表（开页、其他分页改了假期数据）；只读不写。
   function reload() {
+    if (!current()) return;
     const l = loadOnlineTables(storage);
     onTables(mergeTables(builtinOnly(), l.tables));
     emit();
@@ -151,6 +154,7 @@ export function startHolidayUpdate(ctx) {
 
   // source：联网时为下载网址，导入时为 FILE_SOURCE。内置年份永不覆盖；联网数据也不覆盖导入的文件。
   function apply(year, table, papers, source) {
+    if (!current()) return;
     const cur = getTables()[year];
     const fromFile = source === FILE_SOURCE;
     if (cur?.source === 'builtin' || (!fromFile && cur?.source === 'file')) return;
@@ -164,8 +168,13 @@ export function startHolidayUpdate(ctx) {
     const sources = sourcesWith(loadCustomUrl(storage));
     const out = [];
     for (const year of years) {
+      if (!current()) return out;
       const r = await fetchHolidayYear(year, { sources, fetchImpl: ctx.fetchImpl });
-      const cur = getTables()[year]; // 等待期间可能已被另一次检查 / 导入更新：以当下为准
+      if (!current()) return out;
+      // Another tab may have imported this year during the request. Re-read before protecting or writing it.
+      const stored = loadOnlineTables(storage).tables[year];
+      const memory = getTables()[year];
+      const cur = memory?.source === 'builtin' || memory?.source === 'file' ? memory : (stored ?? memory);
       const prot = isProtected(cur);
       const base = { year, protected: prot, against: prot ? cur.source : null };
       if (!r.ok) out.push({ ...base, outcome: r.kind, reason: r.reason, format: r.format === true });
@@ -201,18 +210,21 @@ export function startHolidayUpdate(ctx) {
   function autoCheckIfNeeded() {
     if (!yearsToAutoCheck(clock(), getTables(), loadLastCheck(storage)).length) return Promise.resolve();
     const mine = seq;
+    if (!current()) return Promise.resolve();
     return serial(async () => {
+      if (!current()) return;
       const years = yearsToAutoCheck(clock(), getTables(), loadLastCheck(storage));
       if (!years.length) return;
       const out = await checkYears(years);
+      if (!current()) return;
       const got = out.filter((o) => o.outcome === 'added' || o.outcome === 'refreshed').map((o) => o.year);
       if (got.length) {
-        notify(U.fetched(got), 'success'); // 不打扰的提示，不带「查看」（spec §13.7）
+        notify((strings) => strings.holidayUpdate.fetched(got), 'success'); // 不打扰的提示，不带「查看」（spec §13.7）
         return;
       }
       // 「暂未发布」不是失败：在假期数据区安静地说明；连不上 / 数据不合格则静默
       const unp = out.find((o) => o.outcome === 'unpublished');
-      if (unp && seq === mine && result === null) result = resultView({ outcome: 'unpublished', years: [unp.year] }, t);
+      if (unp && seq === mine && result === null) result = (t) => resultView({ outcome: 'unpublished', years: [unp.year] }, t);
     });
   }
 
@@ -221,22 +233,28 @@ export function startHolidayUpdate(ctx) {
     result = null;
     return serial(async () => {
       const now = clock();
+      if (!current()) return;
       const y = now.getFullYear();
       const out = await checkYears(now.getMonth() >= 10 ? [y, y + 1] : [y]);
-      if (seq === mine) result = resultView(pickResult(out), t); // 期间用户又导入 / 再查：不覆盖更新的结果
+      if (current() && seq === mine) {
+        const picked = pickResult(out);
+        result = (t) => resultView(picked, t);
+      }
       // 与受保护年份不同：页面级提示，内置与导入文件分别说明（两者都不会被覆盖）
+      if (!current() || seq !== mine) return;
       for (const against of ['builtin', 'file']) {
         const n = out.reduce((sum, o) => sum + (o.outcome === 'diff' && o.against === against ? o.n : 0), 0);
-        if (n) notify(against === 'builtin' ? U.diff(n) : U.diffFile(n), 'info', against);
+        if (n) notify((strings) => against === 'builtin' ? strings.holidayUpdate.diff(n) : strings.holidayUpdate.diffFile(n), 'info', against);
       }
     });
   }
 
   function importFile(text) {
+    if (!current()) return { ok: false };
     seq++;
     // format：文件格式 / 内容不合格（不是 JSON、没有年份、validateHolidayYear 不通过）→ 附「查看格式示例」；「已内置」不是格式问题
     const fail = (reason, year, format = true) => {
-      result = { tone: 'warn', text: reason, detail: null, formatHelp: format };
+      result = (t) => ({ tone: 'warn', text: renderReason(reason, reason.domain === 'update' ? t.holidayUpdate : t.holidayData), detail: null, formatHelp: format });
       emit();
       return year === undefined ? { ok: false, reason } : { ok: false, reason, year };
     };
@@ -248,31 +266,32 @@ export function startHolidayUpdate(ctx) {
     }
     // 目标年份 = 文件自己的 year 字段（不按当前查看的月份猜）
     const year = isPlainObject(json) ? json.year : undefined;
-    if (!Number.isInteger(year) || year < 1000 || year > 9999) return fail(U.importNoYear);
-    if (getTables()[year]?.source === 'builtin') return fail(U.importBuiltin(year), year, false);
+    if (!Number.isInteger(year) || year < 1000 || year > 9999) return fail({ code: 'importNoYear', domain: 'update' });
+    if (getTables()[year]?.source === 'builtin') return fail({ code: 'importBuiltin', params: year, domain: 'update' }, year, false);
     const v = validateHolidayYear(json, year);
-    if (!v.ok) return fail(v.reason, year);
+    if (!v.ok) return fail({ code: v.code, params: v.params }, year);
     apply(year, v.table, v.papers, FILE_SOURCE);
     const c = dayCounts(v.table);
-    result = { tone: 'success', text: U.importDone(year, c.off, c.makeup), detail: null };
+    result = (t) => ({ tone: 'success', text: t.holidayUpdate.importDone(year, c.off, c.makeup), detail: null });
     emit();
     return { ok: true, year };
   }
 
   // 空字符串 = 清除；不合格的不保存，返回具体原因
   function setCustomUrl(value) {
+    if (!current()) return { ok: false };
     if (value === '') {
       saveCustomUrl(storage, null);
       emit();
       return { ok: true };
     }
     const v = validateCustomUrl(value);
-    if (!v.ok) return { ok: false, reason: v.reason };
+    if (!v.ok) return { ok: false, code: v.code };
     saveCustomUrl(storage, v.url);
     emit();
     return { ok: true };
   }
 
   emit();
-  return { checkNow, importFile, autoCheckIfNeeded, setCustomUrl, reload };
+  return { checkNow, importFile, autoCheckIfNeeded, setCustomUrl, reload, refresh: emit };
 }

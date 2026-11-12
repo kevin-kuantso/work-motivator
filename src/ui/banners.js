@@ -29,14 +29,15 @@ export function pickInfo(queue) {
 }
 
 export function createBanners(doc, t) {
-  const b = t.banner;
+  let b = t.banner;
+  const resolve = (value) => typeof value === 'function' ? value(t) : value;
   const errors = new Map();
   const infos = new Map();
   const queue = new Set();
 
   // M13：提示条里的动作按钮统一成 xs 描边按钮（不再有下划线链接款式）
   const actionButtons = (actions) => actions.map((a) =>
-    h(doc, 'button', { type: 'button', class: 'btn btn-xs btn-secondary', 'data-action': a.key, text: a.label, onclick: a.onClick }));
+    h(doc, 'button', { type: 'button', class: 'btn btn-xs btn-secondary', 'data-action': a.key, text: resolve(a.label), onclick: a.onClick }));
   const closeButton = (onclick) =>
     h(doc, 'button', { type: 'button', class: 'banner-close', 'aria-label': b.dismiss, title: b.dismiss, text: b.closeGlyph, onclick });
 
@@ -68,14 +69,18 @@ export function createBanners(doc, t) {
   const errHandlers = new Map();
   let errKeys = null;
   function renderErrors() {
-    const m = mergeErrors(errors, b.sep);
+    const resolved = new Map([...errors].map(([id, value]) => [id, { ...value, content: resolve(value.content), actions: value.actions.map((a) => ({ ...a, label: resolve(a.label) })) }]));
+    const m = mergeErrors(resolved, b.sep);
     show(errorBar, Boolean(m));
     errorBar.dataset.ids = m ? m.ids.join(' ') : '';
     setText(errorText, m ? m.text : '');
     errHandlers.clear();
     for (const a of m ? m.actions : []) errHandlers.set(a.key, a.onClick);
-    const keys = m ? [...m.actions.map((a) => `${a.key}:${a.label}`), m.dismissible ? 'close' : ''].join('|') : '';
-    if (keys === errKeys) return;
+    const keys = m ? [...m.actions.map((a) => a.key), m.dismissible ? 'close' : ''].join('|') : '';
+    if (keys === errKeys) {
+      for (const a of m?.actions ?? []) setText(errorActions.querySelector(`[data-action="${a.key}"]`), a.label);
+      return;
+    }
     errKeys = keys;
     const buttons = m ? actionButtons(m.actions.map((a) => ({ ...a, onClick: (e) => errHandlers.get(a.key)?.(e) }))) : [];
     // 关闭钮常驻 DOM（直接子项才能靠右），只在可关闭时显示；errKeys 缓存保证它在焦点里时不重建
@@ -91,7 +96,7 @@ export function createBanners(doc, t) {
     shownInfo = id;
     infoBar.dataset.id = id ?? '';
     const it = id ? infos.get(id) : null;
-    setText(infoText, it ? it.content : '');
+    setText(infoText, it ? resolve(it.content) : '');
     infoClose.hidden = !(it && it.closable !== false);
     infoActions.replaceChildren(...(it ? actionButtons(it.actions ?? []) : []));
   }
@@ -113,6 +118,22 @@ export function createBanners(doc, t) {
     queue.delete(id);
     renderInfo();
   }
+  function setProfile(profile) {
+    t = profile.strings;
+    b = t.banner;
+    for (const button of [errorClose, infoClose]) {
+      button.setAttribute('aria-label', b.dismiss);
+      button.title = b.dismiss;
+      setText(button, b.closeGlyph);
+    }
+    renderErrors();
+    const it = shownInfo ? infos.get(shownInfo) : null;
+    if (it) {
+      setText(infoText, resolve(it.content));
+      for (const a of it.actions ?? []) setText(infoActions.querySelector(`[data-action="${a.key}"]`), resolve(a.label));
+    }
+  }
 
-  return { setError, queueInfo, dismissInfo, root };
+
+  return { setError, queueInfo, dismissInfo, setProfile, root };
 }

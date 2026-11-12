@@ -75,7 +75,7 @@ test('M11: every one of the 9 states has the same card height (= 上班中) at f
   }
 });
 
-test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown right (14px, dark); worked text below the bar; bar 8px, no border; lunch fill #D97706', async () => {
+test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown right (14px, dark); worked text below the bar; bar 8px, no border; lunch fill = the theme token --state-lunch-fill', async () => {
   await withState('working', async (page) => {
     const r = await page.evaluate(() => {
       const q = (s) => document.querySelector(`#status-card ${s}`);
@@ -102,7 +102,17 @@ test('M4 / M3 / M5: progress head row — 「工时进度」 left, countdown rig
     assert.equal(r.standaloneVisible, false, 'no second countdown line while the bar is shown');
   });
   await withState('lunch', async (page) => {
-    assert.equal(await page.locator('#status-card .bar-fill').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(180, 83, 9)');
+    // 主题令牌（--state-lunch-fill）随主题色变化，测试不再写死某一主题的具体色值：
+    // 读渲染后的令牌，再断言实际填充色与它一致（颜色仍由主题决定，不是任意值）。
+    const c = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--state-lunch-fill)';
+      document.body.append(probe);
+      const token = getComputedStyle(probe).color;
+      probe.remove();
+      return { token, fill: getComputedStyle(document.querySelector('#status-card .bar-fill')).backgroundColor };
+    });
+    assert.equal(c.fill, c.token, `lunch bar fill follows --state-lunch-fill (${c.token})`);
     assert.equal(await page.locator('#status-card .card-countdown').textContent(), '45 分钟后继续上班');
   });
   // 没有进度条的状态：倒数 / 说明是单独一行，进度头不出现
@@ -204,9 +214,10 @@ test('M4: first-run + error banners at 1280×585 leave ≥ 12px page slack and t
   const init = `Storage.prototype.setItem = function () { throw new DOMException('quota', 'QuotaExceededError'); };`;
   const { context, page, errors } = await openAt(browser, server.url, '2026-11-03T14:12:00+08:00', { viewport: { width: 1280, height: 585 }, init });
   try {
-    await page.getByRole('tab', { name: '基本设置' }).click();
+    // 分页按钮的 id（#tab-settings / #tab-calendar）与地区无关；role 名称会随语言变化（基本设置 / 基本設定）。
+    await page.locator('#tab-settings').click();
     await page.getByLabel('月薪').fill('7000'); // 触发储存失败 → 错误条
-    await page.getByRole('tab', { name: '月历' }).click();
+    await page.locator('#tab-calendar').click();
     const m = await page.evaluate(() => ({
       banners: document.querySelectorAll('.notices .banner').length,
       error: document.querySelectorAll('.notices .banner-error').length,

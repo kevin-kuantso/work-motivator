@@ -1,7 +1,24 @@
 import { dayInfo, workdaysInMonth, nextWorkdayInDays } from './calendar.js';
-import { STRINGS } from './strings.zh-CN.js';
 
-const R = STRINGS.reasons;
+// 校验原因只回传稳定的 code（必要时附参数），绝不写死任何一种语言的句子：
+// 显示端（设置面板、导入报告、小窗提示）在真正要显示时用当时的字典翻成文字。
+export function reason(code, params) {
+  return params ? { code, params } : { code };
+}
+
+
+// { code, params } → 当前字典的一句话。键缺失回传 ''，不回退到别的语言（翻译缺失必须看得见）。
+// params.field 是字典 labels 的键（start / lunchStart …），不是字段路径。
+export function reasonText(r, t) {
+  const table = t && t.reasons;
+  if (!table || !r || typeof r.code !== 'string') return '';
+  const entry = table[r.code];
+  if (typeof entry === 'string') return entry;
+  if (typeof entry !== 'function') return '';
+  const key = r.params && typeof r.params.field === 'string' ? r.params.field : '';
+  const label = key ? table.labels?.[key] ?? key : '';
+  return entry(label) ?? '';
+}
 
 // 'HH:MM' -> 当日秒数；格式不合法返回 NaN
 function parseHM(s) {
@@ -16,22 +33,25 @@ function parseHM(s) {
 const validSalary = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
 const overlap = (a1, a2, b1, b2) => Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
 
+// 回传 { ok:false, field, code, params }：field 是要挂错误的字段，params.field 是字典 labels 的键
+//（时间类原因要说出是哪个时间）；两者通常一致，因为 cfg 的字段名就是 labels 的键。
+// 已翻译的句子不出现在这里：settings-panel 按 { code, params } 用当时的字典重译。
 export function validateSchedule(cfg) {
-  const fail = (field, reason) => ({ ok: false, field, reason });
-  if (!validSalary(cfg.salary)) return fail('salary', R.salary);
+  const fail = (field, code, label = field) => ({ ok: false, field, code, params: { field: label } });
+  if (!validSalary(cfg.salary)) return fail('salary', 'salary');
   const s = parseHM(cfg.start);
   const e = parseHM(cfg.end);
-  if (Number.isNaN(s)) return fail('start', R.timeFormat(R.labels.start));
-  if (Number.isNaN(e)) return fail('end', R.timeFormat(R.labels.end));
-  if (e <= s) return fail('end', R.endAfterStart);
+  if (Number.isNaN(s)) return fail('start', 'timeFormat');
+  if (Number.isNaN(e)) return fail('end', 'timeFormat');
+  if (e <= s) return fail('end', 'endAfterStart');
   if (cfg.lunchOn) {
     const ls = parseHM(cfg.lunchStart);
     const le = parseHM(cfg.lunchEnd);
-    if (Number.isNaN(ls)) return fail('lunchStart', R.timeFormat(R.labels.lunchStart));
-    if (Number.isNaN(le)) return fail('lunchEnd', R.timeFormat(R.labels.lunchEnd));
-    if (ls < s || ls > e) return fail('lunchStart', R.lunchInShift(R.labels.lunchStart));
-    if (le < s || le > e) return fail('lunchEnd', R.lunchInShift(R.labels.lunchEnd));
-    if (ls >= le) return fail('lunchStart', R.lunchOrder);
+    if (Number.isNaN(ls)) return fail('lunchStart', 'timeFormat');
+    if (Number.isNaN(le)) return fail('lunchEnd', 'timeFormat');
+    if (ls < s || ls > e) return fail('lunchStart', 'lunchInShift');
+    if (le < s || le > e) return fail('lunchEnd', 'lunchInShift');
+    if (ls >= le) return fail('lunchStart', 'lunchOrder');
   }
   return { ok: true };
 }

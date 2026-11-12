@@ -158,10 +158,42 @@ test('validateSchedule', () => {
   assert.equal(bad({ lunchEnd: '17:30' }).field, 'lunchEnd');
   assert.equal(bad({ lunchStart: '13:00', lunchEnd: '13:00' }).ok, false);
   assert.equal(bad({ lunchStart: '14:00', lunchEnd: '13:00' }).ok, false);
-  assert.equal(typeof bad({ salary: 0 }).reason, 'string');
+  // 原因回传稳定 code + 参数，绝不是某种语言的句子：显示端才用当时的字典翻译
+  assert.deepEqual(bad({ salary: 0 }).code, 'salary');
+  assert.deepEqual(bad({ start: 'abc' }).code, 'timeFormat');
+  assert.deepEqual(bad({ start: 'abc' }).params, { field: 'start' });
+  assert.deepEqual(bad({ lunchEnd: '18:00' }).code, 'lunchInShift');
+  assert.deepEqual(bad({ lunchEnd: '18:00' }).params, { field: 'lunchEnd' });
+  assert.deepEqual(bad({ end: '08:00' }).code, 'endAfterStart');
+  assert.equal(typeof bad({ salary: 0 }).reason, 'undefined');
   assert.equal(bad({ start: 'abc' }).field, 'start');
   // lunch ignored when off
   assert.equal(bad({ lunchOn: false, lunchStart: '20:00', lunchEnd: '21:00' }).ok, true);
+});
+
+test('reasonText: 同一份校验结果跟着字典换语言（新增地区只需注册字典）', async () => {
+  const { reasonText } = await import('../src/calc.js');
+  const { STRINGS: cn } = await import('../src/strings.zh-CN.js');
+  // 合成的第二本字典：只要形状对（reasons + labels），不依赖 strings.zh-TW.js 是否已存在
+  const other = { reasons: {
+    salary: 'SALARY-TEXT',
+    timeFormat: (label) => `TIME(${label})`,
+    endAfterStart: 'END-AFTER-START',
+    lunchInShift: (label) => `LUNCH-IN(${label})`,
+    notObject: 'STRUCTURE',
+    labels: { start: 'START-LABEL', lunchEnd: 'LUNCH-END-LABEL' },
+  } };
+  const v = bad => validateSchedule({ ...cfg, ...bad });
+  // 渲染器只认 { code, params }：validateSchedule 的扁平结果与 dropped/error 的 { code, params } 都能直接用
+  assert.equal(reasonText(v({ salary: 0 }), cn), cn.reasons.salary);
+  assert.equal(reasonText(v({ start: 'abc' }), other), 'TIME(START-LABEL)');
+  assert.equal(reasonText(v({ end: '08:00' }), other), 'END-AFTER-START');
+  assert.equal(reasonText(v({ lunchEnd: '18:00' }), other), 'LUNCH-IN(LUNCH-END-LABEL)');
+  // 缺键 / 未知 code / 旧形态：回传空字串，不回退到别的语言
+  assert.equal(reasonText({ code: 'nope' }, other), '');
+  assert.equal(reasonText({ code: 'salary' }, { reasons: {} }), '');
+  assert.equal(reasonText('旧式已翻译字串', other), '');
+  assert.equal(reasonText(null, other), '');
 });
 
 test('monthWage: shared daily-wage helper used by snapshot and the calendar previews', async () => {

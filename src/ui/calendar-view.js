@@ -18,8 +18,10 @@ const LEGEND_KINDS = ['weekend', 'holiday', 'makeup', 'paid', 'unpaid'];
 const HOVER_MS = 400;
 
 // getTables：当前使用的假期表（app.js 持有，替换后调用 render 即可）。
-export function createCalendar(doc, t, { getState, getTables, getToday, onMarks }) {
-  const c = t.calendar;
+// setProfile(t)：切换地区时原地换字典（不重挂载：不重建 DOM、不丢焦点与月份），静态文字、图例与模型一起刷新。
+export function createCalendar(doc, initialT, { getState, getTables, getToday, onMarks, onUndo }) {
+  let t = initialT;
+  let c = t.calendar;
   const today0 = getToday();
   let view = { y: today0.getFullYear(), m: today0.getMonth() };
   let lastTodayKey = null;
@@ -32,6 +34,8 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     TAG_ICON[kind] ? h(doc, 'span', { class: 'day-tag' }, icon(doc, TAG_ICON[kind]), c.tags[kind] ?? null) : null;
 
   const title = h(doc, 'span', { class: 'cal-title', id: 'cal-title', 'aria-live': 'polite' });
+  const prevBtn = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, title: c.prevTitle, onclick: () => move(-1) });
+  const nextBtn = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, title: c.nextTitle, onclick: () => move(1) });
   const todayBtn = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-today', onclick: goToday });
   const summaryText = h(doc, 'span', { class: 'cal-summary-text' });
   const noteIcon = h(doc, 'span', { class: 'cal-note-icon' });
@@ -39,15 +43,12 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
   const note = h(doc, 'span', { class: 'cal-note' }, noteIcon, noteText);
   const yearTag = h(doc, 'span', { class: 'cal-year-tag', hidden: true });
   const reset = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-reset', hidden: true, text: c.reset, onclick: resetMonth });
+  const undo = h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-undo', text: c.undoMark, 'aria-disabled': 'true', onclick: () => { if (undo.getAttribute('aria-disabled') !== 'true') onUndo(); } });
+  const legendTitle = h(doc, 'span', { class: 'legend-title', text: c.legend });
   const legendItems = h(doc, 'span', { class: 'legend-items' });
   const grid = h(doc, 'div', { class: 'cal-grid', role: 'grid', 'aria-labelledby': 'cal-title' });
   const hint = h(doc, 'span', { class: 'legend-hint', text: c.legendHint });
-  const toolbar = h(doc, 'div', { class: 'cal-toolbar' },
-    h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-prev', text: c.prev, title: c.prevTitle, onclick: () => move(-1) }),
-    title,
-    h(doc, 'button', { type: 'button', class: 'btn btn-s btn-secondary cal-next', text: c.next, title: c.nextTitle, onclick: () => move(1) }),
-    todayBtn,
-    hint);
+  const toolbar = h(doc, 'div', { class: 'cal-toolbar' }, prevBtn, title, nextBtn, todayBtn, hint);
 
   // 图例色块只放图示（文字标签已说明类型），省宽度以保持单行
   const legendItem = (kind, label) =>
@@ -56,10 +57,8 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
 
   const el = h(doc, 'section', { class: 'calendar', 'aria-label': c.title },
     toolbar,
-    h(doc, 'div', { class: 'cal-summary' }, summaryText, note, yearTag, reset),
-    h(doc, 'div', { class: 'cal-legend' },
-      h(doc, 'span', { class: 'legend-title', text: c.legend }),
-      legendItems),
+    h(doc, 'div', { class: 'cal-summary' }, summaryText, note, yearTag, undo, reset),
+    h(doc, 'div', { class: 'cal-legend' }, legendTitle, legendItems),
     grid);
   const menu = createDayMenu(doc, el, { onChoose: apply, refocus: (btn) => focusQuietly(btn) });
   const tooltip = createDayTooltip(doc);
@@ -93,7 +92,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     const { marks } = getState();
     const prefix = `${view.y}-${String(view.m + 1).padStart(2, '0')}-`;
     const next = Object.fromEntries(Object.entries(marks).filter(([k]) => !k.startsWith(prefix)));
-    onMarks(next, c.resetDone, marks);
+    onMarks(next, (strings) => strings.calendar.resetDone, marks);
   }
 
   function apply(key, id) {
@@ -104,7 +103,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     if (mark === marks[key]) return; // 选了当前项：不改动、不弹提示
     focusKey = key;
     const md = `${m}/${d}`;
-    onMarks(next, mark === undefined ? c.cleared(md) : c.marked(md, c.kinds[MARK_KIND[mark]]), marks);
+    onMarks(next, (strings) => mark === undefined ? strings.calendar.cleared(md) : strings.calendar.marked(md, strings.calendar.kinds[MARK_KIND[mark]]), marks);
   }
 
   function toggleMenu(cell, btn) {
@@ -114,7 +113,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
       return;
     }
     const { cfg, marks } = getState();
-    menu.open(btn, cell.key, menuModel(cell.date, cfg, marks, getTables()));
+    menu.open(btn, cell.key, menuModel(cell.date, cfg, marks, getTables(), t));
   }
 
   // 键盘聚焦才立即显示；鼠标点击后的程序聚焦不弹提示（悬停另有 0.4 秒延迟）
@@ -159,14 +158,17 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
 
   const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  // 图例只建一次（内容不随月份变）
-  legendItems.replaceChildren(
-    ...LEGEND_KINDS.map((k) => legendItem(k, c.kinds[k])),
-    h(doc, 'span', { class: 'legend-item', 'data-kind': 'today' }, h(doc, 'span', { class: 'legend-swatch is-today' }), c.todayLabel),
-    h(doc, 'span', { class: 'legend-item', 'data-kind': 'manual' }, h(doc, 'span', { class: 'legend-swatch' }, h(doc, 'span', { class: 'day-dot' })), c.manual));
+  // 图例只随地区变（不随月份变）：切换地区时整体重建（文字全部来自字典）
+  function buildLegend() {
+    legendItems.replaceChildren(
+      ...LEGEND_KINDS.map((k) => legendItem(k, c.kinds[k])),
+      h(doc, 'span', { class: 'legend-item', 'data-kind': 'today' }, h(doc, 'span', { class: 'legend-swatch is-today' }), c.todayLabel),
+      h(doc, 'span', { class: 'legend-item', 'data-kind': 'manual' }, h(doc, 'span', { class: 'legend-swatch' }, h(doc, 'span', { class: 'day-dot' })), c.manual));
+  }
+  buildLegend();
 
-  function renderNote(tables, today) {
-    const m = monthContext(view.y, view.m, tables, today, t);
+  function renderNote(tables, today, provider) {
+    const m = monthContext(view.y, view.m, tables, today, t, provider);
     note.dataset.tone = m.tone;
     noteIcon.replaceChildren(m.check ? icon(doc, 'check') : m.tone === 'holiday' ? icon(doc, 'holiday') : '');
     show(noteIcon, m.check || m.tone === 'holiday');
@@ -178,12 +180,12 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
   function fitHint() {
     hint.hidden = false;
     setText(hint, c.legendHint);
-    const t = toolbar.getBoundingClientRect();
-    if (!t.width) return; // 隐藏的分页（display:none）里无从量测
+    const bar = toolbar.getBoundingClientRect();
+    if (!bar.width) return; // 隐藏的分页（display:none）里无从量测
     const last = todayBtn.getBoundingClientRect();
     const fits = () => {
       const r = hint.getBoundingClientRect();
-      return r.width && r.right <= t.right + 0.5 && r.left >= last.right + 8 - 0.5;
+      return r.width && r.right <= bar.right + 0.5 && r.left >= last.right + 8 - 0.5;
     };
     if (!fits()) {
       setText(hint, c.legendHintShort);
@@ -215,13 +217,13 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     setText(todayBtn, isThisMonth ? c.today : c.todayBack(c.monthTitle(today.getFullYear(), today.getMonth() + 1)));
     todayBtn.classList.toggle('is-away', !isThisMonth);
     const wage = monthWage(view.y, view.m, cfg, marks, tables);
-    setText(summaryText, c.summary(wage.workdays, `${t.currency}${money(wage.dailyWage)}`));
+    setText(summaryText, c.summary(wage.workdays, `${t.currency}${money(wage.dailyWage, 2, t)}`));
     // R41：缺表标签只在当年与之后的年份显示，措辞按该年实际标出的日子
-    const missing = missingTableTag(view.y, today, tables, t);
+    const missing = missingTableTag(view.y, today, tables, t, cfg.holidayProvider);
     show(yearTag, Boolean(missing));
     setText(yearTag, missing ? missing.text : '');
     yearTag.title = missing ? missing.title : '';
-    renderNote(tables, today);
+    renderNote(tables, today, cfg.holidayProvider);
     show(reset, model.hasMarks);
 
     const head = h(doc, 'div', { class: 'cal-row cal-head', role: 'row' },
@@ -234,7 +236,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
       h(doc, 'div', { class: 'cal-row', role: 'row' },
         week.map((cell) => {
           if (!cell) return h(doc, 'span', { class: 'cal-cell is-empty', role: 'gridcell' });
-          const tip = dayTooltipModel(cell.date, cfg, marks, tables, today);
+          const tip = dayTooltipModel(cell.date, cfg, marks, tables, today, t);
           const lunar = cfg.showLunar ? lunarText(cell.date, t) : null;
           const descId = `day-desc-${cell.key}`;
           const btn = h(doc, 'button', {
@@ -269,7 +271,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
           cell.manual ? h(doc, 'span', { class: 'day-dot', title: c.manualTitle }) : null);
           if (cell.key === refocus) toFocus = btn;
           return h(doc, 'span', { class: 'cal-cell', role: 'gridcell' }, btn,
-            h(doc, 'span', { id: descId, hidden: true, text: tooltipText(tip) }));
+            h(doc, 'span', { id: descId, hidden: true, text: tooltipText(tip, t) }));
         })));
     const menuHadFocus = menu.hasFocus();
     grid.replaceChildren(head, ...rows);
@@ -280,7 +282,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
       const anchor = grid.querySelector(`button[data-key="${key}"]`);
       const cell = cells.find((x) => x.key === key);
       if (anchor && cell) {
-        menu.refresh(anchor, menuModel(cell.date, cfg, marks, tables));
+        menu.refresh(anchor, menuModel(cell.date, cfg, marks, tables, t));
       } else {
         menu.close(false);
         if (menuHadFocus) focusQuietly(grid.querySelector('button[tabindex="0"]'));
@@ -288,6 +290,24 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     }
     fitHint();
     centerTodayInk();
+  }
+
+  // 切换地区：字典换掉后原地重刷静态文字、图例与整月模型（焦点 / 月份 / 菜单开合都由 render 自己保留）。
+  // 不重建任何节点，也不重新挂载（mountApp 没有 dispose，重挂会重复 listener 与 ticker）。
+  function setProfile(nextT) {
+    if (nextT === t) return;
+    t = nextT;
+    c = t.calendar;
+    el.setAttribute('aria-label', c.title);
+    setText(prevBtn, c.prev);
+    prevBtn.title = c.prevTitle;
+    setText(nextBtn, c.next);
+    nextBtn.title = c.nextTitle;
+    setText(reset, c.reset);
+    setText(undo, c.undoMark);
+    setText(legendTitle, c.legend);
+    buildLegend();
+    render(); // 内含 fitHint()：换了字典后提示文字变长／变短都重新量测
   }
 
   // 切换分页时收起菜单与提示（两者都浮在月历上）
@@ -308,8 +328,7 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     if (!ctx) return;
     ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     ctx.fontKerning = cs.fontKerning;
-    // Canvas does not inherit tabular-nums. Measure each glyph and place it in
-    // its actual DOM advance; measuring the whole proportional string drifts.
+    // Canvas 不继承等宽数字，依 DOM 中各数字的实际宽度测量。
     const node = ink.firstChild;
     const range = doc.createRange();
     let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
@@ -338,5 +357,5 @@ export function createCalendar(doc, t, { getState, getTables, getToday, onMarks 
     // 没有 FontFaceSet：只靠 resize 与 render
   }
 
-  return { el, render, hideOverlays, refreshLayout: () => { fitHint(); centerTodayInk(); } };
+  return { el, render, setProfile, hideOverlays, setUndoAvailable: (available) => undo.setAttribute('aria-disabled', String(!available)), refreshLayout: () => { fitHint(); centerTodayInk(); } };
 }
