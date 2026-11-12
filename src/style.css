@@ -143,55 +143,58 @@
   --cal-weekend-bg:#E8EAE7; --cal-weekend-num:#50584E; --cal-rest-bg:#E8EAE7;
   --cal-holiday-bg:#C8DEDF; --cal-holiday-num:#34595B;
 }
-/* 彩虹主題以暖棕色統一操作與選中態；粉、杏黃、薄荷、天藍作為淡彩背景，
-   不取代休假等语义颜色，也不改变其他主题的控件。 */
+/* 彩虹主題為夢幻淡彩（pastel aurora）：淺薰衣草紫統一操作與選中態，柔紫為品牌色，
+   粉、紫、薄荷、天藍以光暈與淡彩背景出現；不取代休假等語義顏色，也不改變其他主題的控件。 */
 :root[data-theme="rainbow"] {
-  --color-brand-50:#FFF5EE; --color-brand-100:#FBE9DC; --color-brand-600:#88432F; --color-brand-700:#703522;
-  --color-bg:#FAF9F7; --color-surface:#FFFFFF; --color-card:#FFFFFF; --color-calendar-day:#FFFFFF; --color-settings-head:#FAF7F3;
-  --color-border-subtle:#E7E2DC; --color-toast-action:#FBE9DC;
-  --color-text-900:#2F3437; --color-text-600:#5A5F66; --color-text-500:#6B7076;
-  --state-working-bg:#D9F2E6; --state-working-fg:#0B5F3E;
-  --state-before-bg:#E2EDF1; --state-before-fg:#365461;
-  --state-after-bg:#DCEBF7; --state-after-fg:#17466B;
-  --state-holiday-bg:#D7EDEE; --state-holiday-fg:#0F5257;
-  --state-lunch-bg:#FBE7D7; --state-lunch-fg:#7C3D14; --state-lunch-fill:#A34D1E;
-  --warning-bg:#E7DCCF; --warning-fg:#4A3A22;
-  --state-rest-bg:#ECEFED; --state-rest-fg:#465652;
-  --state-paid-bg:#DDF0E2; --state-paid-fg:#1F6B3A;
-  --state-makeup-bg:#FBEBD3; --state-makeup-fg:#7A4A0F;
+  --color-brand-50:#F5F1FD; --color-brand-100:#E9E2F8; --color-brand-600:#7B68AE; --color-brand-700:#5F4E8F;
+  --color-bg:#FAF8FD; --color-surface:#FFFFFF; --color-card:#FFFFFF; --color-calendar-day:#FFFFFF; --color-settings-head:#F8F5FC;
+  --color-border-subtle:#E5DFF0; --color-toast-action:#E9E2F8;
+  --color-text-900:#332F3E; --color-text-600:#55506A; --color-text-500:#666178;
+  --state-working-bg:#E4F3E9; --state-working-fg:#2F6B4F;
+  --state-before-bg:#EBE9F7; --state-before-fg:#4C4570;
+  --state-after-bg:#DCE9F9; --state-after-fg:#2F5A86;
+  --state-holiday-bg:#E2F0F3; --state-holiday-fg:#2A6068;
+  --state-lunch-bg:#FBE8D2; --state-lunch-fg:#8A5A1D; --state-lunch-fill:#A96F2C;
+  --warning-bg:#F0E4D8; --warning-fg:#5A4630;
+  --state-rest-bg:#EEEAF3; --state-rest-fg:#585270;
+  --state-paid-bg:#DFEFEC; --state-paid-fg:#2E6B60;
+  --state-makeup-bg:#FBEDD9; --state-makeup-fg:#8A5A1D;
   --state-unpaid-bg:#FBE0E6; --state-unpaid-fg:#9F1239; --state-unpaid-stripe:#FFF4F6;
-  --cal-weekend-bg:#ECEFED; --cal-weekend-num:#465652; --cal-rest-bg:#ECEFED;
-  --cal-holiday-bg:#CBEBEC; --cal-holiday-num:#0F5257;
+  --color-progress-track:#E8DEF5;
+  --cal-weekend-bg:#EEEAF3; --cal-weekend-num:#585270; --cal-rest-bg:#EEEAF3;
+  --cal-holiday-bg:#D8ECF2; --cal-holiday-num:#2A6068;
   --radius-sm:8px; --radius-md:12px; --radius-lg:18px;
-  --shadow-card:inset 0 1px 0 rgb(255 255 255 / .9), 0 6px 20px rgb(46 51 56 / .07);
-  --rainbow-band:linear-gradient(90deg, #EE9EB4, #F5C27F 30%, #9FD9B8 65%, #91CDE4);
+  --shadow-card:inset 0 1px 0 rgb(255 255 255 / .9), 0 10px 30px rgb(124 102 178 / .10);
+  --rainbow-band:linear-gradient(90deg, #CDBAF2, #F3B8D4 20%, #FFD9B8 40%, #BCEBD3 60%, #B8DEF5 80%, #CFC6F7);
   --rainbow-glow:
-    radial-gradient(ellipse at 0% 0%, rgb(243 174 192 / .35), transparent 55%),
-    radial-gradient(ellipse at 100% 0%, rgb(248 210 150 / .38), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, rgb(166 225 190 / .32), transparent 55%),
-    radial-gradient(ellipse at 0% 100%, rgb(155 211 234 / .32), transparent 55%);
+    radial-gradient(ellipse at 0% 0%, rgb(205 186 242 / .38), transparent 55%),
+    radial-gradient(ellipse at 100% 0%, rgb(243 184 212 / .36), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(188 235 211 / .30), transparent 55%),
+    radial-gradient(ellipse at 0% 100%, rgb(184 222 245 / .36), transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgb(255 244 250 / .45), transparent 70%);
 }
+:root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface); border-color: #D9C8EF; color: var(--color-brand-700); }
+:root[data-theme="rainbow"] .section-pay .scard-head { background: #F9E4F2; }
+:root[data-theme="rainbow"] .section-holiday .scard-head { background: #FFF3E2; }
+:root[data-theme="rainbow"] .section-backup .scard-head { background: #E2F4EC; }
+:root[data-theme="rainbow"] .section-display .scard-head { background: #E2EEFB; }
+:root[data-theme="rainbow"] .section-holiday .chip-ok { background: #E2EEFB; color: #2F5A86; }
+:root[data-theme="rainbow"] .switch:checked { background: #7B68AE; border-color: #7B68AE; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 1) .day.kind-workday { background: #F6E7F5; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 2) .day.kind-workday { background: #FDEAF1; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 3) .day.kind-workday { background: #E4F5EC; }
+:root[data-theme="rainbow"] .cal-cell:nth-child(4n) .day.kind-workday { background: #E3F0FB; }
 :root[data-theme="rainbow"] .status-card { background: var(--rainbow-glow), var(--color-card); }
-:root[data-theme="rainbow"] .card-band { height: 5px; background-image: var(--rainbow-band); }
+:root[data-theme="rainbow"] .card-band { height: 5px; background: linear-gradient(90deg, #F3B8D4, #FFD3E0 45%, #CDBAF2); }
 :root[data-theme="rainbow"] .main-panel { box-shadow: var(--shadow-card); }
-/* 保留實線選中態，在強制顏色模式下也不依賴漸變。 */
+/* 保留实线选中态，在强制颜色模式下也不依赖渐变。 */
 :root[data-theme="rainbow"] .tab[aria-selected="true"] { color: var(--color-brand-700); border-bottom-color: var(--color-brand-600); }
-:root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface); border-color: #D6B6A5; color: var(--color-brand-700); }
 :root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-brand-50); border-color: var(--color-brand-600); }
-:root[data-theme="rainbow"] .status-card[data-tone="working"] .bar { background: #FFF8F5; }
-:root[data-theme="rainbow"] .status-card[data-tone="working"] .bar-fill { background: #D95C72; }
-:root[data-theme="rainbow"] .section-pay .scard-head { background: #FCE4EC; }
-:root[data-theme="rainbow"] .section-holiday .scard-head { background: #FFF0D5; }
-:root[data-theme="rainbow"] .section-backup .scard-head { background: #DCF3E5; }
-:root[data-theme="rainbow"] .section-display .scard-head { background: #DDEFF9; }
-:root[data-theme="rainbow"] .section-holiday .chip-ok { background: #DDEFF9; color: #17466B; }
-:root[data-theme="rainbow"] .switch:checked { background: #24745F; border-color: #24745F; }
-:root[data-theme="rainbow"] .card-cheer { color: var(--color-brand-700); }
-/* 普通工作日用輕淡四色；有語義標記的日期沿用各自顏色。 */
-:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 1) .day.kind-workday { background: #FCE7EE; }
-:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 2) .day.kind-workday { background: #FFF1D9; }
-:root[data-theme="rainbow"] .cal-cell:nth-child(4n + 3) .day.kind-workday { background: #E1F4E8; }
-:root[data-theme="rainbow"] .cal-cell:nth-child(4n) .day.kind-workday { background: #E1F1F9; }
+:root[data-theme="rainbow"] .status-card .bar-fill { background: var(--rainbow-band); }
+@media (forced-colors: active) {
+  :root[data-theme="rainbow"] .status-card[data-tone] .bar { forced-color-adjust: none; background: Canvas; outline: 1px solid CanvasText; outline-offset: -1px; }
+  :root[data-theme="rainbow"] .status-card .bar-fill { forced-color-adjust: none; background: Highlight; }
+}
 :root[data-theme="rainbow"] .cal-cell .day.kind-workday:hover { background: var(--color-brand-100); }
 .amount { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
