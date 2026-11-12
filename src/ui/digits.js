@@ -1,6 +1,6 @@
 // 固定寬度數字格（R33）：每個 0–9 放進等寬的 span.digit，寬度 = 當前字型裡最寬的數字字形（量出來，不是猜的）。
 // 這樣不論字型本身數字是否等寬（Segoe UI Semibold、YaHei Light 等是比例數字），每 tick 變化的數字都不會左右抖動。
-// 只用 el.ownerDocument 建節點 / 量寬度（主分頁與 PiP 檔案各自量各自的），從不碰全域 document。
+// 只用 el.ownerDocument 建節點 / 量寬度（主分頁與 PiP 文件各自量各自的），從不碰全域 document。
 // 文字一律走 textContent，不用 innerHTML。
 export const DIGIT_FALLBACK = '0.62em';
 const DIGITS = '0123456789';
@@ -52,7 +52,7 @@ export function resolveDigitWidth(cache, sig, measure) {
 }
 
 // ---- DOM 部分 ----
-// 每個檔案一份快取；字型載入完成、視窗尺寸 / 縮放改變時清空（下次 render 重新量）。
+// 每個文件一份快取；字型載入完成、視窗尺寸 / 縮放改變時清空（下次 render 重新量）。
 const perDoc = new WeakMap();
 function cacheFor(doc) {
   let c = perDoc.get(doc);
@@ -70,7 +70,7 @@ function cacheFor(doc) {
   return c;
 }
 
-// 在同一個檔案、同一個元素裡放一個看不見的量尺：字型相關樣式全部繼承，量到的就是實際繪製用的字形寬度。
+// 在同一個文件、同一個元素裡放一個看不見的量尺：字型相關樣式全部繼承，量到的就是實際繪製用的字形寬度。
 function measureIn(el) {
   if (typeof el.getClientRects !== 'function' || el.getClientRects().length === 0) return null; // 未顯示
   const doc = el.ownerDocument;

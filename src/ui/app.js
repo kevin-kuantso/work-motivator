@@ -26,7 +26,7 @@ const ANNOUNCE_MS = 60000;
 // R34 / R42 / R43：只有真的停過才提示——兩次 tick 之間超過 5 秒（單調時鐘與牆上時鐘取較大者，見 pause-model.js），
 // 或 Page Lifecycle resume。單純切走分頁再回來（tick 照常）不提示。數字會一下子跳到當前時間：不打擾地提示一次，10 分鐘內最多一次。
 const PAUSE_NOTICE_EVERY_MS = 10 * 60 * 1000;
-// 顯示設定（設定 › 顯示）：改了這些欄位要立刻套用到主檔案與小窗，不必等下一次 tick
+// 顯示設定（設定 › 顯示）：改了這些欄位要立刻套用到主文件與小窗，不必等下一次 tick
 const DISPLAY_FIELDS = ['fontScale', 'showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer'];
 
 // 小窗尺寸依字號儲存；切換字號時清除目標檔位的舊手動尺寸，重新採用預設尺寸。
@@ -388,13 +388,13 @@ export function mountApp(doc, storage, clock) {
 
 
   // 顯示設定（字號檔位與狀態卡區塊開關）：唯一入口。切檔只改 <html data-font-scale>，
-  // 主檔案與小窗檔案各寫一次（小窗裡的卡片靠它算字號）。content = 區塊開關也變了（內容高度會變）。
+  // 主文件與小窗文件各寫一次（小窗裡的卡片靠它算字號）。content = 區塊開關也變了（內容高度會變）。
   function applyDisplay({ resize = false, content = false, doc: only = null, pip = null } = {}) {
     const scale = state.cfg.fontScale ?? 'm';
     for (const target of new Set([only ?? doc, cardRoot.ownerDocument])) {
       target.documentElement.dataset.fontScale = scale;
     }
-    // 小窗開著：先把字號檔位同步到小窗檔案，再重畫卡片、再量該多高
+    // 小窗開著：先把字號檔位同步到小窗文件，再重畫卡片、再量該多高
     if (pip) syncDocumentLook(doc, pip.document);
     // 區塊開關 / 字號變了：先按新設定重畫卡片，再重量參考高度（syncRef 會把 refDirty 清掉，所以順序不能反）
     if (content) tick();
@@ -418,7 +418,7 @@ export function mountApp(doc, storage, clock) {
     applyProfile();
     doc.documentElement.dataset.theme = state.cfg.theme;
     cardRoot.ownerDocument.documentElement.dataset.theme = state.cfg.theme;
-    // 字號 / 區塊開關改了：立刻套用到主檔案與小窗（不必等下一次 tick），小窗也跟著換尺寸
+    // 字號 / 區塊開關改了：立刻套用到主文件與小窗（不必等下一次 tick），小窗也跟著換尺寸
     if (displayChanged) applyDisplay({ resize: prevScale !== state.cfg.fontScale, content: true, pip: float.pipWindow() });
     const res = saveState(storage, state);
     storageOk = res.ok;

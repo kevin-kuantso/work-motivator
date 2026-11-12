@@ -36,7 +36,7 @@ const withTimeout = (p, ms, what) => {
     new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`step timeout after ${ms}ms: ${what}`)), ms); }),
   ]).finally(() => clearTimeout(timer));
 };
-// PiP 檔案的安全取法：視窗已關閉時得到 null（而不是拋錯）
+// PiP 文件的安全取法：視窗已關閉時得到 null（而不是拋錯）
 // 只用於診斷：把「本該一個都沒有的假期資料請求」單獨點名（不回應任何請求）。
 const HOLIDAY_HOSTS = /^https:\/\/(raw\.githubusercontent\.com\/NateScarlet\/holiday-cn\/master|cdn\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master|fastly\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master)\/\d{4}\.json$/;
 // 每次 reload 前只清掉假期資料鍵（含 lastCheck）：2026 / 2027 都是內建表，清掉後仍應正常顯示內建資料、
@@ -312,7 +312,7 @@ async function main() {
     check('1', !/时薪/.test(p1.text) && !/今日满勤可得/.test(p1.text), 'PiP 不含「时薪」「今日满勤可得」(innerText)', `lg-only computed display=${p1.lgOnlyDisplay}`);
     check('1', p1.openerIv100 === 0 && p1.iv100 === 1, '计时器已移到 PiP（开启者 0 个、PiP 1 个 100ms interval）', `opener=${p1.openerIv100} pip=${p1.iv100}`);
 
-    // 地區切換不重建卡片：實際 PiP 與主檔案必須同步語言、幣別和主題。
+    // 地區切換不重建卡片：實際 PiP 與主文件必須同步語言、幣別和主題。
     const switchRegion = async (region) => ev(A, `(() => { const el = document.getElementById('f-region'); el.value = '${region}'; el.dispatchEvent(new Event('change', {bubbles:true})); })()`);
     await switchRegion('TW');
     await sleep(300);

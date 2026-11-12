@@ -12,7 +12,7 @@ import { STRINGS } from '../strings.zh-CN.js';
 
 export { FILE_SOURCE };
 
-// 受保護的年份（R30）：內建表與使用者匯入的檔案，聯網資料只比較、從不覆蓋；只有聯網年份可被聯網新資料替換。
+// 受保護的年份（R30）：內建表與使用者匯入的文件，聯網資料只比較、從不覆蓋；只有聯網年份可被聯網新資料替換。
 const isProtected = (tb) => tb?.source === 'builtin' || tb?.source === 'file';
 
 const has = (o, k) => Boolean(o) && Object.prototype.hasOwnProperty.call(o, k);
@@ -41,7 +41,7 @@ export function dayCounts(table) {
 }
 
 // 狀態（假期資料卡的年份膠囊）：當年；11 月起（或已經有下一年的表時）再加下一年；檢查過才附「上次檢查 MM/DD」。
-// 匯入的年份只寫「已匯入檔案」，不聲稱來源（檔案可能來自任何地方，R30）。
+// 匯入的年份只寫「已匯入文件」，不聲稱來源（文件可能來自任何地方，R30）。
 // kind：builtin / online / file / missing（介面按 kind 上色：內建與聯網 / 匯入 = 有表，missing = 黃色）
 export function statusModel(now, tables, lastCheckMs, t) {
   const U = t.holidayUpdate;
@@ -68,7 +68,7 @@ export function statusLine(now, tables, lastCheckMs, t) {
   return [...m.chips.map((c) => c.text), ...(m.lastCheck ? [m.lastCheck] : [])].join(t.holidayUpdate.sep);
 }
 
-// 多個年份的檢查結果 → 只顯示一個。未受保護的年份優先（那才是使用者要的）；受保護年份（內建 / 匯入檔案）只會「相同」或「失敗」，
+// 多個年份的檢查結果 → 只顯示一個。未受保護的年份優先（那才是使用者要的）；受保護年份（內建 / 匯入文件）只會「相同」或「失敗」，
 // 與之不同的（diff）不套用，由頁面級提示另行告知，這裡按「已是最新」處理。
 const ORDER_OTHER = ['added', 'refreshed', 'invalid', 'network', 'unpublished', 'same'];
 const ORDER_BUILTIN = ['invalid', 'network', 'same'];
@@ -152,7 +152,7 @@ export function startHolidayUpdate(ctx) {
     emit();
   }
 
-  // source：聯網時為下載網址，匯入時為 FILE_SOURCE。內建年份永不覆蓋；聯網資料也不覆蓋匯入的檔案。
+  // source：聯網時為下載網址，匯入時為 FILE_SOURCE。內建年份永不覆蓋；聯網資料也不覆蓋匯入的文件。
   function apply(year, table, papers, source) {
     if (!current()) return;
     const cur = getTables()[year];
@@ -240,7 +240,7 @@ export function startHolidayUpdate(ctx) {
         const picked = pickResult(out);
         result = (t) => resultView(picked, t);
       }
-      // 與受保護年份不同：頁面級提示，內建與匯入檔案分別說明（兩者都不會被覆蓋）
+      // 與受保護年份不同：頁面級提示，內建與匯入文件分別說明（兩者都不會被覆蓋）
       if (!current() || seq !== mine) return;
       for (const against of ['builtin', 'file']) {
         const n = out.reduce((sum, o) => sum + (o.outcome === 'diff' && o.against === against ? o.n : 0), 0);
@@ -252,7 +252,7 @@ export function startHolidayUpdate(ctx) {
   function importFile(text) {
     if (!current()) return { ok: false };
     seq++;
-    // format：檔案格式 / 內容不合格（不是 JSON、沒有年份、validateHolidayYear 不通過）→ 附「檢視格式示例」；「已內建」不是格式問題
+    // format：文件格式 / 內容不合格（不是 JSON、沒有年份、validateHolidayYear 不通過）→ 附「檢視格式示例」；「已內建」不是格式問題
     const fail = (reason, year, format = true) => {
       result = (t) => ({ tone: 'warn', text: renderReason(reason, reason.domain === 'update' ? t.holidayUpdate : t.holidayData), detail: null, formatHelp: format });
       emit();
@@ -264,7 +264,7 @@ export function startHolidayUpdate(ctx) {
     } catch {
       json = undefined;
     }
-    // 目標年份 = 檔案自己的 year 欄位（不按當前檢視的月份猜）
+    // 目標年份 = 文件自己的 year 欄位（不按當前檢視的月份猜）
     const year = isPlainObject(json) ? json.year : undefined;
     if (!Number.isInteger(year) || year < 1000 || year > 9999) return fail({ code: 'importNoYear', domain: 'update' });
     if (getTables()[year]?.source === 'builtin') return fail({ code: 'importBuiltin', params: year, domain: 'update' }, year, false);

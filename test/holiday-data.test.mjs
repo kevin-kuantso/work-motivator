@@ -35,7 +35,7 @@ test('real 2026 file passes and equals built-in table day by day', () => {
 test('empty 2027 file is rejected', () => {
   const r = validateHolidayYear(fx('holiday-cn-2027-empty.json'), 2027);
   assert.equal(r.ok, false);
-  // 空檔案兩項都空：按校驗順序先命中 papersMissing，由流程的「未釋出」判斷另行識別（fetch 裡 kind = unpublished）
+  // 空文件兩項都空：按校驗順序先命中 papersMissing，由流程的「未釋出」判斷另行識別（fetch 裡 kind = unpublished）
   assert.equal(r.code, 'papersMissing');
   assert.equal(typeof r.reason, 'undefined', '纯校验不产出任何一种语言的句子');
   assert.equal(renderReason(r, STRINGS.holidayData), STRINGS.holidayData.papersMissing);
@@ -166,7 +166,7 @@ test('fetch: HTTP error, non-JSON, empty file all fall through; all fail -> reas
   });
   assert.equal(r.ok, false);
   assert.equal(r.kind, 'invalid');
-  // 404 → network、<html> → notJson、空檔案 → unpublished：invalid 最有資訊量，取它；reason 是那一條失敗本身
+  // 404 → network、<html> → notJson、空文件 → unpublished：invalid 最有資訊量，取它；reason 是那一條失敗本身
   assert.deepEqual(r.reason, { code: 'notJson' });
   assert.equal(renderReason(r.reason, STRINGS.holidayData), STRINGS.holidayData.notJson);
   assert.equal(i, 3);

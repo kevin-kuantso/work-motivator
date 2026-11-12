@@ -195,7 +195,7 @@ test('dayTooltipModel: status, source label and pay for every day type', () => {
   // 聯網表：source 'online'
   const online = { 2027: { off: { '2027-01-01': '元旦' }, makeup: { '2027-01-09': '元旦' }, source: 'online' } };
   assert.equal(tip(at(1, 1, 2027), {}, online).source, '来源：联网更新', 'C minor: same claim as the pill (联网取得的数据), no 「官方通知」');
-  // R30：匯入的檔案只寫「匯入檔案」，不聲稱官方來源
+  // R30：匯入的文件只寫「匯入文件」，不聲稱官方來源
   const file = { 2027: { ...online[2027], source: 'file' } };
   assert.equal(tip(at(1, 1, 2027), {}, file).source, '来源：导入文件');
   // 蓋在格子上的短寫（Task 14）：來源只寫類別，計薪寫「計薪 ¥x」

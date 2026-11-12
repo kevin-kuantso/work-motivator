@@ -1,6 +1,6 @@
 // 純函式：月曆小選單的選項、日薪預覽與懸停提示內容（spec §12.1 / §12.2）。
-// 所有文字、幣別與數字格式都取自必填的字典 t（= profile.strings）：本檔案不繫結任何一種語言，
-// 也不提供預設字典——漏傳 t 會立刻報錯，而不是悄悄顯示另一種語言。不得在本檔案寫死介面文案。
+// 所有文字、幣別與數字格式都取自必填的字典 t（= profile.strings）：本文件不繫結任何一種語言，
+// 也不提供預設字典——漏傳 t 會立刻報錯，而不是悄悄顯示另一種語言。不得在本文件寫死介面文案。
 import { dayInfo } from '../calendar.js';
 import { monthWage } from '../calc.js';
 import { money, ymd, lunarText } from './format.js';

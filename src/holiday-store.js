@@ -47,10 +47,10 @@ export function loadOnlineTables(storage) {
       if (!json) continue;
       const v = validateHolidayYear(json, year);
       if (!v.ok) continue;
-      // source 只接受匯入檔案標記 'file' 或以 https:// 開頭的下載網址（區分大小寫）；其他值丟棄該年，絕不預設為聯網
+      // source 只接受匯入文件標記 'file' 或以 https:// 開頭的下載網址（區分大小寫）；其他值丟棄該年，絕不預設為聯網
       if (!isKnownSource(entry.source)) continue;
       if (typeof entry.fetchedAt !== 'number' || !Number.isFinite(entry.fetchedAt)) continue;
-      // R30：匯入的檔案記為 'file'（不聲稱來源），其餘（記錄的是下載網址）為 'online'
+      // R30：匯入的文件記為 'file'（不聲稱來源），其餘（記錄的是下載網址）為 'online'
       tables[year] = { off: v.table.off, makeup: v.table.makeup, source: entry.source === FILE_SOURCE ? 'file' : 'online' };
       meta[year] = { source: entry.source, papers: v.papers, fetchedAt: entry.fetchedAt };
     }
@@ -97,7 +97,7 @@ export function saveLastCheck(storage, ms) {
   return update(storage, (next) => { next.lastCheck = ms; });
 }
 
-// 「自定義網址」存在假期資料記錄裡（不進設定備份檔案）；讀取時重新校驗，不合格視為未設定。
+// 「自定義網址」存在假期資料記錄裡（不進設定備份文件）；讀取時重新校驗，不合格視為未設定。
 export function loadCustomUrl(storage) {
   const { record } = readRecord(storage);
   const v = record && record.customUrl;

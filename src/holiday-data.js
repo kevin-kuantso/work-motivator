@@ -6,7 +6,7 @@
 // 預設資料來源（{year} 會被替換為年份）。不使用任何第三方代理。
 // 順序（R37）：大陸 OONI 測量（2026-05 至 11 月）cdn.jsdelivr.net 大多可達、raw.githubusercontent.com 在電信約一半失敗、
 // fastly.jsdelivr.net 無資料——沒有一個保證可達。jsDelivr @master 在 CDN 可能滯後最多 12 小時，
-// 所以某個來源給出空檔案 / 不合格資料時仍繼續嘗試下一個（新發布的年份可能先出現在 raw 上）。
+// 所以某個來源給出空文件 / 不合格資料時仍繼續嘗試下一個（新發布的年份可能先出現在 raw 上）。
 export const DEFAULT_HOLIDAY_SOURCES = Object.freeze([
   'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
   'https://fastly.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',

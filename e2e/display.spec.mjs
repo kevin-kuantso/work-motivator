@@ -200,7 +200,7 @@ test('changing the scale while floating resizes the PiP window to that scale wid
     await until(() => page.evaluate(() => (window.__pip?.calls ?? []).length > 0), 3000, 'pip opened');
     // 中號開窗：寬度 340（與既有版本一致）
     assert.equal(await page.evaluate(() => window.__pip.calls[0].width), 340);
-    // 小窗檔案也要拿到同一檔位（卡片字號由該檔案的 <html> 決定）
+    // 小窗文件也要拿到同一檔位（卡片字號由該文件的 <html> 決定）
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window?.document?.documentElement?.getAttribute('data-font-scale')), 'm');
     const initialAmountSize = await page.evaluate(() => parseFloat(getComputedStyle(window.documentPictureInPicture.window.document.querySelector('.card-amount')).fontSize));
 

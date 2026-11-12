@@ -187,7 +187,7 @@
 :root[data-theme="rainbow"] .status-card { background: var(--rainbow-glow), var(--color-card); }
 :root[data-theme="rainbow"] .card-band { height: 5px; background: linear-gradient(90deg, #F3B8D4, #FFD3E0 45%, #CDBAF2); }
 :root[data-theme="rainbow"] .main-panel { box-shadow: var(--shadow-card); }
-/* 保留实线选中态，在强制颜色模式下也不依赖渐变。 */
+/* 保留實線選中態，在強制顏色模式下也不依賴漸變。 */
 :root[data-theme="rainbow"] .tab[aria-selected="true"] { color: var(--color-brand-700); border-bottom-color: var(--color-brand-600); }
 :root[data-theme="rainbow"] .float-btn:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-brand-50); border-color: var(--color-brand-600); }
 :root[data-theme="rainbow"] .status-card .bar-fill { background: var(--rainbow-band); }

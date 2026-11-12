@@ -1,4 +1,4 @@
-// 小圖示（內聯 SVG，以 doc 建立節點，可在 PiP 檔案中使用）。純裝飾：aria-hidden。
+// 小圖示（內聯 SVG，以 doc 建立節點，可在 PiP 文件中使用）。純裝飾：aria-hidden。
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const PATHS = {

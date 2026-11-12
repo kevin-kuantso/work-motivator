@@ -36,7 +36,7 @@ export function fieldReasonText(field, reason, dict, settings) {
 // holiday：{ body, advBody, advSummary }（假期資料卡的內容與進階設定裡的自定義網址，見 holiday-panel.js）
 // profile（可選）：{ id, currency, strings }，由父級在地區切換後傳入當前地區的 profile。
 // 地區名稱/說明/示例出處來自字典（profile.strings 或構造時的 t）的 settings.region；
-// 本檔案只保留不含統計數值與網址的兜底文案。
+// 本文件只保留不含統計數值與網址的兜底文案。
 export function createSettingsPanel(doc, t, {
   getCfg, getRegion = null, onRegionChange = null, onChange, onExport, onImport,
   report = null, holiday = null, builtinYears = [], profile = null,
@@ -111,7 +111,7 @@ export function createSettingsPanel(doc, t, {
   // 當前生效的字典：profile.strings 優先，其次構造時傳入的字典。
   const activeDict = () => activeProfile?.strings || t;
 
-  // 當前地區的文案：只用當前生效字典的 settings.region，缺的鍵回落到本檔案的常量兜底。
+  // 當前地區的文案：只用當前生效字典的 settings.region，缺的鍵回落到本文件的常量兜底。
   function regionCopy() {
     const fromDict = activeDict().settings?.region || {};
     return {
@@ -144,7 +144,7 @@ export function createSettingsPanel(doc, t, {
 
   // 示例月薪的出處：只渲染結構化後設資料 { text, sources:[{ label, href }] }（也接受按地區分組的
   // { TW: {...}, CN: {...} } 或純字串），從不推斷數字或拼網址。不安全或缺失的條目整條丟棄。
-  // 沒有後設資料時只顯示本檔案的通用兜底文案，絕不顯示未經確認的統計值或連結。
+  // 沒有後設資料時只顯示本文件的通用兜底文案，絕不顯示未經確認的統計值或連結。
   function normalizeNote(note) {
     if (typeof note === 'string') return { text: note, sources: [] };
     if (!note || typeof note !== 'object') return { text: REGION_FALLBACK.salaryNote, sources: [] };
@@ -164,7 +164,7 @@ export function createSettingsPanel(doc, t, {
   }
 
   // 午休關閉時的說明：必須講清「午休仍計入工時與薪資」。舊的 lunchOffHint 只提工時，因此優先用
-  // 新的 lunchOffPay（字典或 profile 提供），沒有時用本檔案的完整兜底文案。
+  // 新的 lunchOffPay（字典或 profile 提供），沒有時用本文件的完整兜底文案。
   const lunchHintText = () => activeProfile?.strings?.settings?.region?.lunchOffPay
     || activeDict().settings?.lunchOffPay
     || activeDict().settings?.region?.lunchOffPay
@@ -390,7 +390,7 @@ export function createSettingsPanel(doc, t, {
   const currencySign = h(doc, 'span', { class: 'input-prefix-sign', 'aria-hidden': 'true' });
   const unitEl = h(doc, 'span', { class: 'unit', 'aria-hidden': 'true' });
   const salaryUnitA11y = h(doc, 'span', { class: 'visually-hidden', id: 'hint-salary-unit' });
-  // 示例月薪說明：文案與出處連結只由 profile / 字典的結構化後設資料渲染，本檔案不拼網址、不寫統計數值
+  // 示例月薪說明：文案與出處連結只由 profile / 字典的結構化後設資料渲染，本文件不拼網址、不寫統計數值
   const salaryNoteText = h(doc, 'span');
   const salarySources = h(doc, 'span', { class: 'salary-sources' });
   const salarySep = h(doc, 'span', { 'aria-hidden': 'true', hidden: true, text: ' ' });
@@ -600,7 +600,7 @@ export function createSettingsPanel(doc, t, {
   // 校驗結果 → 當前語言的文字。check() 回傳結構化原因（code + params），絕不回傳已翻譯的句子：
   // 這樣錯誤在顯示時、切語言後、以及逐欄位重試時都能按當時的字典重新措辭。
   // 翻譯統一交給 calc 的 reasonText（同一份 code → 字典鍵對映，含 labels 查表與尚未補鍵的別名），
-  // 本檔案不再自己維護一份 switch：兩邊各寫一份遲早會漂移。
+  // 本文件不再自己維護一份 switch：兩邊各寫一份遲早會漂移。
   // 唯一的例外是月薪輸入框的輸入格式說明（settings.salaryError）——它講的是「這個框怎麼填」，
   // 比 reasons.salary 更具體；按 code 選措辭，所以仍然跟著當前字典重譯，語義狀態不變。
   // validateSchedule 若還回傳舊式 reason 文字（遷移不同步時的過渡），就退化為原樣顯示，避免錯誤消失。
@@ -811,7 +811,7 @@ export function createSettingsPanel(doc, t, {
     renderRegion();
   }
 
-  // 語言（字典）與地區 profile 切換的唯一入口：先換字典，再重畫本檔案擁有的一切靜態文案、ARIA、
+  // 語言（字典）與地區 profile 切換的唯一入口：先換字典，再重畫本文件擁有的一切靜態文案、ARIA、
   // 選項文字、地區說明和欄位錯誤。全部是就地改寫文本，不重建 DOM、不重掛載、不碰輸入值、不移動焦點，
   // 也不改變已展開的進階設定與下拉框的當前值。
   function setProfile(next) {

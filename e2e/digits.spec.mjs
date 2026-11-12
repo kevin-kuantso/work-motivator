@@ -1,6 +1,6 @@
 // R33：每 tick 變化的數字用固定寬度數字格，與字型本身的數字是否等寬無關。
 // 刻意換成本機上「比例數字」的字型組合（system-ui, sans-serif + font-variant-numeric: normal），
-// 先用純文字證明它確實是比例數字（負對照），再證明數字格讓同長度字串寬度完全一樣；主分頁與 PiP stub 檔案都測。
+// 先用純文字證明它確實是比例數字（負對照），再證明數字格讓同長度字串寬度完全一樣；主分頁與 PiP stub 文件都測。
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ import { startServer, launch, openAt, expectedAutoUrls, pipStub, root } from './
 
 const T1412 = '2026-11-03T14:12:00+08:00';
 
-// 本檔案斷言的是中國地區的數字格式（千分位、¥ 金額）：明確寫入舊版（v1，無地區）設定，
+// 本文件斷言的是中國地區的數字格式（千分位、¥ 金額）：明確寫入舊版（v1，無地區）設定，
 // 讓應用走「舊資料一律歸中國」的遷移路徑，不依賴當前的新使用者預設地區（臺灣）。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
@@ -60,7 +60,7 @@ async function withPage(iso, fn, opts) {
 const spread = (w) => Math.max(...w) - Math.min(...w);
 const pipFrame = (page) => page.frames().find((f) => f !== page.mainFrame() && f.url() === 'about:blank');
 
-// 在 ctx（主分頁或 PiP 的 frame）裡：純文字 vs 數字格，量 head + tail 的繪製寬度；同時獨立量出該檔案裡最寬的數字
+// 在 ctx（主分頁或 PiP 的 frame）裡：純文字 vs 數字格，量 head + tail 的繪製寬度；同時獨立量出該文件裡最寬的數字
 function measureGroups(groups) {
   const head = document.querySelector('#status-card .amount-head');
   const tail = document.querySelector('#status-card .amount-tail');
@@ -99,7 +99,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
     await page.locator('#btn-float').click();
     await page.frameLocator('iframe.pip-stub').locator('#status-card').waitFor();
     const frame = pipFrame(page);
-    // 只在 PiP 檔案裡換成比例字型（主檔案維持原樣），並分別統計兩個檔案建立的元素
+    // 只在 PiP 文件裡換成比例字型（主文件維持原樣），並分別統計兩個文件建立的元素
     await frame.addStyleTag({ content: PROPORTIONAL_CSS });
     await page.evaluate(() => {
       const count = (proto, key) => {
@@ -110,7 +110,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
       count(Document.prototype, '__mainCreates');
       count(document.querySelector('iframe.pip-stub').contentWindow.Document.prototype, '__pipCreates');
     });
-    // 真實 tick（計時器在 PiP 視窗）：樣式變了 → 簽名變了 → 在 PiP 檔案裡重新量
+    // 真實 tick（計時器在 PiP 視窗）：樣式變了 → 簽名變了 → 在 PiP 文件裡重新量
     const ticks = [];
     for (let i = 0; i < 20; i += 1) {
       await page.clock.runFor(100);
@@ -127,7 +127,7 @@ test('PiP document: measured with the PiP document\'s own font and nodes, never 
     assert.ok(creates.pip >= 11, `measurement probe (1 + 10 digits) built in the PiP document (${creates.pip})`);
     assert.ok(new Set(ticks.map((t) => t.text)).size >= 15, 'the amount really changed on (almost) every tick');
     assert.ok(spread(ticks.map((t) => t.w)) < 0.01, `PiP amount width constant over 20 ticks: ${[...new Set(ticks.map((t) => t.w))].join(' / ')}`);
-    // 指定字串（同一份 helper）：負對照 + 數字格；--digit-w 等於 PiP 檔案裡量到的最寬數字
+    // 指定字串（同一份 helper）：負對照 + 數字格；--digit-w 等於 PiP 文件裡量到的最寬數字
     const m = await frame.evaluate(measureGroups, GROUPS);
     assertGroups(m, 'pip');
     assert.equal(ticks[0].digitW, m.digitW, 'the app measured the same width in the PiP document');

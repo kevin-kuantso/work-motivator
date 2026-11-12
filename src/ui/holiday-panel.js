@@ -1,7 +1,7 @@
 // 基本設定 › 假期資料（年份膠囊、「檢查更新」「匯入假期表文件」各帶一行說明、單一結果區、可展開的格式示例）
 // 與 進階設定 › 自定義資料網址。只負責畫面；流程在 holiday-update.js。所有文字走 textContent（聯網來的資料從不當 HTML）。
 // profile（可選）：{ id, locale, currency, strings }。setProfile() 就地重畫全部文案/ARIA/按鈕/示例，不重建 DOM。
-// getOperationToken（可選）：父級的地區代數 getter。檔案讀取開始時同步取一次，讀完若已切區就整份丟棄。
+// getOperationToken（可選）：父級的地區代數 getter。文件讀取開始時同步取一次，讀完若已切區就整份丟棄。
 // 地區差異：臺灣沒有線上檢查（單一離線檔跨來源抓官方資料集可能被 CORS 擋下；尚未逐一驗證），
 // 整列「檢查更新」連同說明都藏起來，
 // 只留手動匯入官方 CSV 並明說這條路；大陸保留「檢查更新」原樣（含檢查中的焦點與狀態）。
@@ -13,11 +13,11 @@ import { icon } from './icons.js';
 // 地區 ID 是穩定契約；只在父級沒給 profile / getRegion 時兜底。
 const REGION_TW = 'TW';
 const REGION_CN = 'CN';
-// 檔案選擇器的可接受型別：臺灣只接受官方 CSV，大陸沿用年度 JSON。
+// 文件選擇器的可接受型別：臺灣只接受官方 CSV，大陸沿用年度 JSON。
 const ACCEPT = Object.freeze({ TW: '.csv,text/csv,application/csv', CN: '.json,application/json' });
 
 // 讀檔的先後順序：每次選擇都取一個單調遞增的序號，只有「最後一次選擇」才允許把結果交給流程。
-// 讀一個幾百 KB 的 CSV 要幾毫秒到幾百毫秒；這段期間再選一個檔案、或切到別的地區再選，
+// 讀一個幾百 KB 的 CSV 要幾毫秒到幾百毫秒；這段期間再選一個文件、或切到別的地區再選，
 // 先開始的那次讀完不能蓋掉後來的選擇（成功、失敗、換區都算）。
 // 令牌在 await 之前同步取：讀完才知道期間有沒有換區；序號則決定「誰是最新的選擇」。
 // 單獨匯出以便不依賴 DOM 驗證這段順序契約（面板本身只負責把選擇器接上來）。
@@ -44,7 +44,7 @@ export function createImportReader({
     const token = getToken();
     const region = token?.region ?? REGION_CN;
     const { text, readError } = await readFile(file, region);
-    // 期間又選了別的檔案（這臺文件選擇器一次只顯示一個結果）：這次讀數作廢，不呼叫、不提示
+    // 期間又選了別的文件（這臺文件選擇器一次只顯示一個結果）：這次讀數作廢，不呼叫、不提示
     if (mine !== seq) return { delivered: false, superseded: true };
     // 已經切區/換代：這次讀取屬於舊地區，不呼叫、不提示、不寫表（父級不必再判斷）
     if (isStale(token)) return { delivered: false, stale: true };
@@ -80,7 +80,7 @@ export function createHolidayPanel(doc, t, {
     if (activeProfile?.id) return activeProfile.id;
     return lastRegion || REGION_CN;
   }
-  // 每次真正換地區：本地代數 +1，讓切換瞬間還在跑的檔案讀取全部作廢。
+  // 每次真正換地區：本地代數 +1，讓切換瞬間還在跑的文件讀取全部作廢。
   function noteRegion() {
     const r = regionNow();
     if (r !== lastRegion) {
@@ -183,10 +183,10 @@ export function createHolidayPanel(doc, t, {
     type: 'file', accept: ACCEPT[lastRegion] || ACCEPT.CN, class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true', id: 'holiday-file',
     onchange: async () => {
       const file = fileInput.files && fileInput.files[0];
-      // 先清空選擇器：同一個檔案連續選兩次也要能觸發 change
+      // 先清空選擇器：同一個文件連續選兩次也要能觸發 change
       fileInput.value = '';
       if (!file) return;
-      // 讀檔與順序判定在 reader 裡（readError／換區／期間又選了別的檔案都在那裡處理）
+      // 讀檔與順序判定在 reader 裡（readError／換區／期間又選了別的文件都在那裡處理）
       await reader.select(file);
     },
   });
@@ -204,7 +204,7 @@ export function createHolidayPanel(doc, t, {
   const resultDetail = h(doc, 'span', { class: 'holiday-result-detail' });
   const result = h(doc, 'p', { class: 'holiday-result', id: 'holiday-result', role: 'status', 'aria-live': 'polite', hidden: true }, resultText, resultDetail);
 
-  // 「檢視匯入檔案的格式示例」：可複製的等寬示例 + 兩行白話；地址是可選取的文字，不是連結
+  // 「檢視匯入文件的格式示例」：可複製的等寬示例 + 兩行白話；地址是可選取的文字，不是連結
   const code = h(doc, 'pre', { class: 'code', id: 'holiday-example-code' });
   const copyState = h(doc, 'span', { class: 'example-copy-state', role: 'status' });
   const copyBtn = h(doc, 'button', { type: 'button', class: 'btn btn-secondary btn-xs', id: 'btn-example-copy', onclick: copyExample });
@@ -533,11 +533,11 @@ export function createHolidayPanel(doc, t, {
     if (changed && result.offsetParent !== null) result.scrollIntoView({ block: 'nearest' });
   }
 
-  // 臺灣：沒有自定義網址（隱藏整塊，摘要也清空），檔案選擇器只收官方 CSV。
+  // 臺灣：沒有自定義網址（隱藏整塊，摘要也清空），文件選擇器只收官方 CSV。
   // 只有真正換地區才清掉上一區的校驗結果；輸入框裡沒送出的值一律保留（切回大陸還在），
   // 不會因為換地區就替使用者丟掉正在輸入的內容。
   // 臺灣：整列「檢查更新」隱藏（含說明與 aria-describedby 的指向物）。焦點若正停在即將被藏起來的
-  // 節點裡（檢查鈕 / 說明 / 自定義網址那一塊），交給「匯入假日表檔案」，不讓焦點掉回 body。
+  // 節點裡（檢查鈕 / 說明 / 自定義網址那一塊），交給「匯入假日表文件」，不讓焦點掉回 body。
   // 大陸：原樣顯示，不主動搶焦點。
   function renderRegionChrome(prevRegion) {
     const tw = lastRegion === REGION_TW;
@@ -573,7 +573,7 @@ export function createHolidayPanel(doc, t, {
     if (next) activeProfile = next;
     U = dictU();
     const wasRegion = lastRegion;
-    noteRegion(); // 地區變了就換代：此前開始的檔案讀取作廢
+    noteRegion(); // 地區變了就換代：此前開始的文件讀取作廢
     retranslate();
     renderExampleLines();
     setExample(!example.hidden, false);

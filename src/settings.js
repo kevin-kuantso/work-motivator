@@ -60,7 +60,7 @@ const CFG_RULES = {
 };
 
 const salaryReason = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? null : reason('salary'));
-// 認不出的地區 ID 是對「地區的取值」不合法：結構本身沒問題，別用「檔案內容的結構不正確」硬套。
+// 認不出的地區 ID 是對「地區的取值」不合法：結構本身沒問題，別用「文件內容的結構不正確」硬套。
 const regionReason = () => reason('region');
 
 function markKeyReason(key) {

@@ -11,7 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 //  - 三個假期資料來源模板（只有按「檢查更新」或自動檢查條件成立時才會請求）
 //  - 校驗用的 gov.cn 字首（只做字串比較，從不請求）
 //  - 自定義網址的輸入框佔位示例（example.com 是 RFC 2606 保留的示例域名，從不請求）
-//  - 「匯入檔案的格式示例」裡的出處連結（holiday-cn 2026.json 的 papers；只作顯示 / 複製的文字，從不請求；Task 14 / R47）
+//  - 「匯入文件的格式示例」裡的出處連結（holiday-cn 2026.json 的 papers；只作顯示 / 複製的文字，從不請求；Task 14 / R47）
 export const URL_ALLOWLIST = Object.freeze([
   'https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json',
   'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',

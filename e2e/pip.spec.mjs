@@ -9,7 +9,7 @@ import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harnes
 const T1412 = '2026-11-03T14:12:00+08:00';
 const T1830 = '2026-11-03T18:30:00+08:00';
 
-// 本檔案斷言的是中國地區文案與金額：明確寫入舊版（v1，無地區）設定，讓應用走「舊資料一律歸中國」的遷移路徑，
+// 本文件斷言的是中國地區文案與金額：明確寫入舊版（v1，無地區）設定，讓應用走「舊資料一律歸中國」的遷移路徑，
 // 不依賴應用當前的新使用者預設地區（臺灣）。舊設定裡午休 11:30–13:00 與「開啟午休」是一組合法值。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;

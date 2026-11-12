@@ -17,7 +17,7 @@
 // 因為無法安全合併原記錄。
 //
 // 優先序（內建 > 匯入 > 線上）不在這裡執行：內建年份是靜態資料、從不進儲存；具體規則在編排層
-// （holiday-update-tw.js 的 isProtected/rankOf）。本模組只如實儲存來源，讓編排層分得清匯入檔案與線上資料，
+// （holiday-update-tw.js 的 isProtected/rankOf）。本模組只如實儲存來源，讓編排層分得清匯入文件與線上資料，
 // 並且不提供自訂網址（TW 沒有這個功能，記錄裡也不會有 customUrl）。
 //
 // 所有失敗都返回穩定的程式碼，不返回已翻譯文字：'storage'（Web Storage 讀寫失敗）、'corrupt'（記錄損壞或版本未知）、
@@ -253,7 +253,7 @@ export function saveTwLastCheck(storage, ms) {
 }
 
 // 優先序判斷（真正的執行在編排層，這裡只提供一致的規則）：
-// 內建年份永不被覆蓋；已匯入的檔案不被線上資料覆蓋；線上資料可被線上或匯入替換。
+// 內建年份永不被覆蓋；已匯入的文件不被線上資料覆蓋；線上資料可被線上或匯入替換。
 // current 傳 tables[year]（可為 undefined）；incoming 傳 FILE_SOURCE（匯入）或線上 CSV 網址。
 export function mayReplaceTw(current, incoming) {
   const cur = current?.source;

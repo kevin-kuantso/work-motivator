@@ -34,7 +34,7 @@ const synth2028 = (patch = {}) => JSON.stringify({
   ...patch,
 });
 
-// 2027 已是內建年份：把內建錶轉成上游格式的「官方檔案」，用於「內建年份不被覆蓋 / 與內建不同」的測試。
+// 2027 已是內建年份：把內建錶轉成上游格式的「官方文件」，用於「內建年份不被覆蓋 / 與內建不同」的測試。
 // 只比較日期與型別（節日名稱不同不算差異），所以直接沿用內建表的名稱即可。
 const fromTable = (year, table, papers) => JSON.stringify({
   year,
@@ -54,9 +54,9 @@ const changed2027 = () => {
   return fromTable(2027, { off, makeup }, ['https://www.gov.cn/zhengce/test-only-2027.htm']);
 };
 
-// 本檔案斷言的是中國地區的假期來源、文案與金額：明確寫入舊版（v1，無地區）設定，
+// 本文件斷言的是中國地區的假期來源、文案與金額：明確寫入舊版（v1，無地區）設定，
 // 讓應用走「舊資料一律歸中國」的遷移路徑，不依賴應用當前的新使用者預設地區（臺灣）。
-// 全檔案沒有 seed: false：首次提示要求 localStorage 裡沒有設定，與寫入中國設定互斥，
+// 全文件沒有 seed: false：首次提示要求 localStorage 裡沒有設定，與寫入中國設定互斥，
 // 所以凡是需要頁面級提示的用例都直接斷言差異提示本身，不構造「排在首次提示之後」。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
 const CN_SEED = `if (!sessionStorage.getItem('cn-seeded')) { localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_LEGACY))}); sessionStorage.setItem('cn-seeded', '1'); }`;
@@ -636,12 +636,12 @@ test('R30: an imported year is labelled 「导入文件」 (tooltip, status line
     assert.deepEqual(base, ['2月6日 周日', '法定假日·春节', '导入文件', '计薪 ¥0.00'], `date / status / source / pay lines: ${JSON.stringify(lines)}`);
     assert.equal(lunar, '农历正月十二');
     assert.equal(lines[1], lunar, 'lunar line right under the date');
-    // 聯網有不同的 2028：不覆蓋匯入的檔案，頁面級提示
+    // 聯網有不同的 2028：不覆蓋匯入的文件，頁面級提示
     const changed = JSON.parse(synth2028());
     changed.days = changed.days.filter((d) => d.date !== '2028-01-03');
     body2028 = JSON.stringify(changed);
     await checkNow(page);
-    // 頁面級提示直接就是檔案差異這一條：首次提示需要 localStorage 裡沒有設定，與本用例明確寫入的中國設定互斥
+    // 頁面級提示直接就是文件差異這一條：首次提示需要 localStorage 裡沒有設定，與本用例明確寫入的中國設定互斥
     assert.equal(await page.locator('.notices .banner-info').getAttribute('data-id'), 'holidayDiffFile');
     assert.equal(await text(page, '.notices .banner-info .banner-text'), '网上的放假安排与你导入的文件有 1 天不同，暂按导入的文件计算');
     assert.equal((await holidayRecord(page)).years['2028'].source, 'file');

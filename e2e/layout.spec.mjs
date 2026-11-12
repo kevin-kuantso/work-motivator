@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { startServer, launch, openAt, expectedAutoUrls, pipStub } from './harness.mjs';
 
-// 截圖只在設了 WM_SHOTS=目錄 時才寫（預設不寫任何檔案，Task 14 E3）
+// 截圖只在設了 WM_SHOTS=目錄 時才寫（預設不寫任何文件，Task 14 E3）
 const SHOTS = process.env.WM_SHOTS || null;
 async function shot(page, name) {
   if (!SHOTS) return;
@@ -17,7 +17,7 @@ async function shot(page, name) {
 
 const T1412 = '2026-11-03T14:12:00+08:00'; // 2026-11：週一為首共 6 周
 
-// 本檔案斷言的是中國地區的版面文案、幣別與年表：明確寫入舊版（v1，無地區）設定，
+// 本文件斷言的是中國地區的版面文案、幣別與年表：明確寫入舊版（v1，無地區）設定，
 // 讓應用走「舊資料一律歸中國」的遷移路徑，不依賴應用當前的新使用者預設地區（臺灣）。
 // 例外：斷言首次提示橫幅的測試必須讓 localStorage 裡沒有設定，因此那些用例以 seed: false 保持全新使用者。
 const CN_LEGACY = { version: 1, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '' };
@@ -1687,7 +1687,7 @@ test('A3: unsupported browser — float button is aria-disabled (not native disa
 
 // ---- Task 14 fix round 1 · Block B ----
 
-// B1（WCAG 2.4.11）：按下「檢視匯入檔案的格式示例」後，獲得焦點的展開鈕仍在右欄的可見範圍內（示例比右欄高時也一樣）
+// B1（WCAG 2.4.11）：按下「檢視匯入文件的格式示例」後，獲得焦點的展開鈕仍在右欄的可見範圍內（示例比右欄高時也一樣）
 test('B1: after expanding the example the focused toggle stays inside the visible rect of every scroller around it (two-column 1280×585, 1366×650; single-column 1100×520, 1093×535, 1024×468)', () =>
   withPage(T1412, async (page) => {
     for (const [w, ht] of [[1280, 585], [1366, 650], [1100, 520], [1093, 535], [1024, 468]]) {

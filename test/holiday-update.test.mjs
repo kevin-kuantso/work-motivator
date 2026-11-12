@@ -246,7 +246,7 @@ test('auto-check: 2027 built in -> nothing to fetch in Nov 2026 either', async (
   assert.deepEqual(h.calls, []);
   assert.equal(loadLastCheck(h.storage), null, 'no attempt -> lastCheck untouched');
   assert.equal(h.tables()[2027], HOLIDAYS_CN[2027]);
-  // 次年（2028）沒有表時照常抓取（空檔案會繼續試下一個來源）
+  // 次年（2028）沒有表時照常抓取（空文件會繼續試下一個來源）
   const empty2028 = JSON.stringify({ year: 2028, papers: [], days: [] });
   const n = harness({ now: new Date(2027, 10, 4, 9), fetchImpl: byHost({ 'cdn.jsdelivr.net': resp(empty2028) }) });
   await n.api.autoCheckIfNeeded();
@@ -425,7 +425,7 @@ test('importFile: success / rejected / no year / built-in year / not JSON', () =
   assert.deepEqual(b, { ok: false, reason: { code: 'importBuiltin', params: 2026, domain: 'update' }, year: 2026 });
   assert.equal(h.last().result.text, t.holidayUpdate.importBuiltin(2026));
   assert.equal(h.tables()[2026], HOLIDAYS_CN[2026]);
-  // 空檔案（未釋出）匯入：按校驗拒絕，不當作「該年沒有假日」
+  // 空文件（未釋出）匯入：按校驗拒絕，不當作「該年沒有假日」
   const e = h.api.importFile(JSON.stringify({ year: 2029, papers: [], days: [] }));
   assert.equal(e.ok, false);
   assert.equal(h.tables()[2029], undefined);
@@ -465,7 +465,7 @@ test('reload (other tab changed the holidays key): re-read tables, no storage wr
   assert.equal(h.tables()[2026], HOLIDAYS_CN[2026]);
 });
 
-// ---- R30：匯入的檔案年份受保護 ----
+// ---- R30：匯入的文件年份受保護 ----
 test('R30: online data never overwrites an imported (file) year; differing data -> 「联网数据与导入的表有 N 处不同，未采用」', async () => {
   const storage = memStore();
   const body = file2027();
@@ -495,7 +495,7 @@ test('R30: online data never overwrites an imported (file) year; differing data 
   });
   await api2.checkNow();
   assert.deepEqual(notes, []);
-  // 使用者可以再次匯入覆蓋自己的檔案年份
+  // 使用者可以再次匯入覆蓋自己的文件年份
   assert.equal(api2.importFile(JSON.stringify(body)).ok, true);
   assert.equal(cur[2027].off['2027-04-05'], '清明节');
 });
