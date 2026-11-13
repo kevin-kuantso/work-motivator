@@ -1,5 +1,6 @@
 node_modules/
 dist/
 electron/app/
+electron/dist/
 electron/release/
 .DS_Store

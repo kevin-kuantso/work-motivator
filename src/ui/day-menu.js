@@ -8,7 +8,7 @@ const OPTION_ICON = { default: 'reset', work: 'makeup', rest: 'rest', paidLeave:
 const GAP = 4;
 
 // refocus(btn)：把焦點還給日期格（呼叫方用來區分程式聚焦，避免 Esc 後立刻彈出提示）。
-export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn.focus() }) {
+export function createDayMenu(doc, container, { onChoose, onChange = () => {}, refocus = (btn) => btn.focus() }) {
   const win = doc.defaultView;
   const header = h(doc, 'p', { class: 'day-menu-header', id: 'day-menu-header' });
   const list = h(doc, 'div', { class: 'day-menu-list', id: 'day-menu', role: 'menu', 'aria-labelledby': 'day-menu-header', 'aria-describedby': 'day-menu-footer' });
@@ -90,6 +90,7 @@ export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn
   function open(btn, key, model) {
     if (openKey !== null) close(false);
     openKey = key;
+    onChange(openKey);
     build(model);
     setAnchor(btn);
     el.hidden = false;
@@ -113,6 +114,7 @@ export function createDayMenu(doc, container, { onChoose, refocus = (btn) => btn
   function close(returnFocus) {
     if (openKey === null) return;
     openKey = null;
+    onChange(null);
     el.hidden = true;
     doc.removeEventListener('pointerdown', onOutside, true);
     win.removeEventListener('resize', onResize);

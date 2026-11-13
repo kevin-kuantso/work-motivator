@@ -124,6 +124,20 @@ test('click opens a menu with header, options and footer; keyboard moves; Esc re
     assert.equal((await focused(page)).key, '2026-11-07', 'focus back on the cell after applying');
   }));
 
+test('the date whose menu is open stays selected while another date can still hover', () =>
+  withPage(T1412, async (page) => {
+    const selected = cell(page, '11月7日');
+    const other = cell(page, '11月6日');
+    await selected.click();
+    await menu(page).waitFor({ state: 'visible' });
+    assert.equal(await selected.evaluate((el) => el.classList.contains('is-selected')), true);
+    // 選單可覆蓋鄰近日期；強制派發懸停事件，驗證該互動不會清掉來源日期的選取。
+    await other.hover({ force: true });
+    assert.equal(await selected.evaluate((el) => el.classList.contains('is-selected')), true);
+    await page.locator('.cal-summary-text').click();
+    assert.equal(await selected.evaluate((el) => el.classList.contains('is-selected')), false);
+  }));
+
 test('calendar undo remains available after the toast expires and reverses only the latest change', () =>
   withPage(T1412, async (page) => {
     const undo = page.locator('.cal-undo');

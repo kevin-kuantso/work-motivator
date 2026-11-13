@@ -7,6 +7,7 @@ export const STRINGS = {
 
   header: {
     float: '懸浮成小窗',
+    repository: '在 GitHub 查看專案',
   },
 
   // 右側分頁

@@ -12,6 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 //  - 校驗用的 gov.cn 字首（只做字串比較，從不請求）
 //  - 自定義網址的輸入框佔位示例（example.com 是 RFC 2606 保留的示例域名，從不請求）
 //  - 「匯入文件的格式示例」裡的出處連結（holiday-cn 2026.json 的 papers；只作顯示 / 複製的文字，從不請求；Task 14 / R47）
+//  - 主畫面使用者主動點擊的官方 GitHub 專案連結（不由應用程式自動請求）
 export const URL_ALLOWLIST = Object.freeze([
   'https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json',
   'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json',
@@ -25,6 +26,7 @@ export const URL_ALLOWLIST = Object.freeze([
   'https://data.gov.tw/license',
   'https://www.dgpa.gov.tw/FileConversion?filename=dgpa/files/202506/a52331bd-a189-466b-b0f0-cae3062bbf74.csv&nfix=&name=115%e5%b9%b4%e4%b8%ad%e8%8f%af%e6%b0%91%e5%9c%8b%e6%94%bf%e5%ba%9c%e8%a1%8c%e6%94%bf%e6%a9%9f%e9%97%9c%e8%be%a6%e5%85%ac%e6%97%a5%e6%9b%86%e8%a1%a8.csv',
   'https://www.dgpa.gov.tw/FileConversion?filename=dgpa/files/202607/f538b1ff-ba60-4c63-9477-10db8e6612d1.csv&nfix=&name=116%e5%b9%b4%e4%b8%ad%e8%8f%af%e6%b0%91%e5%9c%8b%e6%94%bf%e5%ba%9c%e8%a1%8c%e6%94%bf%e6%a9%9f%e9%97%9c%e8%be%a6%e5%85%ac%e6%97%a5%e6%9b%86%e8%a1%a8_utf8bom.csv',
+  'https://github.com/kevin-kuantso/work-motivator',
 ]);
 // 不帶主機名的 "https://" 只允許出現在這兩個固定上下文裡（R31），且成品裡出現的次數固定（見下方 dist 測試）。
 // 其他任何裸 "https://"（例如 "https://" + host 的拼接）都會被當成 URL 報出來。

@@ -54,6 +54,11 @@ test('Taiwan dictionary implements the mainland dictionary contract and uses Tai
   assert.deepEqual(bad, []);
 });
 
+test('both locale headers name the GitHub repository entry point', () => {
+  assert.match(STRINGS.header.repository, /GitHub/);
+  assert.match(TW.header.repository, /GitHub/);
+});
+
 test('the approved Task 14 copy is present verbatim', () => {
   const s = STRINGS.settings;
   assert.equal(s.backupDesc, '设置只保存在这个浏览器里，不会上传。');

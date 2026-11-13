@@ -28,6 +28,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
   let focusKey = null; // 下一次重繪後要聚焦的日期（套用選單、PgUp / PgDn）
   let rovingKey = null; // 月曆的 Tab 停靠點：跟著實際焦點走
   let quiet = false; // 程式聚焦（Esc 關選單、重繪後還原焦點）時不彈提示
+  let selectedKey = null; // 只在日期選單開啟期間存在的視覺選取，不寫入設定
 
   // 法定假日格只放旗子圖示 + 節日名（Task 18：不再有「假」字；無節日名時只剩旗子，格子的無障礙名稱仍寫明「法定假日」）
   const tag = (kind) =>
@@ -60,7 +61,14 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
     h(doc, 'div', { class: 'cal-summary' }, summaryText, note, yearTag, undo, reset),
     h(doc, 'div', { class: 'cal-legend' }, legendTitle, legendItems),
     grid);
-  const menu = createDayMenu(doc, el, { onChoose: apply, refocus: (btn) => focusQuietly(btn) });
+  const menu = createDayMenu(doc, el, {
+    onChoose: apply,
+    onChange: (key) => {
+      selectedKey = key;
+      for (const btn of grid.querySelectorAll('.day')) btn.classList.toggle('is-selected', btn.dataset.key === key);
+    },
+    refocus: (btn) => focusQuietly(btn),
+  });
   const tooltip = createDayTooltip(doc);
   el.append(menu.el);
 
@@ -241,7 +249,7 @@ export function createCalendar(doc, initialT, { getState, getTables, getToday, o
           const descId = `day-desc-${cell.key}`;
           const btn = h(doc, 'button', {
             type: 'button',
-            class: `day kind-${cell.kind}${cell.today ? ' is-today' : ''}${cell.manual ? ' is-manual' : ''}`,
+            class: `day kind-${cell.kind}${cell.today ? ' is-today' : ''}${cell.manual ? ' is-manual' : ''}${cell.key === selectedKey ? ' is-selected' : ''}`,
             'data-key': cell.key,
             'data-day': String(cell.day),
             tabindex: cell.key === tabKey ? '0' : '-1',

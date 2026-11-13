@@ -82,6 +82,14 @@ const errorBar = '.notices .banner-error';
 const infoBar = '.notices .banner-info';
 const todayCell = (page, label) => page.locator(`.cal-grid button[aria-label^="${label} "]`);
 
+test('header repository link is labelled and points only to the general-edition repository', () =>
+  withPage(T1412, async (page) => {
+    const link = page.locator('#repo-link');
+    assert.equal(await link.getAttribute('href'), 'https://github.com/kevin-kuantso/work-motivator');
+    assert.equal(await link.getAttribute('target'), '_blank');
+    assert.match(await link.getAttribute('aria-label'), /GitHub/);
+  }));
+
 test('themes coordinate the working badge, card band and progress while keeping calendar states legible', () =>
   withPage(T1412, async (page) => {
     await openSettings(page);

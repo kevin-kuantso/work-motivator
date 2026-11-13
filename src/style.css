@@ -247,6 +247,10 @@ button, input, select { font: inherit; color: inherit; }
 .app-header { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; margin-bottom: var(--space-2); flex: none; }
 .app-logo { width: calc(28px * var(--fs-scale)); height: calc(28px * var(--fs-scale)); flex: none; object-fit: contain; }
 .app-header h1 { font-size: calc(18px * var(--fs-scale)); line-height: calc(28px * var(--fs-scale)); font-weight: 700; }
+.app-repo-link { margin-left: auto; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--color-text-600); }
+.app-repo-link:hover { background: var(--color-brand-50); color: var(--color-brand-700); }
+.app-repo-link:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
+.app-repo-link .icon { width: 18px; height: 18px; }
 
 /* Banners（單行薄條約 28px；info → before, error → unpaid） */
 .notices { display: grid; gap: var(--space-2); margin-bottom: var(--space-2); flex: none; }
@@ -628,6 +632,10 @@ button, input, select { font: inherit; color: inherit; }
    有标记的格子（法定假日/带薪假/无薪假/调休上班/手动改休息）已经有自己的底色，不去盖掉它 */
 .day.kind-workday:hover, .day.kind-weekend:hover { background: var(--color-brand-50); }
 .day:focus-visible { outline: 2px solid var(--color-text-900); outline-offset: 1px; }
+/* 日期選單開啟時保留來源日期的選取感：外圈不蓋掉假別色，普通日期才補一層柔和底色。 */
+.day.is-selected { border-color: var(--color-brand-600); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-600) 24%, transparent); z-index: 1; }
+.day.is-selected.kind-workday, .day.is-selected.kind-weekend { background: var(--color-brand-50); }
+.day.is-selected:focus-visible { outline-color: var(--color-text-900); }
 /* 數字寬於圓時也以圓心為基準居中；今天另按實際墨跡對齊。 */
 .day-num { font-size: calc(13px * var(--fs-scale)); font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; height: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .day-num-ink { flex: none; }
@@ -656,6 +664,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .kind-rest { background: var(--cal-rest-bg); }
 .day.is-today { border: 2px solid var(--color-brand-600); padding: 3px 5px 1px; }
+.day.is-today.is-selected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-600) 30%, transparent); }
 /* 今日圓圈隨字級放大，M 以下維持原尺寸，避免大字貼住圓邊。 */
 .day.is-today .day-num { width: max(22px, calc(22px * var(--fs-scale))); height: max(22px, calc(22px * var(--fs-scale))); flex: none; background: var(--color-brand-600); color: #fff; }
 /* 大格子放大日期並放寬內邊距；今日圓圈仍隨全域性字級調整。 */

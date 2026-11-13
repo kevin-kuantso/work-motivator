@@ -4,6 +4,7 @@ import logo from '../logo.png';
 import { STORAGE_KEY, defaultsFor, loadState, saveState, exportState, importState } from '../settings.js';
 import { PROFILES } from '../profiles.js';
 import { h, show, setText } from './dom.js';
+import { icon } from './icons.js';
 import { renderCard, syncReferenceHeight } from './card.js';
 import { createSettingsPanel } from './settings-panel.js';
 import { createCalendar } from './calendar-view.js';
@@ -27,6 +28,7 @@ const ANNOUNCE_MS = 60000;
 // R34 / R42 / R43：只有真的停過才提示——兩次 tick 之間超過 5 秒（單調時鐘與牆上時鐘取較大者，見 pause-model.js），
 // 或 Page Lifecycle resume。單純切走分頁再回來（tick 照常）不提示。數字會一下子跳到當前時間：不打擾地提示一次，10 分鐘內最多一次。
 const PAUSE_NOTICE_EVERY_MS = 10 * 60 * 1000;
+const REPOSITORY_URL = 'https://github.com/kevin-kuantso/work-motivator';
 // 顯示設定（設定 › 顯示）：改了這些欄位要立刻套用到主文件與小窗，不必等下一次 tick
 const DISPLAY_FIELDS = ['fontScale', 'showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer'];
 
@@ -126,7 +128,11 @@ export function mountApp(doc, storage, clock) {
   const fileInput = h(doc, 'input', { type: 'file', accept: '.json,application/json', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true', onchange: onFile });
   const header = h(doc, 'header', { class: 'app-header' },
     h(doc, 'img', { class: 'app-logo', src: logo, alt: '', width: 28, height: 28 }),
-    h(doc, 'h1', { text: t.appTitle }));
+    h(doc, 'h1', { text: t.appTitle }),
+    h(doc, 'a', {
+      id: 'repo-link', class: 'app-repo-link', href: REPOSITORY_URL, target: '_blank', rel: 'noopener noreferrer',
+      'aria-label': t.header.repository, title: t.header.repository,
+    }, icon(doc, 'github')));
 
   // ---- 主區：左 狀態卡｜右 分頁「月曆」「基本設定」----
   let holiday = null; // 下方建立；面板的回撥在使用者操作時才會用到
@@ -359,6 +365,9 @@ export function mountApp(doc, storage, clock) {
       target.documentElement.dataset.theme = state.cfg.theme;
     }
     setText(header.querySelector('h1'), t.appTitle);
+    const repositoryLink = header.querySelector('#repo-link');
+    repositoryLink.setAttribute('aria-label', t.header.repository);
+    repositoryLink.title = t.header.repository;
     setText(toastUndo, t.calendar.undo);
     if (toastMessage !== null) setText(toastText, resolveMessage(toastMessage));
     banners.setProfile(profile);
