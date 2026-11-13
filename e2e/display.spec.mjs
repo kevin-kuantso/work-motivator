@@ -105,22 +105,31 @@ test('reduced motion rotates nonblank encouragement without animation', () =>
     assert.equal(await page.locator('.card-cheer').textContent(), '第一句');
   }));
 
-test('font scale changes the whole page at once and is remembered after reload', () =>
+test('font scale changes only the status card and is remembered after reload', () =>
   withPage(T1412, async (page) => {
     await openSettings(page);
     // 預設中號：與未加這個設定時一致（屬性有值、整頁係數為 1）
     assert.equal(await attr(page, 'data-font-scale'), 'm');
     const base = await fontSize(page, '.card-label');
+    const calendarBase = await fontSize(page, '.cal-title');
+    const settingsBase = await fontSize(page, '.scard-title');
+    const headerBase = await fontSize(page, '.app-header h1');
 
     await pickScale(page, 's');
     await until(async () => (await attr(page, 'data-font-scale')) === 's', 2000, 'scale s');
     const small = await fontSize(page, '.card-label');
     assert.ok(small < base, `s should be smaller: ${small} < ${base}`);
+    assert.equal(await fontSize(page, '.cal-title'), calendarBase);
+    assert.equal(await fontSize(page, '.scard-title'), settingsBase);
+    assert.equal(await fontSize(page, '.app-header h1'), headerBase);
 
     await pickScale(page, 'xl');
     await until(async () => (await attr(page, 'data-font-scale')) === 'xl', 2000, 'scale xl');
     const xl = await fontSize(page, '.card-label');
     assert.ok(xl > base, `xl should be larger: ${xl} > ${base}`);
+    assert.equal(await fontSize(page, '.cal-title'), calendarBase);
+    assert.equal(await fontSize(page, '.scard-title'), settingsBase);
+    assert.equal(await fontSize(page, '.app-header h1'), headerBase);
 
     // 存檔寫成穩定 ID（xs…xl），不是畫素或譯文
     assert.equal((await stored(page)).fontScale, 'xl');
@@ -131,17 +140,23 @@ test('font scale changes the whole page at once and is remembered after reload',
     assert.equal(await fontSize(page, '.card-label'), xl);
   }));
 
-test('each font scale applies the same ratio to representative page text and the main amount', () =>
+test('each font scale applies its ratio only to status-card typography', () =>
   withPage(T1412, async (page) => {
     await openSettings(page);
-    const selectors = ['.app-header h1', '.card-label', '.card-amount', '.metric-value', '.card-progress-title', '.scard-title', '#f-fontScale', '.tab'];
-    const sizes = async () => page.evaluate((items) => items.map((s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize)), selectors);
-    const base = await sizes();
+    const cardSelectors = ['.card-label', '.card-amount', '.metric-value', '.card-progress-title'];
+    const pageSelectors = ['.app-header h1', '.scard-title', '#f-fontScale', '.tab'];
+    const sizes = async (items) => page.evaluate((targets) => targets.map((s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize)), items);
+    const cardBase = await sizes(cardSelectors);
+    const pageBase = await sizes(pageSelectors);
     for (const [scale, ratio] of [['xs', .8], ['s', .9], ['m', 1], ['l', 1.1], ['xl', 1.2]]) {
       await pickScale(page, scale);
-      const actual = await sizes();
-      for (let i = 0; i < selectors.length; i++) {
-        assert.ok(Math.abs(actual[i] - base[i] * ratio) < .05, `${scale} ${selectors[i]}: ${actual[i]} vs ${base[i] * ratio}`);
+      const cardActual = await sizes(cardSelectors);
+      const pageActual = await sizes(pageSelectors);
+      for (let i = 0; i < cardSelectors.length; i++) {
+        assert.ok(Math.abs(cardActual[i] - cardBase[i] * ratio) < .05, `${scale} ${cardSelectors[i]}: ${cardActual[i]} vs ${cardBase[i] * ratio}`);
+      }
+      for (let i = 0; i < pageSelectors.length; i++) {
+        assert.equal(pageActual[i], pageBase[i], `${scale} ${pageSelectors[i]} remains fixed`);
       }
     }
   }));
@@ -198,8 +213,8 @@ test('changing the scale while floating resizes the PiP window to that scale wid
   return withPage(T1412, async (page) => {
     await page.locator('#btn-float').click();
     await until(() => page.evaluate(() => (window.__pip?.calls ?? []).length > 0), 3000, 'pip opened');
-    // 中號開窗：寬度 340（與既有版本一致）
-    assert.equal(await page.evaluate(() => window.__pip.calls[0].width), 340);
+    // 中號開窗：一般版的小窗寬度與桌面殼的 m 檔一致。
+    assert.equal(await page.evaluate(() => window.__pip.calls[0].width), 352);
     // 小窗文件也要拿到同一檔位（卡片字號由該文件的 <html> 決定）
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window?.document?.documentElement?.getAttribute('data-font-scale')), 'm');
     const initialAmountSize = await page.evaluate(() => parseFloat(getComputedStyle(window.documentPictureInPicture.window.document.querySelector('.card-amount')).fontSize));
@@ -212,7 +227,7 @@ test('changing the scale while floating resizes the PiP window to that scale wid
       3000,
       'pip resize',
     );
-    assert.equal(resized, 372);
+    assert.equal(resized, 384);
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window?.document?.documentElement?.getAttribute('data-font-scale')), 'xl');
     const enlargedAmountSize = await page.evaluate(() => parseFloat(getComputedStyle(window.documentPictureInPicture.window.document.querySelector('.card-amount')).fontSize));
     assert.ok(Math.abs(enlargedAmountSize - initialAmountSize * 1.2) < .05, `PiP amount: ${initialAmountSize} → ${enlargedAmountSize}`);
@@ -273,8 +288,10 @@ test('content changes refit while unchanged content preserves a manual size', ()
     const compact = await page.evaluate(() => window.documentPictureInPicture.window.innerHeight);
     assert.ok(compact < expanded, `${expanded} → ${compact}`);
     await page.clock.runFor(400);
-    await page.locator('#btn-float').click();
-    await page.locator('#btn-float').click();
+    // Stub iframe lives inside the page and can overlap the button; invoke the
+    // same native button action so this checks close/reopen rather than layout.
+    await page.locator('#btn-float').evaluate((button) => button.click());
+    await page.locator('#btn-float').evaluate((button) => button.click());
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window.innerHeight), compact);
   }, { init: stub });
 });

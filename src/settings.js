@@ -9,7 +9,7 @@ export const DEFAULT_REGION = 'TW';
 
 // 共享設定（不含月薪）：月薪按地區放在 salaries 裡，避免同一份值存兩處互相矛盾。
 export const DEFAULTS = Object.freeze({
-  start: '08:30', end: '17:00', lunchOn: false, lunchStart: '12:00', lunchEnd: '13:00',
+  start: '09:00', end: '18:00', lunchOn: false, lunchStart: '12:00', lunchEnd: '13:00',
   weekends: false, payday: null, cheers: Object.freeze(['']), showLunar: true, theme: 'rainbow',
   // 畫面設定：全域性字號作用於狀態卡的訊息顯示；五個開關決定卡片上「可見資訊」的範圍。
   // 預設值與舊版畫面一致（中號、全部都顯示），所以舊存檔缺這些鍵時畫面不會變。

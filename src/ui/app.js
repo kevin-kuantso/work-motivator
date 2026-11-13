@@ -20,6 +20,7 @@ import { TW_HOLIDAYS_STORAGE_KEY } from '../holiday-store-tw.js';
 import { createHolidayPanel } from './holiday-panel.js';
 import { readTicks, isStall } from './pause-model.js';
 import { createTicker } from './tick-scheduler.js';
+import { readSizes } from './window-sizes.js';
 
 const UI_KEY = `${STORAGE_KEY}-ui`; // 介面旗標（首次提示已關閉、備份提示已顯示），與設定分開存放
 const ANNOUNCE_MS = 60000;
@@ -30,21 +31,6 @@ const PAUSE_NOTICE_EVERY_MS = 10 * 60 * 1000;
 const DISPLAY_FIELDS = ['fontScale', 'showCardProgress', 'showCardMetrics', 'showCardDate', 'showCardPayday', 'showCardCheer'];
 
 // 小窗尺寸依字號儲存；切換字號時清除目標檔位的舊手動尺寸，重新採用預設尺寸。
-const UI_SCALES = ['xs', 's', 'm', 'l', 'xl'];
-function readSizes(v) {
-  const out = {};
-  if (!v || typeof v !== 'object') return out;
-  for (const k of UI_SCALES) {
-    const s = v[k];
-    const width = Number(s?.width);
-    const height = Number(s?.height);
-    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
-      out[k] = { width: Math.round(width), height: Math.round(height) };
-    }
-  }
-  return out;
-}
-
 function readUi(storage) {
   try {
     const v = JSON.parse(storage.getItem(UI_KEY) ?? '{}');
@@ -128,6 +114,7 @@ export function mountApp(doc, storage, clock) {
     onOpen: (pipWin) => { pipWin.document.documentElement.dataset.theme = state.cfg.theme; pipWin.document.documentElement.lang = profile.locale; pipWin.document.documentElement.dataset.fontScale = state.cfg.fontScale ?? 'm'; pipWin.document.title = t.appTitle; moveTimer(pipWin); },
     onClose: () => moveTimer(win),
     onFail: () => toast((s) => s.float.failed),
+    onPreviewSize: (size) => syncPreviewSize(size),
     // 小窗尺寸按字號檔位管理：目前檔位、該檔記住的尺寸、使用者拉動後記住
     getScale: () => state.cfg.fontScale ?? 'm',
     getSize: (scale) => ui.winSizes[scale] ?? null,
@@ -168,6 +155,7 @@ export function mountApp(doc, storage, clock) {
     report: reportPanel,
     builtinYears: Object.keys(profile.holidayProvider.tables).filter((y) => profile.holidayProvider.tables[y].source === 'builtin'),
     profile,
+    desktop: win.workMotivatorDesktop,
   });
   const calendar = createCalendar(doc, t, {
     getState: activeState,
@@ -193,6 +181,7 @@ export function mountApp(doc, storage, clock) {
     onChange: (id) => { if (id === 'calendar') calendar.refreshLayout(); else { calendar.hideOverlays(); settings.refreshFade(); } },
   });
   const openSettings = () => tabs.select('settings', { focus: true });
+  win.workMotivatorDesktop?.onOpenSettings?.(openSettings);
 
   const toastText = h(doc, 'span', { class: 'toast-text' });
   const toastUndo = h(doc, 'button', { type: 'button', class: 'toast-action', text: t.calendar.undo });
@@ -410,6 +399,21 @@ export function mountApp(doc, storage, clock) {
     if (pip && (resize || content)) float.syncSize({ fit: content && !resize });
   }
 
+  function syncPreviewSize(size = ui.winSizes[state.cfg.fontScale ?? 'm']) {
+    const slot = doc.getElementById('card-slot');
+    if (!slot) return;
+    for (const axis of ['width', 'height']) {
+      if (Number.isFinite(size?.[axis]) && size[axis] > 0) slot.style.setProperty(`--preview-${axis}`, `${size[axis]}px`);
+      else slot.style.removeProperty(`--preview-${axis}`);
+    }
+  }
+  // Electron 的原生小窗回報實際幾何時，沿用與 Document PiP 相同的左欄預覽尺寸。
+  win.workMotivatorDesktop?.onWidgetBounds?.((size) => syncPreviewSize(size));
+  // Native widgets are allowed to be absent.  Ask the desktop shell to measure
+  // the same small-card layout in that case, rather than waiting until a widget
+  // exists (or retaining a stale height after a relaunch).
+  const refitDesktopPreview = () => win.workMotivatorDesktop?.requestPreviewFit?.(state.cfg.fontScale ?? 'm');
+
   function commit(next, fromSettings) {
     const displayChanged = DISPLAY_FIELDS.some((k) => (state.cfg[k] ?? null) !== (next.cfg[k] ?? null));
     const cardTextChanged = JSON.stringify(state.cfg.cheers) !== JSON.stringify(next.cfg.cheers) || state.cfg.payday !== next.cfg.payday;
@@ -445,6 +449,7 @@ export function mountApp(doc, storage, clock) {
     calendar.render();
     tick();
     if (cardTextChanged && float.pipWindow()) float.syncSize({ fit: true });
+    if (displayChanged || cardTextChanged) refitDesktopPreview();
     return res.ok; // 呼叫者可據此說真話（例如標記沒寫進儲存時不能只說「已標記」）
   }
 
@@ -601,6 +606,7 @@ export function mountApp(doc, storage, clock) {
     const cfg = activeCfg();
     const snap = { ...snapshot(now, cfg, activeMarks(), tables), now };
     const m = renderCard(cardRoot, snap, cfg, t);
+    float.syncPreview();
     lastSnap = snap;
     if (refDirty) syncRef();
     const day = ymd(now);
@@ -662,6 +668,7 @@ export function mountApp(doc, storage, clock) {
     calendar.render();
     tick();
     if (cardTextChanged && float.pipWindow()) float.syncSize({ fit: true });
+    if (displayChanged || cardTextChanged) refitDesktopPreview();
   }
   win.addEventListener('storage', (e) => {
     if (e.storageArea && e.storageArea !== storage) return;

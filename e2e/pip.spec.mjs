@@ -81,7 +81,7 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     await floatBtn(page).click();
     await pip(page).locator('#status-card').waitFor();
     const [size] = await page.evaluate(() => window.__pip.calls);
-    assert.equal(size.width, 340);
+    assert.equal(size.width, 352);
     assert.ok(size.height >= 280);
     assert.equal(await page.locator('#status-card').count(), 0, 'card left the main document');
 
@@ -110,11 +110,18 @@ test('float moves the card into the PiP document (sm) and the X / pagehide bring
     assert.equal(await txt(page.locator('.card-col #float-keep')), '请保持本页开启：关闭本页，小窗也会一起关闭');
     assert.equal(await page.locator('#float-keep').isVisible(), true);
     assert.equal(await floatBtn(page).getAttribute('aria-describedby'), 'float-keep');
-    assert.ok(!(await page.locator('#card-slot').innerText()).includes('194'), 'placeholder shows no amount');
+  assert.ok(!(await placeholder(page).innerText()).includes('194'), 'placeholder shows no amount');
+    const preview = page.locator('#card-slot > .pip-preview');
+    assert.equal(await preview.count(), 1, 'a visual-only preview remains in the left column');
+    assert.equal(await preview.getAttribute('aria-hidden'), 'true');
+    assert.equal(await preview.locator('button, [tabindex]').count(), 0, 'the preview cannot receive focus');
+    assert.equal(await txt(preview.locator('.card-amount')), '¥ 194.2857');
+    assert.equal(await preview.evaluate((el) => Math.round(el.getBoundingClientRect().width)), size.width);
 
     // 使用者按 PiP 的 X：瀏覽器觸發 pagehide
     await page.evaluate(() => window.documentPictureInPicture.window.close());
     assert.equal(await page.locator('#card-slot #status-card').count(), 1, 'card back in the main page');
+    assert.equal(await page.locator('#card-slot > .pip-preview').count(), 0, 'preview is removed with PiP');
     assert.equal(await page.locator('#status-card').getAttribute('data-size'), 'lg');
     assert.equal(await placeholder(page).isVisible(), false);
     assert.equal(await txt(floatBtn(page)), '悬浮成小窗');
@@ -128,6 +135,7 @@ test('placeholder click, the float button and gear all close the PiP; gear opens
   withPage(T1412, async (page) => {
     await floatBtn(page).click();
     await pip(page).locator('#status-card').waitFor();
+    await page.locator('iframe.pip-stub').evaluate((el) => { el.style.visibility = 'hidden'; });
     await placeholder(page).click();
     assert.equal(await page.locator('#card-slot #status-card').count(), 1);
     assert.equal(await page.evaluate(() => window.documentPictureInPicture.window), null, 'PiP closed');
@@ -135,6 +143,7 @@ test('placeholder click, the float button and gear all close the PiP; gear opens
 
     await floatBtn(page).click();
     await pip(page).locator('#status-card').waitFor();
+    await page.locator('iframe.pip-stub').evaluate((el) => { el.style.visibility = 'hidden'; });
     await floatBtn(page).click(); // 「收回小窗」
     assert.equal(await page.locator('#card-slot #status-card').count(), 1);
 
@@ -283,7 +292,7 @@ async function floatFits(page) {
   await floatBtn(page).click();
   await pip(page).locator('#status-card').waitFor();
   const [req] = await page.evaluate(() => window.__pip.calls);
-  assert.equal(req.width, 340, 'width fixed');
+  assert.equal(req.width, 352, 'm-scale default width');
   // about:blank 文件是 quirks 模式：捲動元素是 body，不是 html，故用 scrollingElement
   const m = await pip(page).locator('html').evaluate((el) => {
     const se = el.ownerDocument.scrollingElement;

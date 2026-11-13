@@ -17,8 +17,8 @@ const VOID_NUMBERS = ['312.64', '44.66', '187.5862', '500.23', '6,565.52', '5,62
 const CN_SEED = { version: 2, salary: 6800, start: '08:30', end: '17:00', lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00', weekends: false, payday: null, cheer: '', showLunar: true };
 const SEED_CN = `if (!localStorage.getItem('work-motivator-v1')) localStorage.setItem('work-motivator-v1', ${JSON.stringify(JSON.stringify(CN_SEED))});`;
 
-// H1：首次提示的數字來自真實預設設定（臺灣預設：月薪 40000、08:30–17:00）
-const FRESH_HINT = '目前按預設月薪 NT$40,000、08:30–17:00 計算，請改成你自己的';
+// H1：首次提示的數字來自真實預設設定（臺灣預設：月薪 40000、09:00–18:00）
+const FRESH_HINT = '目前按預設月薪 NT$40,000、09:00–18:00 計算，請改成你自己的';
 
 let server;
 let browser;

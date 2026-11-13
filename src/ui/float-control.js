@@ -1,14 +1,14 @@
 // 左欄狀態卡下方的「懸浮成小窗」按鈕（R38）、按鈕下的說明（不支援的原因 / 懸浮時「請保持本頁開啟」）、
 // 主分頁佔位卡，以及開 / 關小窗的狀態同步。
-// 小窗尺寸：寬度按字號檔位，高度按內容（含時薪、今日滿勤這些按內容出現的指標）；手動拉過的尺寸留給同檔重開時使用。
-// 切換字號時清除目標檔位的舊尺寸，重設為該檔預設；內容高度仍受 PIP_MAX_HEIGHT 限制。
+// 小窗尺寸：寬度按字號檔位（手動拉過的寬度留給同檔重開）；一般更新保留手動高度，
+// 只有內容區塊變動才回到自然高度。切換字號時清除目標檔位的舊尺寸，重設為該檔預設。
 // resizeTo 需要手勢，瀏覽器可能靜默拒絕：設完尺寸等一拍讀回實際大小，確實放不下就如實說明（#float-size-note），
 // 讓使用者自己拉，而不是假裝已經調好了。
-import { isPipSupported, openFloat, measureSmallCard, pipWidth, pipHeight, pipFitsContent, PIP_MAX_HEIGHT } from '../pip.js';
+import { isPipSupported, openFloat, measureSmallCard, pipWidth, pipMinWidth, pipHeight, pipFitsContent, PIP_MAX_HEIGHT } from '../pip.js';
 import { h, setText, show } from './dom.js';
 import { icon } from './icons.js';
 
-export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, onFail, getScale, getSize, rememberSize }) {
+export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, onFail, onPreviewSize, getScale, getSize, rememberSize }) {
   const win = doc.defaultView;
   let t = initialT;
   let f = t.float;
@@ -18,6 +18,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
   let floating = false;
   let placeholderTitle = null;
   let placeholderNote = null;
+  let preview = null;
   const scale = () => getScale?.() ?? 'm';
   const saved = (s) => getSize?.(s) ?? null;
 
@@ -111,6 +112,30 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     if (!pipWin) return;
     placeholder.style.minHeight = `${liveCardHeight()}px`;
   }
+
+  function syncPreview() {
+    if (!pipWin) return;
+    const next = cardRoot.cloneNode(true);
+    next.classList.add('pip-preview');
+    next.removeAttribute('id');
+    next.setAttribute('aria-hidden', 'true');
+    for (const el of next.querySelectorAll('[id], button, a, input, select, textarea, [tabindex], [role="status"], [aria-live]')) {
+      if (el.matches('button, a, input, select, textarea, [tabindex]')) el.remove();
+      else {
+        el.removeAttribute('id');
+        el.removeAttribute('role');
+        el.removeAttribute('aria-live');
+      }
+    }
+    const width = Math.round(pipWin.innerWidth);
+    const height = Math.round(pipWin.innerHeight);
+    if (Number.isFinite(width) && width > 0) next.style.width = `${width}px`;
+    if (Number.isFinite(height) && height > 0) next.style.height = `${height}px`;
+    preview?.replaceWith(next);
+    if (!preview) placeholder.before(next);
+    preview = next;
+    onPreviewSize?.({ width, height });
+  }
   win.addEventListener('resize', syncPlaceholder);
   // 只在相同寬度下的自然內容高度變化時適配，手動拖曳不視為內容變化。
   let cardObserver = null;
@@ -142,11 +167,16 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     const keep = saved(s);
     const width = fit && Number.isFinite(pipWin?.innerWidth) && pipWin.innerWidth > 0
       ? Math.round(pipWin.innerWidth)
-      : Math.max(pipWidth(s), Number.isFinite(keep?.width) ? keep.width : 0);
+      : Math.max(pipMinWidth(s), Number.isFinite(keep?.width) ? keep.width : pipWidth(s));
     const natural = measureSmallCard(cardRoot, width);
     const content = pipHeight(natural);
     if (fit) measured = { width, height: Math.ceil(natural) };
-    const height = !fit && keep && keep.height > content ? Math.min(PIP_MAX_HEIGHT, pipHeight(keep.height)) : content;
+    // 一般 render / tick 尊重使用者手動高度；只有確實改變內容區塊（fit）時才回到自然高度。
+    // 舊紀錄在 readSizes 已視為 manual:true，避免升級後把使用者的手動視窗壓回內容高度。
+    const rememberedHeight = Number(keep?.height);
+    const height = !fit && keep?.manual && Number.isFinite(rememberedHeight) && rememberedHeight > 0
+      ? Math.round(rememberedHeight)
+      : content;
     return { width, height };
   }
 
@@ -167,6 +197,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     pipWin = w;
     placeholder.style.minHeight = `${placeholderHeight}px`;
     show(placeholder, true);
+    syncPreview();
     setFloating(true);
     watchCard(w);
     watchSize(w);
@@ -185,7 +216,8 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
       // 拖動視窗會連續派發 resize：停下來 250 ms 再寫一次，別把每次移動都變成一次儲存寫入
       clearTimeout(rememberTimer);
       rememberTimer = win.setTimeout(() => {
-        rememberSize?.(scale(), { width: Math.round(w.innerWidth), height: Math.round(w.innerHeight) });
+        rememberSize?.(scale(), { width: Math.round(w.innerWidth), height: Math.round(w.innerHeight), manual: true });
+        syncPreview();
         refreshSizeNote(); // 使用者自己把視窗拉大了：放得下就把黃色提示收掉
       }, 250);
     });
@@ -208,6 +240,7 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     const w = pipWin;
     const { width, height } = targetSize(fit);
     placeholder.style.minHeight = `${liveCardHeight()}px`;
+    syncPreview();
     cancelSizeCheck();
     programmatic = true;
     try {
@@ -227,8 +260,9 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
       sizeTimer = null;
       if (pipWin !== w) return; // 期間已經收回 / 重開
       if (fit && pipFitsContent(w) === true && Math.abs(w.innerHeight - height) <= 2) {
-        rememberSize?.(scale(), { width: Math.round(w.innerWidth), height: Math.round(w.innerHeight) });
+        rememberSize?.(scale(), { width: Math.round(w.innerWidth), height: Math.round(w.innerHeight), manual: false });
       }
+      syncPreview();
       confirmSizeNote(w);
     }, 200);
   }
@@ -246,6 +280,8 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     cancelSizeCheck();
     programmatic = false;
     pipWin = null;
+    preview?.remove();
+    preview = null;
     show(placeholder, false);
     setFloating(false);
     if (refocus) button.focus();
@@ -269,5 +305,5 @@ export function createFloatControl(doc, initialT, { cardRoot, onOpen, onClose, o
     setText(placeholderNote, f.placeholderNote);
   }
 
-  return { el, button, placeholder, close, setProfile, syncSize, pipWindow: () => pipWin };
+  return { el, button, placeholder, close, setProfile, syncPreview, syncSize, pipWindow: () => pipWin };
 }

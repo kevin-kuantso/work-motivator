@@ -44,6 +44,8 @@ test('version 4 契约：键名不变、地区列表、共享设置不含月薪'
     assert.equal(DEFAULTS[f], true, `${f} defaults to visible`);
   }
   // 預設午休關閉（不預先把某個休息時段當成所有人的作息），但保留 12:00–13:00 的預填值。
+  assert.equal(DEFAULTS.start, '09:00');
+  assert.equal(DEFAULTS.end, '18:00');
   assert.equal(DEFAULTS.lunchOn, false);
   assert.equal(DEFAULTS.lunchStart, '12:00');
   assert.equal(DEFAULTS.lunchEnd, '13:00');
@@ -120,7 +122,7 @@ test('旧 v1 / 无版本储存同样载入为 CN', () => {
     const r = loadState(fakeStorage({ [KEY]: raw }));
     assert.equal(r.state.region, 'CN', raw);
     assert.equal(r.state.salaries.CN, 9000);
-    assert.equal(r.state.cfg.start, '08:30');
+    assert.equal(r.state.cfg.start, '09:00');
     assert.equal(r.corrupt, false);
   }
 });
@@ -157,7 +159,7 @@ test('load: 无法识别的未来版本整份拒绝（保守回退，不当旧�
     assert.equal(r.corrupt, true, raw);
     assert.equal(r.state.region, 'CN');
     assert.equal(r.state.salaries.CN, 5000, raw);
-    assert.equal(r.state.cfg.start, '08:30');
+    assert.equal(r.state.cfg.start, '09:00');
     assert.equal(st._m.get(KEY), raw);
     assert.deepEqual(st._writes, []);
   }
@@ -511,8 +513,8 @@ test('import (R7): 时间合起来不成立时一并丢弃，用旧午休 fixtur
     cfg: { ...DEFAULTS, lunchOn: true, lunchStart: '11:30', lunchEnd: '13:00' },
   });
   const r = importState('{"start":"18:00","end":"19:00"}', current); // 舊午休 11:30–13:00 落在這段時間之外
-  assert.equal(r.state.cfg.start, '08:30');
-  assert.equal(r.state.cfg.end, '17:00');
+  assert.equal(r.state.cfg.start, '09:00');
+  assert.equal(r.state.cfg.end, '18:00');
   assert.deepEqual(r.dropped.map((d) => d.field).sort(), ['end', 'start']);
   assert.ok(r.dropped.every((d) => typeof d.reason.code === 'string' && d.reason.code.length > 0));
   assert.deepEqual(r.applied, []);

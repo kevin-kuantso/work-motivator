@@ -27,7 +27,7 @@
   --font-sans:'Microsoft YaHei UI','Microsoft YaHei','PingFang SC','Noto Sans SC',system-ui,sans-serif;
   /* 會跳動的數字：只用系統字型；拉丁 / 數字取 Segoe UI（Windows）或系統 UI 字型（Mac），中文落到雅黑 / 蘋方 */
   --font-num:"Segoe UI",system-ui,"Microsoft YaHei UI","PingFang SC",sans-serif;
-  /* 五檔字號共用一個比例；主金額和月曆提示也跟隨。 */
+  /* 頁面文字固定為標準大小；字級設定只會改寫狀態卡內的 --fs-scale。 */
   --fs-scale:1;
   --fs-hero-lg:calc(56px * var(--fs-scale)); --fs-hero-sm:calc(40px * var(--fs-scale));
   --fs-metric-lg:calc(20px * var(--fs-scale)); --fs-metric-sm:calc(16px * var(--fs-scale));
@@ -42,12 +42,12 @@
   /* 觸屏最小可點高度：只在窄於 1000px 時套到按鈕 / 分頁標籤 / 摺疊行上（見檔案末尾的觸屏一節） */
   --tap-min:44px;
 }
-/* M 保持原有大小；相鄰檔位相差 10 個百分點。 */
-:root[data-font-scale="xs"] { --fs-scale:.8; }
-:root[data-font-scale="s"] { --fs-scale:.9; }
-:root[data-font-scale="m"] { --fs-scale:1; }
-:root[data-font-scale="l"] { --fs-scale:1.1; }
-:root[data-font-scale="xl"] { --fs-scale:1.2; }
+/* M 保持原有大小；相鄰檔位相差 10 個百分點。卡片另行取得這個比例，右側月曆與設定不縮放。 */
+:root[data-font-scale="xs"] { --card-fs-scale:.8; }
+:root[data-font-scale="s"] { --card-fs-scale:.9; }
+:root[data-font-scale="m"] { --card-fs-scale:1; }
+:root[data-font-scale="l"] { --card-fs-scale:1.1; }
+:root[data-font-scale="xl"] { --card-fs-scale:1.2; }
 :root:lang(zh-TW) {
   --font-sans:'Microsoft JhengHei UI','Microsoft JhengHei','PingFang TC','Noto Sans TC',system-ui,sans-serif;
   --font-num:"Segoe UI",system-ui,"Microsoft JhengHei UI","PingFang TC",sans-serif;
@@ -297,8 +297,18 @@ button, input, select { font: inherit; color: inherit; }
 .tabpanel-settings { container-type: inline-size; position: relative; }
 
 /* StatusCard */
-.card-slot { container-type: inline-size; position: relative; }
+.card-slot { container-type: inline-size; position: relative; overflow: auto; }
+.pip-preview {
+  box-sizing: border-box; overflow: auto; flex: none; margin-bottom: var(--space-2);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
+}
 .status-card {
+  --fs-scale:var(--card-fs-scale, 1);
+  /* 衍生 token 必須在卡片自身重新計算；在 :root 計算後繼承會把當時的 1 固化。 */
+  --fs-hero-lg:calc(56px * var(--fs-scale)); --fs-hero-sm:calc(40px * var(--fs-scale));
+  --fs-metric-lg:calc(20px * var(--fs-scale)); --fs-metric-sm:calc(16px * var(--fs-scale));
+  --fs-title:calc(16px * var(--fs-scale)); --fs-body:calc(14px * var(--fs-scale));
+  --fs-label:calc(12px * var(--fs-scale)); --fs-caption:calc(12px * var(--fs-scale));
   --tone-bg: var(--state-working-bg); --tone-fg: var(--state-working-fg);
   position: relative; overflow: hidden; background: var(--color-card);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: var(--space-5);

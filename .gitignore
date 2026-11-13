@@ -1,3 +1,5 @@
 node_modules/
 dist/
+electron/app/
+electron/release/
 .DS_Store

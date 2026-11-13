@@ -1,0 +1,23 @@
+{
+  "name": "work-motivator-desktop",
+  "private": true,
+  "version": "1.3.0",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "build:app": "node build-app.mjs",
+    "start": "npm run build:app && electron .",
+    "package:mac": "npm run build:app && electron-builder --mac dmg zip --arm64",
+    "package:win": "npm run build:app && electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.kevin.workmotivator",
+    "productName": "Work Motivator",
+    "files": ["app/**", "desktop/**", "package.json"],
+    "mac": { "target": ["dmg"], "icon": "assets/icon.icns" },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "assets/icon.ico" }
+  }
+}

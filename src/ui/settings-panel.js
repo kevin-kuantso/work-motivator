@@ -39,7 +39,7 @@ export function fieldReasonText(field, reason, dict, settings) {
 // 本文件只保留不含統計數值與網址的兜底文案。
 export function createSettingsPanel(doc, t, {
   getCfg, getRegion = null, onRegionChange = null, onChange, onExport, onImport,
-  report = null, holiday = null, builtinYears = [], profile = null,
+  report = null, holiday = null, builtinYears = [], profile = null, desktop = null,
 }) {
   // s = 當前生效的 settings 文案。構造時用傳入字典，setProfile 後與 profile.strings.settings 逐鍵合併：
   // 合併而非整體替換，profile 字典缺鍵時仍退回構造時的字典，不讓一句文案缺失打斷切換。
@@ -508,6 +508,32 @@ export function createSettingsPanel(doc, t, {
     id: 'f-fontScale', name: 'fontScale', class: 'sel', 'aria-describedby': 'hint-fontScale err-fontScale',
   }, fontScaleOptEls);
 
+  // 系統登入項不屬於 cfg：只有 Electron bridge 存在時才建立，永遠不會進備份或一般自動儲存。
+  let loginItemRow = null;
+  if (desktop?.loginItem) {
+    const loginState = h(doc, 'span', { class: 'switch-state', 'aria-hidden': 'true' });
+    const loginInput = h(doc, 'input', { type: 'checkbox', role: 'switch', id: 'f-login-item', class: 'switch', 'aria-describedby': 'hint-login-item err-login-item' });
+    const loginHint = hint('hint-login-item', () => s.other.loginItemHint);
+    const loginError = h(doc, 'p', { class: 'field-error row-msg', id: 'err-login-item', role: 'alert' });
+    let knownLoginEnabled = false;
+    const syncLogin = (result = {}) => {
+      knownLoginEnabled = Boolean(result.enabled);
+      loginInput.checked = knownLoginEnabled;
+      loginInput.disabled = false;
+      setText(loginState, loginInput.checked ? s.on : s.off);
+      setText(loginError, result.error ? s.other.loginItemError : '');
+      loginInput.toggleAttribute('aria-invalid', Boolean(result.error));
+    };
+    loginInput.addEventListener('change', async () => {
+      loginInput.disabled = true;
+      try { syncLogin(await desktop.loginItem.set(loginInput.checked)); }
+      catch { syncLogin({ enabled: knownLoginEnabled, error: 'login-item-change-failed' }); }
+    });
+    desktop.loginItem.get().then(syncLogin).catch(() => syncLogin({ enabled: false, error: 'login-item-read-failed' }));
+    desktop.loginItem.onChange?.(syncLogin);
+    loginItemRow = row(label('login-item', () => s.other.loginItem), [loginInput, loginState], loginHint, loginError);
+  }
+
   const displayCard = card('display', 'pip', () => s.sections.display, () => s.display.desc,
     row(label('theme', () => s.theme), inputs.theme, fieldError('theme')),
     cheerRowEl,
@@ -521,6 +547,10 @@ export function createSettingsPanel(doc, t, {
     switchRow('showCardPayday', () => s.display.payday, () => s.display.paydayHint),
     switchRow('showCardCheer', () => s.display.cheer, () => s.display.cheerHint),
     boundText('p', { class: 'para display-status-note' }, () => s.display.statusNote));
+
+  const otherCard = loginItemRow
+    ? card('other', 'gear', () => s.sections.other, () => s.other.desc, loginItemRow)
+    : null;
 
   const grid = h(doc, 'div', { class: 'set-grid settings-cols' },
     h(doc, 'div', { class: 'set-col settings-col' },
@@ -556,6 +586,7 @@ export function createSettingsPanel(doc, t, {
           boundText('button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-export', onclick: onExport }, () => s.backup.export),
           boundText('button', { type: 'button', class: 'btn btn-secondary btn-s', id: 'btn-import', onclick: onImport }, () => s.backup.import),
           h(doc, 'span', { class: 'warn-note backup-note' }, icon(doc, 'lock'), bindText(h(doc, 'span'), () => s.backup.note)))),
+      otherCard,
       advCard));
 
   // 分割槽導航：顯示與否完全交給 CSS（.settings-nav 桌面 display:none，窄屏才出現），所以這裡不加 hidden、
@@ -573,7 +604,7 @@ export function createSettingsPanel(doc, t, {
   const navLinkText = (section) => () => s.sections[section === 'adv' ? 'advanced' : section];
   // 導航順序與單欄卡片順序一致。
   const nav = bindAttr(h(doc, 'nav', { class: 'settings-nav' },
-    ['pay', 'display', 'holiday', 'backup', 'adv'].map((section) =>
+    ['pay', 'display', 'holiday', 'backup', ...(otherCard ? ['other'] : []), 'adv'].map((section) =>
       h(doc, 'a', {
         class: 'settings-nav-link', href: `#scard-${section}`,
         onclick: (e) => { e.preventDefault(); jumpTo(section); },

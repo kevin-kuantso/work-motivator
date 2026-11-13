@@ -96,7 +96,7 @@ test('first tick and normal-pace ticks show nothing; one 60 s jump shows exactly
     await page.clock.fastForward(60000);
     assert.equal(await notices(page), 2, 'again after 10 minutes');
     // 橫幅不受影響（首次提示仍在）
-    assert.equal(await page.getByText('目前按預設月薪 NT$40,000、08:30–17:00 計算，請改成你自己的').isVisible(), true, 'banners untouched');
+    assert.equal(await page.getByText('目前按預設月薪 NT$40,000、09:00–18:00 計算，請改成你自己的').isVisible(), true, 'banners untouched');
   }, { seed: false })); // 例外：首次提示只在新使用者（localStorage 沒有設定）時出現，與「寫入舊版中國設定」互斥
 
 test('the notice never replaces the calendar undo toast: it waits until the undo toast is gone', () =>

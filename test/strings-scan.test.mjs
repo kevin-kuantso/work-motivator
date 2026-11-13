@@ -57,7 +57,7 @@ test('Taiwan dictionary implements the mainland dictionary contract and uses Tai
 test('the approved Task 14 copy is present verbatim', () => {
   const s = STRINGS.settings;
   assert.equal(s.backupDesc, '设置只保存在这个浏览器里，不会上传。');
-  assert.equal(s.paydayHint, '设置后，状态卡会显示「距离发薪日 N 天」');
+  assert.equal(s.paydayHint, '设置后可显示发薪倒数；当月没有该日期时按月底计算。');
   assert.equal(s.cheerHint, '会显示在左侧状态卡上');
   assert.equal(s.advancedSub, '一般不用改');
   assert.equal(STRINGS.float.keepOpen, '请保持本页开启：关闭本页，小窗也会一起关闭');

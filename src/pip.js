@@ -3,17 +3,23 @@
 // 計時與介面狀態由呼叫方處理。
 // 寬度按全域性字號檔位給（字大一點窗就寬一點，卡片內容不會先被擠扁）；高度隨內容（spec §4.2）。
 // resizeTo 需要使用者手勢，所以開窗前就要算好尺寸。
-export const PIP_WIDTH = 340; // = m 檔，既有行為不變
+export const PIP_WIDTH = 352; // = m 檔
 export const PIP_MIN_HEIGHT = 200;
 // 小窗裡最多四行指標 + 鼓勵語 + 發薪日 + 缺表說明；xl 檔（字號 1.2 倍）比 m 檔高約兩成，
 // 520 會把這幾種內容疊在一起時的下半截裁掉，所以放寬到 640。
 export const PIP_MAX_HEIGHT = 640;
 // 檔位 → 視窗寬度：每個數字格都以 em 計，寬度跟著字號線性放大一點就夠（xl 比 m 寬 32px）
-export const PIP_WIDTHS = Object.freeze({ xs: 320, s: 330, m: PIP_WIDTH, l: 356, xl: 372 });
+export const PIP_WIDTHS = Object.freeze({ xs: 328, s: 344, m: PIP_WIDTH, l: 368, xl: 384 });
+// 瀏覽器允許縮窄時，仍保留金額與主要指標的最小可讀寬度。
+export const PIP_MIN_WIDTHS = Object.freeze({ xs: 312, s: 328, m: 328, l: 344, xl: 344 });
 
 // 未知 / 預設檔位一律走 m：舊備份沒有 fontScale 時視窗尺寸與以前一致
 export function pipWidth(fontScale) {
   return PIP_WIDTHS[fontScale] ?? PIP_WIDTH;
+}
+
+export function pipMinWidth(fontScale) {
+  return PIP_MIN_WIDTHS[fontScale] ?? PIP_MIN_WIDTHS.m;
 }
 
 export function pipHeight(measured) {
@@ -31,17 +37,21 @@ export function pipHeight(measured) {
 // 用 try/finally 還原：萬一期間有異常，卡片也不會卡在測量用的臨時樣式裡。
 export function measureSmallCard(cardRoot, width = PIP_WIDTH) {
   const { size } = cardRoot.dataset;
-  const prev = { width: cardRoot.style.width, minHeight: cardRoot.style.minHeight, alignSelf: cardRoot.style.alignSelf };
+  const prev = { width: cardRoot.style.width, height: cardRoot.style.height, minHeight: cardRoot.style.minHeight, alignSelf: cardRoot.style.alignSelf };
   try {
     cardRoot.dataset.size = 'sm';
     cardRoot.style.alignSelf = 'start';
     cardRoot.style.width = `${width}px`;
+    cardRoot.style.height = 'auto';
     cardRoot.style.minHeight = '0';
-    return cardRoot.getBoundingClientRect().height;
+    const rect = cardRoot.getBoundingClientRect().height;
+    const scroll = cardRoot.scrollHeight;
+    return Number.isFinite(scroll) ? Math.max(rect, scroll) : rect;
   } finally {
     if (size === undefined) delete cardRoot.dataset.size;
     else cardRoot.dataset.size = size;
     cardRoot.style.width = prev.width;
+    cardRoot.style.height = prev.height;
     cardRoot.style.minHeight = prev.minHeight;
     cardRoot.style.alignSelf = prev.alignSelf;
   }
@@ -53,10 +63,10 @@ export function pipFitsContent(win) {
   const doc = win?.document;
   const se = doc?.scrollingElement ?? doc?.documentElement;
   if (!se) return null;
-  const scroll = se.scrollHeight;
-  const client = se.clientHeight;
-  if (!Number.isFinite(scroll) || !Number.isFinite(client) || client <= 0) return null;
-  return scroll <= client + 1;
+  const { scrollHeight, clientHeight, scrollWidth, clientWidth } = se;
+  if (!Number.isFinite(scrollHeight) || !Number.isFinite(clientHeight) || clientHeight <= 0
+    || !Number.isFinite(scrollWidth) || !Number.isFinite(clientWidth) || clientWidth <= 0) return null;
+  return scrollHeight <= clientHeight + 1 && scrollWidth <= clientWidth + 1;
 }
 
 // 功能偵測（不比對 UA）。API 只在安全上下文暴露，非安全上下文下這裡自然為 false。

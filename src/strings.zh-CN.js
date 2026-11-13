@@ -259,7 +259,7 @@ export const STRINGS = {
     // 分割槽導航（窄面板 / 手機單欄才顯示）：名字與卡片標題一致，跳到已有的卡片
     navLabel: '跳到设置分区',
     sections: {
-      pay: '工资与上班时间', holiday: '假期数据', backup: '数据与备份', advanced: '高级设置',
+      pay: '工资与上班时间', holiday: '假期数据', backup: '数据与备份', other: '其他设置', advanced: '高级设置',
       display: '画面设置',
     },
     payDesc: '用来计算每天、每秒赚多少，修改后自动保存',
@@ -303,7 +303,7 @@ export const STRINGS = {
     weekendsHint: '打开后，周六、周日也算工作日；个别调休上班日请在月历上标记',
     payday: '发薪日',
     paydayNone: '未设置',
-    paydayHint: '设置后，状态卡会显示「距离发薪日 N 天」',
+    paydayHint: '设置后可显示发薪倒数；当月没有该日期时按月底计算。',
     paydayOption: (d) => `每月 ${d} 号`,
     // ---- 畫面設定：只管狀態卡顯示什麼，不改變任何計算 ----
     // 匯入報告按欄位名查標籤（import-model 的 t.settings[field]）：這些鍵在 settings 頂層也放一份，
@@ -330,6 +330,12 @@ export const STRINGS = {
       cheer: '鼓励内容',
       cheerHint: '那句鼓励语仍保存在设置里。',
       statusNote: '「上班中」「午休」「已下班」这些状态标签不受开关影响，始终显示。',
+    },
+    other: {
+      desc: '桌面版与系统整合设置，不影响工时、薪资或月历计算。',
+      loginItem: '开机自动启动并打开小窗',
+      loginItemHint: '仅限桌面版；系统停用或要求批准时，请在系统设置中处理。此项不会导出到备份。',
+      loginItemError: '无法更新开机启动设置，已恢复为系统当前状态。',
     },
     backup: {
       export: '导出备份',
