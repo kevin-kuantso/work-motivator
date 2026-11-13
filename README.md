@@ -29,7 +29,7 @@
 
 ## 快速開始
 
-**使用線上版**：直接開啟上方網址即可。
+**使用線上版**：直接開啟[線上版網頁](https://kevin-kuantso.github.io/work-motivator)即可。
 
 **離線使用**：
 
